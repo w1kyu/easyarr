@@ -22,6 +22,22 @@ cd dashboard/server && pnpm build
 EASYARR_DATA_ROOT=/tmp/ea/data EASYARR_APPDATA_DIR=/tmp/ea/appdata node dist/index.js init
 ```
 
+The setup wizard lives at `/setup/<step>`. To start it over, stop the server and delete
+`dev/data/dashboard-state/`. Help pages are the Markdown files in `docs/` (top level only); a
+"What's this?" link opens them in a dialog, and `/help/<name>` shows them as a page.
+
+### Wizard e2e tests (Playwright)
+
+```sh
+pnpm exec playwright install chromium   # once
+pnpm build && pnpm test:e2e             # starts a dashboard with fresh, temporary state
+E2E_BASE_URL=http://localhost:39000 pnpm test:e2e   # against the stack (dev/stack.sh up)
+```
+
+The tests walk through the wizard like one user would, so they need a fresh install
+(`dev/stack.sh reset` before running them against the stack again). CI runs them on every push and,
+for changes under `umbrel/`, `dev/` or `e2e/`, also against the full stack.
+
 UI code copied from umbrelOS lives in `dashboard/web/src/vendor/umbrel/` and is imported as `@/…`.
 Our own code is imported as `~/…`. If you vendor another file, add it to `PROVENANCE.md`.
 `pnpm lint` fails otherwise (SPEC §14.1).
@@ -55,7 +71,8 @@ The *arr apps, qBittorrent and SABnzbd aren't published. They'll be reachable th
 dashboard proxy (`/apps/<service>/`) from phase 05 onwards.
 
 CI (`.github/workflows/umbrel-app.yml`) runs Umbrel's official app linter, plus
-`up → wait → leaktest` on both amd64 and arm64 for every change under `umbrel/` or `dev/`.
+`up → wait → leaktest → wizard e2e` on both amd64 and arm64 for every change under `umbrel/`,
+`dev/` or `e2e/`.
 
 ## 4. Test on a real Umbrel
 

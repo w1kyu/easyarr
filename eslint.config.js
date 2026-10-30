@@ -14,6 +14,8 @@ export default tseslint.config(
       // Third-party code under PolyForm Noncommercial, kept as close to upstream as possible (SPEC §14.1).
       'dashboard/web/src/vendor/**',
       'dev/data/**',
+      'e2e/test-results/**',
+      'e2e/playwright-report/**',
     ],
   },
   js.configs.recommended,

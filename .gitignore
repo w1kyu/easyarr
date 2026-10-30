@@ -13,3 +13,6 @@ coverage/
 !.vscode/extensions.json
 # local dev data
 dev/data/
+# Playwright output
+e2e/test-results/
+e2e/playwright-report/

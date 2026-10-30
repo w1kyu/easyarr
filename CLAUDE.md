@@ -72,7 +72,7 @@ pnpm lint           # eslint + prettier --check + vendored-code license check
 pnpm format         # prettier --write
 pnpm typecheck
 pnpm test           # unit tests (vitest, all dashboard/* packages)
-pnpm test:e2e       # integration tests (docker) — placeholder until phase 05
+pnpm test:e2e       # Playwright wizard e2e (after pnpm build; E2E_BASE_URL=… for the stack)
 pnpm build
 dev/stack.sh up|wait|leaktest|down   # full Umbrel stack locally (Docker), see docs/dev/development.md
 ```
