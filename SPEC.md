@@ -294,8 +294,8 @@ used by official Umbrel apps).
   ApiKey, Port), qBittorrent.conf (WebUI port 8090, sub-path settings, subnet whitelist, save paths),
   sabnzbd.ini (url_base, port), Bazarr config, Recyclarr/Unpackerr/Cleanuparr configs pointing at
   `localhost` ports.
-- API keys: generated once, stored in `secrets.json`, so EasyArr knows every key before services start.
-  (Alternative if seeding proves fragile: read keys from generated configs. Decide in Phase 1, log it.)
+- API keys: generated once (or adopted from an existing config), stored in `secrets.json`, so EasyArr
+  knows every key before services start (D-031).
 - Never overwrite an existing value the user may have changed, except keys EasyArr owns and documents
   (UrlBase, ports) — and only if they would break the stack.
 
@@ -509,7 +509,7 @@ EasyArr's own code is MIT so it can be combined with it (GPL-3.0 could not — s
 - **Before an official Umbrel store submission** (v2): ask Umbrel (help@getumbrel.com) to confirm the
   vendored code is fine, or replace it.
 - Responsive (phone → desktop), keyboard accessible, WCAG AA contrast, reduced-motion support.
-- Design tokens in `web/src/styles/tokens.css`; a `/dev/ui` page lists all components (dev builds only).
+- Design tokens in `web/src/styles/tokens.css` (umbrelOS material tokens come from `vendor/umbrel/index.css`); a `/dev/ui` page lists all components (dev builds only).
 
 ---
 

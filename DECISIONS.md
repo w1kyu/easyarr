@@ -135,3 +135,47 @@ Every image is pinned as `tag@sha256:<multi-arch index digest>`. All images were
 ### D-030 — Dev stack + CI run the real Umbrel compose (2026-10-30)
 **Decision:** `dev/docker-compose.dev.yml` is an *override* on top of the Umbrel compose, not a copy. It adds the `umbrel_main_network` network, the Umbrel container names, a disabled `app_proxy` and the dashboard published on 39000. `dev/stack.sh` sets Umbrel-like env vars and runs `up | wait | leaktest | down`. CI (`umbrel-app.yml`) runs Umbrel's official linter plus the stack + leak test on amd64 **and** arm64 runners.
 **Why:** One source of truth for the stack. It also gives a real Docker test of the kill switch even though the agent sandbox has no Docker (D-022). This still doesn't replace testing on a real Umbrel.
+
+### D-031 — init seeds configs; API keys: seed + adopt (2026-10-30)
+**Decision:** `init` (dashboard image, `node dist/index.js init`, run as root) creates the `/data` tree and writes EasyArr's `state.json` and `secrets.json` (both chmod 600). It also prepares the service configs:
+- **Servarr** (`config.xml`):
+  - **ApiKey:** if the config already has a valid key, EasyArr adopts it; otherwise it uses the key in `secrets.json` or generates one.
+  - **Owned keys, always re-applied:** `Port`, `UrlBase=/apps/<id>`, `BindAddress=*`.
+  - **Only on first creation:** `AuthenticationMethod=External` (Umbrel login protects the proxy) and `UpdateMechanism=Docker`.
+- **qBittorrent:** EasyArr owns `WebUI\Port=8090`, the auth-subnet whitelist (`${NETWORK_IP}/16`) and `HostHeaderValidation=false`. Defaults it sets once: save path under `/data/downloads/torrents` and the legal notice.
+- **SABnzbd:** EasyArr owns `api_key`/`nzb_key` (adopted if present), `port=8080`, and adds `w1kyu-easyarr_vpn_1` to `host_whitelist`. Defaults it sets once: the download folders.
+
+All other values are left alone. A second run changes nothing (unit-tested, and `dev/stack.sh leaktest` checks it in CI). Bazarr, Recyclarr, Unpackerr and Cleanuparr configs, plus sub-path specifics (SABnzbd `url_base`, qBittorrent reverse-proxy settings), move to phase 05, where the proxy is built and can be tested.
+**Why:** Seeding means EasyArr knows every key before services start (SPEC §7.4), and adopting existing keys keeps installs from earlier versions and user changes intact. Folders only get mode/owner fixes and init never recurses, so it never touches media files.
+**Alternatives considered:** reading keys back after first start, as Umbrel's media-app-configurator does. That means slower first runs and more moving parts.
+
+### D-032 — No HSTS, no upgrade-insecure-requests (2026-10-30)
+**Decision:** Helmet's security headers are on, with a strict CSP (`default-src 'self'`; inline styles allowed for Radix/motion), but **HSTS and `upgrade-insecure-requests` are disabled**.
+**Why:** umbrelOS serves every app over HTTP *and* HTTPS on `umbrel.local`. HSTS would force HTTPS for every app on that host, and the CSP upgrade would break plain-HTTP access.
+
+### D-033 — Web stack details + how vendored code is wired in (2026-10-30)
+**Decision:**
+- **Stack:** React 19, Vite 8, Tailwind 4 (`@tailwindcss/vite`, the vendored `tailwind.config.ts` loaded via `@config`), react-router 8, TanStack Query 5, i18next/react-i18next, Radix, sonner, lucide.
+- **Import aliases:** `@/…` resolves to `src/vendor/umbrel/` so vendored files keep their upstream imports unchanged. Our own code uses `~/…`.
+- **Lint/format:** the vendor folder is excluded from ESLint and Prettier and is guarded instead by `scripts/check-vendor.mjs`, which is part of `pnpm lint`.
+- **TypeScript:** the web `tsconfig` stays `strict` but turns off `noUnusedLocals`/`noUnusedParameters`, because upstream code trips them. ESLint still catches unused code in our own files.
+- **App name in HTML:** `index.html` gets the app name injected from `brand.ts` by a tiny Vite plugin.
+**Why:** It's the least invasive way to reuse upstream code verbatim while keeping our own code strict.
+
+### D-034 — Dashboard image + publishing (2026-10-30)
+**Decision:**
+- **Build:** `dashboard/Dockerfile` builds the JS once on `$BUILDPLATFORM`, then `pnpm deploy --prod`s the server. The runtime is `node:26.13.0-alpine` (pinned), with `serve` running as `node` (uid 1000).
+- **Notices:** license notices go in `/licenses`.
+- **init as root:** the compose file runs `init` with `user: "0:0"` so it can fix ownership.
+- **CI tags:** `.github/workflows/image.yml` pushes `ghcr.io/w1kyu/easyarr` for amd64 + arm64 as `edge` and `sha-<short>` on main, and as semver on `v*` tags. It also runs a smoke test: health, SPA, licenses, and `init` run twice.
+- **Pinning:** the Umbrel compose pins `sha-<short>@<index digest>`.
+- **Visibility:** the GHCR package is public (anonymous pulls verified).
+- **Existing installs:** a `hooks/pre-start` creates the new `data/easyarr` mount source, since umbrelOS only copies `data/` scaffolding on fresh installs.
+**Why:** Fast multi-arch builds without running pnpm under QEMU. It follows the Umbrel image-pinning rules and is a safe update path from 0.0.1.
+
+### D-035 — Own visual identity (2026-10-30)
+**Decision:**
+- **Logo:** a violet→blue rounded square with a play triangle and a down chevron (`assets/icon.svg`), approved by the owner. The store manifest's `icon` points to its raw GitHub URL.
+- **Wallpaper:** a tiny pre-blurred WebP generated by `scripts/make-wallpaper.py`, so no full-screen CSS blur is needed.
+- **Service tiles:** our own Lucide-icon tiles instead of upstream logos (trademarks).
+**Why:** SPEC §14 requires our own identity. The pre-blurred image is cheap on low-power devices; a headless test showed full-screen CSS blur stalling rendering.

@@ -102,6 +102,28 @@ describe('init', () => {
     expect(sab).toContain('complete_dir = /data/elsewhere');
   });
 
+  it('stays idempotent after services rewrite their own config files', async () => {
+    await runInit(cfg, log);
+    // SABnzbd (configobj) writes one-element lists with a trailing comma and may drop keys;
+    // qBittorrent drops/migrates keys it no longer uses.
+    const sabFile = path.join(cfg.appDataDir, 'sabnzbd/sabnzbd.ini');
+    const sab = (await fs.readFile(sabFile, 'utf8'))
+      .replace('host_whitelist = w1kyu-easyarr_vpn_1', 'host_whitelist = w1kyu-easyarr_vpn_1,')
+      .replace(/^download_dir = .*\n/m, '');
+    await fs.writeFile(sabFile, sab);
+    const qbtFile = path.join(cfg.appDataDir, 'qbittorrent/qBittorrent/qBittorrent.conf');
+    const qbt = (await fs.readFile(qbtFile, 'utf8')).replace(
+      /^Session\\\\TempPathEnabled=.*\n/m,
+      '',
+    );
+    expect(qbt).not.toContain('TempPathEnabled');
+    await fs.writeFile(qbtFile, qbt);
+    const before = await snapshot(root);
+    const report = await runInit(cfg, log);
+    expect(report.changes).toEqual([]);
+    expect(await snapshot(root)).toEqual(before);
+  });
+
   it('never touches files inside the media folders', async () => {
     await runInit(cfg, log);
     const movie = path.join(cfg.dataRoot, 'media/movies/film.mkv');

@@ -112,14 +112,13 @@ export async function runInit(cfg: InitConfig, log: Logger): Promise<InitReport>
     changed =
       ini.set('Preferences', 'WebUI\\AuthSubnetWhitelist', `${cfg.networkIp}/16`) || changed;
     changed = ini.set('Preferences', 'WebUI\\HostHeaderValidation', 'false') || changed;
-    // Defaults.
-    changed = ini.setDefault('LegalNotice', 'Accepted', 'true') || changed;
-    changed =
-      ini.setDefault('BitTorrent', 'Session\\DefaultSavePath', '/data/downloads/torrents') ||
-      changed;
-    changed = ini.setDefault('BitTorrent', 'Session\\TempPathEnabled', 'false') || changed;
-    changed =
-      ini.setDefault('Preferences', 'Downloads\\SavePath', '/data/downloads/torrents/') || changed;
+    // Defaults, only on first creation: qBittorrent rewrites and migrates its file on start, so
+    // re-adding defaults it dropped would flip-flop on every start (idempotency).
+    if (raw === undefined) {
+      ini.set('BitTorrent', 'Session\\DefaultSavePath', '/data/downloads/torrents');
+      ini.set('BitTorrent', 'Session\\TempPathEnabled', 'false');
+      changed = true;
+    }
     if (changed) {
       await ensureDir(path.dirname(file), 0o755, own, [], cfg.appDataDir);
       await writeService(file, ini.toString(), own);
@@ -144,17 +143,23 @@ export async function runInit(cfg: InitConfig, log: Logger): Promise<InitReport>
     changed = ini.set('misc', 'nzb_key', nzbKey, sep) || changed;
     // Owned: port + accept requests addressed to the vpn container name (D-031).
     changed = ini.set('misc', 'port', '8080', sep) || changed;
+    // SABnzbd writes lists configobj-style ("a, b" or "a," for one item): only touch it when a
+    // host is actually missing, never just to reformat (idempotency).
     const whitelist = (ini.get('misc', 'host_whitelist') ?? '')
       .split(',')
       .map((h) => h.trim())
       .filter(Boolean);
-    for (const host of [containerName('vpn')]) if (!whitelist.includes(host)) whitelist.push(host);
-    changed = ini.set('misc', 'host_whitelist', whitelist.join(', '), sep) || changed;
-    // Defaults.
-    changed =
-      ini.setDefault('misc', 'download_dir', '/data/downloads/usenet/incomplete', sep) || changed;
-    changed =
-      ini.setDefault('misc', 'complete_dir', '/data/downloads/usenet/complete', sep) || changed;
+    const missing = [containerName('vpn')].filter((h) => !whitelist.includes(h));
+    if (missing.length) {
+      changed =
+        ini.set('misc', 'host_whitelist', [...whitelist, ...missing].join(', '), sep) || changed;
+    }
+    // Defaults, only on first creation.
+    if (raw === undefined) {
+      ini.set('misc', 'download_dir', '/data/downloads/usenet/incomplete', sep);
+      ini.set('misc', 'complete_dir', '/data/downloads/usenet/complete', sep);
+      changed = true;
+    }
     if (changed) {
       await writeService(file, ini.toString(), own);
       changes.push(`${raw === undefined ? 'created' : 'updated'} sabnzbd/sabnzbd.ini`);

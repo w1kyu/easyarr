@@ -68,16 +68,24 @@ fail=0
 check() { # check <description> <expect: ok|fail> <command...>
   local desc="$1" expect="$2" got
   shift 2
-  if "$@" >/dev/null 2>&1; then got=ok; else got=fail; fi
+  if "$@" >/dev/null 2>"${TMPDIR:-/tmp}/easyarr-check.err"; then got=ok; else got=fail; fi
   if [[ "$got" == "$expect" ]]; then
     echo "PASS  $desc"
   else
     echo "FAIL  $desc (expected $expect, got $got)"
+    if [[ "$expect" == ok ]]; then sed 's/^/      /' "${TMPDIR:-/tmp}/easyarr-check.err" | tail -5; fi
     fail=1
   fi
 }
 
-init_is_idempotent() { compose run --rm --no-deps init 2>&1 | grep -q 'everything already in place'; }
+init_is_idempotent() {
+  local out
+  out=$(compose run --rm --no-deps init 2>&1)
+  grep -q 'everything already in place' <<<"$out" || {
+    echo "$out" | tail -5 >&2
+    return 1
+  }
+}
 dashboard_serves_app() { curl -fsS -m 10 http://localhost:39000/ | grep -q 'id="root"'; }
 
 leaktest() {

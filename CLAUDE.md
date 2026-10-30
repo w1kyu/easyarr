@@ -68,12 +68,13 @@ Everything technical: decide yourself, log it in DECISIONS.md.
 ```
 pnpm install
 pnpm dev            # web + server with hot reload (against dev/docker-compose.dev.yml)
-pnpm lint           # eslint + prettier --check
+pnpm lint           # eslint + prettier --check + vendored-code license check
 pnpm format         # prettier --write
 pnpm typecheck
 pnpm test           # unit tests (vitest, all dashboard/* packages)
 pnpm test:e2e       # integration tests (docker) — placeholder until phase 05
 pnpm build
+dev/stack.sh up|wait|leaktest|down   # full Umbrel stack locally (Docker), see docs/dev/development.md
 ```
 Node 26 (`.nvmrc`), pnpm 12, TypeScript 6.0 (see D-021).
 
