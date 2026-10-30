@@ -22,6 +22,8 @@ export default defineConfig({
   build: { outDir: 'dist', sourcemap: true },
   server: {
     port: 5173,
+    // In-app help reads the repo's docs/ folder (two levels up).
+    fs: { allow: [src('../..')] },
     proxy: { '/api': 'http://localhost:3000', '/licenses': 'http://localhost:3000' },
   },
 });

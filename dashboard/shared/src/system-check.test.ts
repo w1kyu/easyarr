@@ -39,6 +39,14 @@ describe('evaluateSystem', () => {
     expect(verdicts({ totalMemoryBytes: 32 * GIB }).memory).toBe('ok');
   });
 
+  it('shows disk sizes in GB or TB', () => {
+    const disk = evaluateSystem({
+      ...base,
+      disk: { freeBytes: 5_581_657_341_952, totalBytes: 48_300_000_000 },
+    }).items.find((i) => i.id === 'disk');
+    expect(disk?.values).toEqual({ free: '5.6 TB', total: '48.3 GB' });
+  });
+
   it('disk: < 50 GB free is a warning; unreadable is a warning too', () => {
     expect(verdicts({ disk: { freeBytes: 49 * GB, totalBytes: 500 * GB } }).disk).toBe('warning');
     expect(verdicts({ disk: { freeBytes: 50 * GB, totalBytes: 500 * GB } }).disk).toBe('ok');

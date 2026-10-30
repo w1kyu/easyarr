@@ -51,6 +51,11 @@ export const SUPPORTED_ARCHES: Record<string, string> = { x64: 'amd64', arm64: '
 /** One decimal, in the units people see on the box (GB = 10^9 for disks, GiB-ish for RAM). */
 const fmt = (n: number) => (Math.round(n * 10) / 10).toFixed(1);
 
+/** Disk sizes like drive makers print them: "48.3 GB", "5.6 TB". */
+export function formatDiskSize(bytes: number): string {
+  return bytes >= 1000 * GB ? `${fmt(bytes / (1000 * GB))} TB` : `${fmt(bytes / GB)} GB`;
+}
+
 export function evaluateSystem(info: SystemInfo): SystemCheckResult {
   const items: SystemCheckItem[] = [];
 
@@ -78,7 +83,10 @@ export function evaluateSystem(info: SystemInfo): SystemCheckResult {
   if (info.disk === null) {
     items.push({ id: 'disk', verdict: 'warning', reason: 'system.disk.unknown', values: {} });
   } else {
-    const values = { gb: fmt(info.disk.freeBytes / GB), totalGb: fmt(info.disk.totalBytes / GB) };
+    const values = {
+      free: formatDiskSize(info.disk.freeBytes),
+      total: formatDiskSize(info.disk.totalBytes),
+    };
     items.push(
       info.disk.freeBytes < DISK_WARNING_BELOW_BYTES
         ? { id: 'disk', verdict: 'warning', reason: 'system.disk.low', values }

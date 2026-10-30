@@ -1,14 +1,26 @@
 import { SERVICES, type ServiceInfo } from '@easyarr/shared';
-import { Hourglass } from 'lucide-react';
+import { CircleCheckBig } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { Link, Navigate } from 'react-router';
 import { GlassPanel } from '~/components/glass-panel';
 import { ServiceIcon } from '~/components/service-icon';
 import { StatusPill } from '~/components/status-pill';
 import { buttonVariants } from '@/components/ui/button';
+import { Loading } from '@/components/ui/loading';
 import { cn } from '@/lib/utils';
+import { useWizard } from '~/features/wizard/wizard-api';
 
 function portUrl(port: number): string {
   return `${window.location.protocol}//${window.location.hostname}:${port}`;
+}
+
+/** `/`: the wizard until steps are done (SPEC §8: shown on first open), then the home screen. */
+export function Start() {
+  const wizard = useWizard();
+  if (wizard.isPending) return <Loading />;
+  // If the API is unreachable, still show the home screen (it links to Jellyfin etc.).
+  if (wizard.data?.next) return <Navigate to={`/setup/${wizard.data.next}`} replace />;
+  return <Home />;
 }
 
 export function Home() {
@@ -18,13 +30,16 @@ export function Home() {
     <div className="flex flex-col gap-6">
       <GlassPanel className="flex flex-col gap-4 md:flex-row md:items-center md:gap-6">
         <div className="grid size-14 shrink-0 place-items-center rounded-full bg-white/10 ring-1 ring-white/15">
-          <Hourglass className="size-6 text-white/80" aria-hidden />
+          <CircleCheckBig className="size-6 text-white/80" aria-hidden />
         </div>
         <div className="flex-1">
           <h2 className="text-19 font-semibold -tracking-3">{t('home.title')}</h2>
           <p className="mt-1 max-w-2xl text-14 leading-relaxed text-white/65">{t('home.body')}</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Link to="/setup/welcome" className={cn(buttonVariants({ size: 'md' }))}>
+            {t('home.review')}
+          </Link>
           {published.map((s) => (
             <a
               key={s.id}
