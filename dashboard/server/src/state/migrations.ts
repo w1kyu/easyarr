@@ -1,0 +1,35 @@
+/**
+ * Ordered migrations. Each one takes the document at `from` and returns it at `from + 1`.
+ * Migrations must be pure and never drop data they don't understand.
+ */
+export interface Migration {
+  from: number;
+  migrate: (doc: Record<string, unknown>) => Record<string, unknown>;
+}
+
+export function migrate(
+  doc: Record<string, unknown>,
+  targetVersion: number,
+  migrations: readonly Migration[],
+): { doc: Record<string, unknown>; migrated: boolean } {
+  let current = doc;
+  let version = typeof current['schemaVersion'] === 'number' ? current['schemaVersion'] : 0;
+  if (version > targetVersion) {
+    throw new Error(
+      `File was written by a newer EasyArr (schema ${version}, this version understands ${targetVersion}). Update EasyArr.`,
+    );
+  }
+  let migrated = false;
+  while (version < targetVersion) {
+    const step = migrations.find((m) => m.from === version);
+    if (!step) throw new Error(`No migration from schema version ${version}`);
+    current = { ...step.migrate(current), schemaVersion: version + 1 };
+    version += 1;
+    migrated = true;
+  }
+  return { doc: current, migrated };
+}
+
+/** state.json migrations (none yet — schema 1 is the first). */
+export const stateMigrations: readonly Migration[] = [];
+export const secretsMigrations: readonly Migration[] = [];
