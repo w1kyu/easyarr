@@ -1,0 +1,71 @@
+name: Umbrel app
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'umbrel/**'
+      - 'dev/**'
+      - '.github/workflows/umbrel-app.yml'
+  pull_request:
+    paths:
+      - 'umbrel/**'
+      - 'dev/**'
+      - '.github/workflows/umbrel-app.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: umbrel-app-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Umbrel linter
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7
+        with:
+          repository: getumbrel/umbrel-apps
+          path: umbrel-apps
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+      - name: Lint with Umbrel's official app linter
+        working-directory: umbrel-apps
+        run: |
+          npm ci --ignore-scripts
+          cp -r ../umbrel/w1kyu-easyarr .
+          node .tools/lint-apps.mjs w1kyu-easyarr --check-images --format github
+
+  stack:
+    name: Stack + kill-switch test (${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Start the stack like umbrelOS would
+        run: dev/stack.sh up
+      - name: Wait for every service to be healthy
+        run: dev/stack.sh wait 900
+      - name: Kill-switch leak test + reachability
+        run: dev/stack.sh leaktest
+      - name: Show state and logs
+        if: always()
+        run: |
+          dev/stack.sh ps
+          dev/stack.sh logs --no-color --tail 80
+      - name: Tear down
+        if: always()
+        run: dev/stack.sh down
