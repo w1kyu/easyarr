@@ -13,10 +13,12 @@ on:
       - 'LICENSE'
       - 'NOTICE.md'
       - '.dockerignore'
+      - 'docs/*.md'
       - '.github/workflows/image.yml'
   pull_request:
     paths:
       - 'dashboard/**'
+      - 'docs/*.md'
       - 'pnpm-lock.yaml'
       - '.github/workflows/image.yml'
   workflow_dispatch:
@@ -78,6 +80,8 @@ jobs:
           curl -fsS http://localhost:3000/api/health
           curl -fsS http://localhost:3000/ | grep -q '<div id="root">'
           curl -fsS http://localhost:3000/licenses/umbrelOS-LICENSE.md | grep -q 'PolyForm Noncommercial'
+          # In-app help pages are bundled (docs/ must be in the build context).
+          docker exec ea sh -c "grep -rl 'Usenet 101' /app/web/assets" >/dev/null
           mkdir -p /tmp/t/data /tmp/t/appdata
           docker run --rm -u 0:0 -v /tmp/t/data:/data -v /tmp/t/appdata:/appdata easyarr:test init
           docker run --rm -u 0:0 -v /tmp/t/data:/data -v /tmp/t/appdata:/appdata easyarr:test init | grep -q 'everything already in place'

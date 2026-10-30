@@ -1,3 +1,4 @@
+import { readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
@@ -12,8 +13,24 @@ const brandHtml = (): Plugin => ({
   transformIndexHtml: (html) => html.replaceAll('%APP_NAME%', APP_NAME),
 });
 
+/** The in-app help bundles ../../docs/*.md; fail the build instead of shipping empty help. */
+const requireDocs = (): Plugin => ({
+  name: 'easyarr-require-docs',
+  buildStart() {
+    const dir = src('../../docs');
+    let pages: string[] = [];
+    try {
+      pages = readdirSync(dir).filter((f) => f.endsWith('.md') && f !== 'README.md');
+    } catch {
+      // handled below
+    }
+    if (pages.length === 0)
+      this.error(`No help pages found in ${dir} (is docs/ in the build context?)`);
+  },
+});
+
 export default defineConfig({
-  plugins: [react(), tailwindcss(), brandHtml()],
+  plugins: [react(), tailwindcss(), brandHtml(), requireDocs()],
   resolve: {
     // `@/` = vendored umbrelOS code (keeps its upstream imports unchanged), `~/` = our own code.
     alias: { '@/': src('./src/vendor/umbrel/'), '~/': src('./src/') },

@@ -18,6 +18,8 @@ RUN pnpm install --frozen-lockfile
 COPY dashboard/shared dashboard/shared
 COPY dashboard/server dashboard/server
 COPY dashboard/web dashboard/web
+# In-app help pages are bundled from docs/*.md at build time.
+COPY docs docs
 RUN pnpm --filter @easyarr/shared --filter @easyarr/server --filter @easyarr/web build \
  && pnpm --filter @easyarr/server deploy --prod /out/server
 

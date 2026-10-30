@@ -4,7 +4,7 @@
 .git
 dev/data
 umbrel
-docs
+docs/dev
 prompts
 *.md
 !NOTICE.md
