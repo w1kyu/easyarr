@@ -1,0 +1,50 @@
+manifestVersion: 1.1
+id: w1kyu-easyarr
+storage:
+  dataRoot: data
+category: media
+name: EasyArr
+version: '0.0.1'
+tagline: Your own Netflix-style media setup, wired up for you
+description: >-
+  ⚠️ PREVIEW — not ready for everyday use yet. This early build installs all services, but the
+  setup wizard is still being built and downloading is switched off until you can add a VPN.
+
+
+  EasyArr sets up a complete media automation stack on your Umbrel and connects everything for
+  you: request a movie, show or album, and it gets found, downloaded through a VPN, organised,
+  given subtitles and shows up in Jellyfin automatically.
+
+
+  Included: Sonarr (TV), Radarr (movies), Lidarr (music), Prowlarr (indexers), qBittorrent
+  (torrents), SABnzbd (Usenet), Bazarr (subtitles), Jellyfin (watch), Jellyseerr (requests),
+  plus FlareSolverr, Recyclarr, Unpackerr and Cleanuparr working in the background.
+
+
+  All searching and downloading goes through a VPN with a kill switch. Your files live in the
+  "EasyArr" folder in Files.
+
+
+  Jellyfin opens on port 39096 and the request page on port 39055 of your Umbrel.
+releaseNotes: ''
+
+developer: w1kyu
+website: https://github.com/w1kyu/easyarr
+dependencies: []
+repo: https://github.com/w1kyu/easyarr
+support: https://github.com/w1kyu/easyarr/issues
+
+port: 39000
+gallery: []
+path: ''
+
+defaultUsername: ''
+defaultPassword: ''
+permissions:
+  - GPU
+backupIgnore:
+  - data/jellyfin/cache/*
+  - data/jellyfin/log/*
+
+submitter: w1kyu
+submission: https://github.com/w1kyu/easyarr

@@ -1,0 +1,377 @@
+# EasyArr — Umbrel app definition (SPEC §3, §5, §6, §19).
+#
+# Phase 01 layout. The VPN-side services share the `vpn` container's network namespace
+# (network_mode: "service:vpn"), so they talk to each other via localhost:<port> and are
+# reached from outside via the container name w1kyu-easyarr_vpn_1:<port>. Internal ports
+# must therefore never collide (see SPEC §3).
+#
+# Until Phase 04 (VPN wrapper) the `vpn` service runs plain Gluetun with a deliberately
+# unusable WireGuard config: the kill switch is up, the tunnel never connects, so nothing
+# inside the VPN namespace can reach the internet (D-025).
+version: '3.7'
+
+services:
+  app_proxy:
+    environment:
+      APP_HOST: w1kyu-easyarr_dashboard_1
+      APP_PORT: 3000
+
+  # One-shot: creates the shared /data tree with the right owner (D-024).
+  # Replaced by the dashboard image's `init` command in Phase 02.
+  init:
+    image: busybox:1.38.0@sha256:a46257e06c82ad85242d0d38077d0a52d9896389ca60a1a59d3463db586e5fa4
+    restart: on-failure
+    volumes:
+      - ${UMBREL_ROOT}/data/storage/EasyArr:/data
+    command:
+      - sh
+      - -c
+      - >-
+        set -e;
+        for d in
+        . downloads downloads/torrents
+        downloads/torrents/movies downloads/torrents/tv downloads/torrents/music
+        downloads/usenet downloads/usenet/incomplete downloads/usenet/complete
+        downloads/usenet/complete/movies downloads/usenet/complete/tv downloads/usenet/complete/music
+        media media/movies media/tv media/music
+        backups;
+        do mkdir -p "/data/$$d"; chown 1000:1000 "/data/$$d"; chmod 2775 "/data/$$d"; done;
+        echo "EasyArr folders ready"
+
+  # Placeholder web page so the app opens inside Umbrel (replaced in Phase 02).
+  dashboard:
+    image: busybox:1.38.0@sha256:a46257e06c82ad85242d0d38077d0a52d9896389ca60a1a59d3463db586e5fa4
+    restart: on-failure
+    user: '1000:1000'
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    command:
+      - sh
+      - -c
+      - >-
+        mkdir -p /tmp/www &&
+        printf '%s' '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Installing…</title><style>body{font-family:system-ui,sans-serif;background:#0b0b0f;color:#fff;display:grid;place-items:center;min-height:100vh;margin:0}main{max-width:32rem;padding:2rem;text-align:center}p{color:#ffffffaa;line-height:1.5}</style></head><body><main><h1>Almost there</h1><p>Your media stack is installed. The setup wizard is coming in a future update.</p><p>Jellyfin: port 39096 · Requests: port 39055</p></main></body></html>' > /tmp/www/index.html &&
+        exec httpd -f -v -p 3000 -h /tmp/www
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://localhost:3000/']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 10s
+
+  # Owns the network namespace for every download/search service (SPEC §5).
+  vpn:
+    image: qmcgaw/gluetun:v3.41.3@sha256:fa19cc76b2af13d57a8d3dc3066f2ada061b1c761b8aecf989b3877c0486e027
+    restart: on-failure
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    environment:
+      TZ: 'Etc/UTC'
+      # Temporary, deliberately unusable tunnel until Phase 04 (D-025):
+      # 192.0.2.1 is TEST-NET-1 (RFC 5737) and is never routed; the keys are Gluetun's
+      # public documentation examples, not secrets. Gluetun keeps its kill switch up and
+      # keeps retrying, so the namespace has no route to the internet.
+      VPN_SERVICE_PROVIDER: 'custom'
+      VPN_TYPE: 'wireguard'
+      WIREGUARD_ENDPOINT_IP: '192.0.2.1'
+      WIREGUARD_ENDPOINT_PORT: '51820'
+      WIREGUARD_PUBLIC_KEY: 'wAUaJMhAq3NFutLHIdF8AN0B5WG8RndfQKLPTEDHal0='
+      WIREGUARD_PRIVATE_KEY: 'wOEI9rqqbDwnN8/Bpp22sVz48T71vJ4fYmFWujulwUU='
+      WIREGUARD_ADDRESSES: '10.64.222.21/32'
+      # Let VPN-side apps reach other containers on Umbrel's Docker network.
+      FIREWALL_OUTBOUND_SUBNETS: '${NETWORK_IP}/16'
+      UPDATER_PERIOD: '0'
+      VERSION_INFORMATION: 'off'
+    volumes:
+      - ${APP_DATA_DIR}/data/vpn:/gluetun
+
+  qbittorrent:
+    image: linuxserver/qbittorrent:5.3.0@sha256:75ecbb1c89ab7b0a21c4bde40b4820e4f1649d2d56d83b91913422155e8d2a5f
+    network_mode: 'service:vpn'
+    restart: on-failure
+    depends_on:
+      init:
+        condition: service_completed_successfully
+      vpn:
+        condition: service_started
+    environment:
+      PUID: '1000'
+      PGID: '1000'
+      UMASK: '002'
+      TZ: 'Etc/UTC'
+      WEBUI_PORT: '8090'
+      TORRENTING_PORT: '6881'
+    volumes:
+      - ${APP_DATA_DIR}/data/qbittorrent:/config
+      - ${UMBREL_ROOT}/data/storage/EasyArr:/data
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -s -o /dev/null http://localhost:8090/ || exit 1']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  sabnzbd:
+    image: linuxserver/sabnzbd:5.1.3@sha256:a7cfba459929f73b83c98b476a845076dc72524af80b24fcb4200684e6b1b675
+    network_mode: 'service:vpn'
+    restart: on-failure
+    depends_on:
+      init:
+        condition: service_completed_successfully
+      vpn:
+        condition: service_started
+    environment:
+      PUID: '1000'
+      PGID: '1000'
+      UMASK: '002'
+      TZ: 'Etc/UTC'
+    volumes:
+      - ${APP_DATA_DIR}/data/sabnzbd:/config
+      - ${UMBREL_ROOT}/data/storage/EasyArr:/data
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -s -o /dev/null http://localhost:8080/ || exit 1']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  prowlarr:
+    image: linuxserver/prowlarr:2.7.0@sha256:04be30163fbaf48d6aeee7b5893c9f6614ffbad6d853971df0d6dcdf01c7f104
+    network_mode: 'service:vpn'
+    restart: on-failure
+    depends_on:
+      init:
+        condition: service_completed_successfully
+      vpn:
+        condition: service_started
+    environment:
+      PUID: '1000'
+      PGID: '1000'
+      UMASK: '002'
+      TZ: 'Etc/UTC'
+    volumes:
+      - ${APP_DATA_DIR}/data/prowlarr:/config
+    healthcheck:
+      test: ['CMD', 'curl', '-fsS', '-o', '/dev/null', 'http://localhost:9696/ping']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  flaresolverr:
+    image: ghcr.io/flaresolverr/flaresolverr:v3.5.2@sha256:c80ae007ce2ccdcd217a12426e4f039ef763ff90738c808d38810c3e59323767
+    network_mode: 'service:vpn'
+    restart: on-failure
+    depends_on:
+      init:
+        condition: service_completed_successfully
+      vpn:
+        condition: service_started
+    environment:
+      TZ: 'Etc/UTC'
+      LOG_LEVEL: 'info'
+
+  sonarr:
+    image: linuxserver/sonarr:4.0.20@sha256:48e36b608b461273b9dae857725cd0561a127f2c694b687318f6d0c5ce63e5c9
+    network_mode: 'service:vpn'
+    restart: on-failure
+    depends_on:
+      init:
+        condition: service_completed_successfully
+      vpn:
+        condition: service_started
+    environment:
+      PUID: '1000'
+      PGID: '1000'
+      UMASK: '002'
+      TZ: 'Etc/UTC'
+    volumes:
+      - ${APP_DATA_DIR}/data/sonarr:/config
+      - ${UMBREL_ROOT}/data/storage/EasyArr:/data
+    healthcheck:
+      test: ['CMD', 'curl', '-fsS', '-o', '/dev/null', 'http://localhost:8989/ping']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  radarr:
+    image: linuxserver/radarr:6.4.4@sha256:084b3b2ab1d0ef930660727259546a241f2bdf67c9ed085d54bf1486a6887c9b
+    network_mode: 'service:vpn'
+    restart: on-failure
+    depends_on:
+      init:
+        condition: service_completed_successfully
+      vpn:
+        condition: service_started
+    environment:
+      PUID: '1000'
+      PGID: '1000'
+      UMASK: '002'
+      TZ: 'Etc/UTC'
+    volumes:
+      - ${APP_DATA_DIR}/data/radarr:/config
+      - ${UMBREL_ROOT}/data/storage/EasyArr:/data
+    healthcheck:
+      test: ['CMD', 'curl', '-fsS', '-o', '/dev/null', 'http://localhost:7878/ping']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  lidarr:
+    image: linuxserver/lidarr:3.1.6@sha256:9fddcf5c613361edfce390d4e6b7c364282e71e90a40ce7793077fed788f6e63
+    network_mode: 'service:vpn'
+    restart: on-failure
+    depends_on:
+      init:
+        condition: service_completed_successfully
+      vpn:
+        condition: service_started
+    environment:
+      PUID: '1000'
+      PGID: '1000'
+      UMASK: '002'
+      TZ: 'Etc/UTC'
+    volumes:
+      - ${APP_DATA_DIR}/data/lidarr:/config
+      - ${UMBREL_ROOT}/data/storage/EasyArr:/data
+    healthcheck:
+      test: ['CMD', 'curl', '-fsS', '-o', '/dev/null', 'http://localhost:8686/ping']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  bazarr:
+    image: linuxserver/bazarr:1.6.2@sha256:9a625883f054e722795affe5e3ca71057e6ed817ecdf99f4a99624346fcc509c
+    network_mode: 'service:vpn'
+    restart: on-failure
+    depends_on:
+      init:
+        condition: service_completed_successfully
+      vpn:
+        condition: service_started
+    environment:
+      PUID: '1000'
+      PGID: '1000'
+      UMASK: '002'
+      TZ: 'Etc/UTC'
+    volumes:
+      - ${APP_DATA_DIR}/data/bazarr:/config
+      - ${UMBREL_ROOT}/data/storage/EasyArr:/data
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -s -o /dev/null http://localhost:6767/ || exit 1']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  recyclarr:
+    image: ghcr.io/recyclarr/recyclarr:8.8.1@sha256:3e9c41b9ec29bbf65fe846864058730d321a21f7695d8c0d9437b73e34d50ad9
+    network_mode: 'service:vpn'
+    user: '1000:1000'
+    restart: on-failure
+    depends_on:
+      init:
+        condition: service_completed_successfully
+      vpn:
+        condition: service_started
+    environment:
+      TZ: 'Etc/UTC'
+    volumes:
+      - ${APP_DATA_DIR}/data/recyclarr:/config
+
+  unpackerr:
+    image: ghcr.io/unpackerr/unpackerr:v1.0.1@sha256:22b4693fbeaae4bd927905d63b59b8f67b4a1446682d965ac876c61a48976658
+    network_mode: 'service:vpn'
+    user: '1000:1000'
+    restart: on-failure
+    depends_on:
+      init:
+        condition: service_completed_successfully
+      vpn:
+        condition: service_started
+    environment:
+      TZ: 'Etc/UTC'
+    volumes:
+      - ${APP_DATA_DIR}/data/unpackerr:/config
+      - ${UMBREL_ROOT}/data/storage/EasyArr:/data
+
+  cleanuparr:
+    image: ghcr.io/cleanuparr/cleanuparr:2.10.12@sha256:d0212e4c66bd0522e23c5e5da5d3006bd5ff0e0de1e3ecfcf892e039d55721e2
+    network_mode: 'service:vpn'
+    restart: on-failure
+    depends_on:
+      init:
+        condition: service_completed_successfully
+      vpn:
+        condition: service_started
+    environment:
+      PUID: '1000'
+      PGID: '1000'
+      UMASK: '002'
+      TZ: 'Etc/UTC'
+      PORT: '11011'
+    volumes:
+      - ${APP_DATA_DIR}/data/cleanuparr:/config
+      - ${UMBREL_ROOT}/data/storage/EasyArr:/data
+    healthcheck:
+      test: ['CMD', 'curl', '-fsS', '-o', '/dev/null', 'http://localhost:11011/health']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # Outside the VPN (D-003): media streaming must stay reachable on the LAN.
+  jellyfin:
+    image: linuxserver/jellyfin:version-12.4ubu2604@sha256:3894d9eae88418d3cf9ac6349392d2c4dad818365a59565d19edc38098897044
+    restart: on-failure
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    environment:
+      PUID: '1000'
+      PGID: '1000'
+      UMASK: '002'
+      TZ: 'Etc/UTC'
+    volumes:
+      - ${APP_DATA_DIR}/data/jellyfin:/config
+      - ${UMBREL_ROOT}/data/storage/EasyArr:/data
+    ports:
+      - '39096:8096'
+    healthcheck:
+      test: ['CMD', 'curl', '-fsS', '-o', '/dev/null', 'http://localhost:8096/health']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  jellyseerr:
+    image: ghcr.io/seerr-team/seerr:v3.5.1@sha256:d8fab675b55ad293ded98fd71efcfd46054cbad9746534ae1cc4794a88c0b3be
+    restart: on-failure
+    user: '1000:1000'
+    init: true
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    environment:
+      TZ: 'Etc/UTC'
+      PORT: '5055'
+    volumes:
+      - ${APP_DATA_DIR}/data/jellyseerr:/app/config
+    ports:
+      - '39055:5055'
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'wget --no-verbose --tries=1 --spider http://localhost:5055/api/v1/status || exit 1',
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
