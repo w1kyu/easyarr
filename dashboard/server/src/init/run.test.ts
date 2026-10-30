@@ -112,10 +112,7 @@ describe('init', () => {
       .replace(/^download_dir = .*\n/m, '');
     await fs.writeFile(sabFile, sab);
     const qbtFile = path.join(cfg.appDataDir, 'qbittorrent/qBittorrent/qBittorrent.conf');
-    const qbt = (await fs.readFile(qbtFile, 'utf8')).replace(
-      /^Session\\\\TempPathEnabled=.*\n/m,
-      '',
-    );
+    const qbt = (await fs.readFile(qbtFile, 'utf8')).replace(/^Session\\TempPathEnabled=.*\n/m, '');
     expect(qbt).not.toContain('TempPathEnabled');
     await fs.writeFile(qbtFile, qbt);
     const before = await snapshot(root);
