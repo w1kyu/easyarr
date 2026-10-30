@@ -41,6 +41,8 @@ COPY --from=build /src/dashboard/web/dist /app/web
 COPY LICENSE NOTICE.md /licenses/
 COPY dashboard/web/src/vendor/umbrel/LICENSE.md /licenses/umbrelOS-LICENSE.md
 COPY dashboard/web/src/vendor/umbrel/PROVENANCE.md /licenses/umbrelOS-PROVENANCE.md
+# Default state dir for runs without a mount (Umbrel mounts ${APP_DATA_DIR}/data/easyarr here).
+RUN mkdir -p /easyarr && chown node:node /easyarr && chmod 700 /easyarr
 # `serve` runs as the unprivileged `node` user (uid 1000 = Umbrel's user).
 # The compose file runs `init` as root so it can create folders and fix ownership.
 USER node

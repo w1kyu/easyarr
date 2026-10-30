@@ -73,7 +73,9 @@ jobs:
           docker buildx build --load --platform linux/amd64 -f dashboard/Dockerfile -t easyarr:test \
             --build-arg VERSION=${{ steps.version.outputs.value }} --cache-from type=gha .
           docker run -d --name ea -p 3000:3000 easyarr:test
-          for i in $(seq 1 20); do curl -fsS http://localhost:3000/api/health && break; sleep 1; done
+          for i in $(seq 1 20); do curl -fsS http://localhost:3000/api/health && break; sleep 1; done || true
+          docker logs ea
+          curl -fsS http://localhost:3000/api/health
           curl -fsS http://localhost:3000/ | grep -q '<div id="root">'
           curl -fsS http://localhost:3000/licenses/umbrelOS-LICENSE.md | grep -q 'PolyForm Noncommercial'
           mkdir -p /tmp/t/data /tmp/t/appdata
