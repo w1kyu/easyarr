@@ -30,6 +30,16 @@ describe('http app', () => {
     expect(page.body).toContain('<title>t</title>');
     const api = await app.inject({ method: 'GET', url: '/api/nope' });
     expect(api.statusCode).toBe(404);
+    const asset = await app.inject({ method: 'GET', url: '/assets/missing-123.js' });
+    expect(asset.statusCode).toBe(404);
+  });
+
+  it('serves files added after startup (new builds)', async () => {
+    const app = await make();
+    await fs.writeFile(path.join(webDir, 'late.js'), 'console.log(1)');
+    const res = await app.inject({ method: 'GET', url: '/late.js' });
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['content-type']).toContain('javascript');
   });
 
   it('sends security headers without HSTS or upgrade-insecure-requests (Umbrel serves HTTP too)', async () => {

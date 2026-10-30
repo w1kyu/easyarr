@@ -50,11 +50,18 @@ export async function buildApp({ config, logger }: BuildAppOptions): Promise<Fas
 
   const hasWeb = existsSync(path.join(config.webDir, 'index.html'));
   if (hasWeb) {
-    await app.register(fastifyStatic, { root: config.webDir, prefix: '/', wildcard: false });
+    await app.register(fastifyStatic, { root: config.webDir, prefix: '/' });
   }
 
   app.setNotFoundHandler(async (request, reply) => {
-    if (request.url.startsWith('/api/') || request.method !== 'GET' || !hasWeb) {
+    const pathname = request.url.split('?')[0] ?? '';
+    // API routes and missing files (anything with an extension) are real 404s.
+    if (
+      pathname.startsWith('/api/') ||
+      /\.[a-z0-9]+$/i.test(pathname) ||
+      request.method !== 'GET' ||
+      !hasWeb
+    ) {
       return reply.code(404).send({ error: 'not_found' });
     }
     // Single-page app: let the client router handle the path.
