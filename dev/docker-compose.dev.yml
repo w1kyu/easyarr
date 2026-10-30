@@ -1,0 +1,58 @@
+# Local dev / CI override that makes the Umbrel compose run on a normal Docker host.
+# Use it through dev/stack.sh, which also sets the Umbrel-like env vars
+# (UMBREL_ROOT, APP_DATA_DIR, NETWORK_IP, …). Never shipped to Umbrel.
+#
+# What it mimics from umbrelOS (see PROGRESS.md → Verified facts):
+# - the shared `umbrel_main_network` (10.21.0.0/16) as the default network
+# - container names `<app-id>_<service>_1`, which umbreld injects
+# - no app_proxy container (umbrelOS 2.0 proxies in-process); the dashboard is published
+#   on the manifest port 39000 instead
+name: w1kyu-easyarr
+
+networks:
+  default:
+    name: umbrel_main_network
+    ipam:
+      config:
+        - subnet: 10.21.0.0/16
+
+services:
+  app_proxy:
+    # Declared by the Umbrel compose for umbreld's gateway; never started here.
+    image: busybox:1.38.0@sha256:a46257e06c82ad85242d0d38077d0a52d9896389ca60a1a59d3463db586e5fa4
+    profiles: ['umbrel-only']
+
+  init:
+    container_name: w1kyu-easyarr_init_1
+  dashboard:
+    container_name: w1kyu-easyarr_dashboard_1
+    ports:
+      - '39000:3000'
+  vpn:
+    container_name: w1kyu-easyarr_vpn_1
+  qbittorrent:
+    container_name: w1kyu-easyarr_qbittorrent_1
+  sabnzbd:
+    container_name: w1kyu-easyarr_sabnzbd_1
+  prowlarr:
+    container_name: w1kyu-easyarr_prowlarr_1
+  flaresolverr:
+    container_name: w1kyu-easyarr_flaresolverr_1
+  sonarr:
+    container_name: w1kyu-easyarr_sonarr_1
+  radarr:
+    container_name: w1kyu-easyarr_radarr_1
+  lidarr:
+    container_name: w1kyu-easyarr_lidarr_1
+  bazarr:
+    container_name: w1kyu-easyarr_bazarr_1
+  recyclarr:
+    container_name: w1kyu-easyarr_recyclarr_1
+  unpackerr:
+    container_name: w1kyu-easyarr_unpackerr_1
+  cleanuparr:
+    container_name: w1kyu-easyarr_cleanuparr_1
+  jellyfin:
+    container_name: w1kyu-easyarr_jellyfin_1
+  jellyseerr:
+    container_name: w1kyu-easyarr_jellyseerr_1
