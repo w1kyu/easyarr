@@ -142,7 +142,7 @@ Every image is pinned as `tag@sha256:<multi-arch index digest>`. All images were
   - **ApiKey:** if the config already has a valid key, EasyArr adopts it; otherwise it uses the key in `secrets.json` or generates one.
   - **Owned keys, always re-applied:** `Port`, `UrlBase=/apps/<id>`, `BindAddress=*`.
   - **Only on first creation:** `AuthenticationMethod=External` (Umbrel login protects the proxy) and `UpdateMechanism=Docker`.
-- **qBittorrent:** EasyArr owns `WebUI\Port=8090`, the auth-subnet whitelist (`${NETWORK_IP}/16`) and `HostHeaderValidation=false`. Defaults it sets once: save path under `/data/downloads/torrents` and the legal notice.
+- **qBittorrent:** written in the qBittorrent 5 layout (`[WebUI]` section). qBittorrent moves legacy `[Preferences] WebUI\*` keys only once (gated by `[Meta] MigrationVersion`), so init removes legacy duplicates of the keys it owns. EasyArr owns `Port=8090`, the auth-subnet whitelist (`${NETWORK_IP}/16`) and `HostHeaderValidation=false`. Defaults it sets once: the save path under `/data/downloads/torrents` and temp path off.
 - **SABnzbd:** EasyArr owns `api_key`/`nzb_key` (adopted if present), `port=8080`, and adds `w1kyu-easyarr_vpn_1` to `host_whitelist`. Defaults it sets once: the download folders.
 
 All other values are left alone. A second run changes nothing (unit-tested, and `dev/stack.sh leaktest` checks it in CI). Bazarr, Recyclarr, Unpackerr and Cleanuparr configs, plus sub-path specifics (SABnzbd `url_base`, qBittorrent reverse-proxy settings), move to phase 05, where the proxy is built and can be tested.
