@@ -4,8 +4,10 @@
 > Newest session log entries go on top.
 
 ## Current phase
-**Phase 02 — ✅ done by the agent, waiting for the owner's test (v0.0.2).**
-Next prompt: `prompts/03-wizard-basics.md` (after the owner's checklist below passes).
+**Phase 03 — ✅ done by the agent, waiting for the owner's test (v0.0.3).**
+The phase 02 checklist is still open too (EasyArr was not installed on the Umbrel on 2026-10-31,
+checked via Umbrel MCP) — one fresh install of 0.0.3 covers both checklists.
+Next prompt: `prompts/04-vpn.md` (after the owner's checklists below pass).
 
 ## Phase status
 | Phase | Title | Status | Notes |
@@ -13,7 +15,7 @@ Next prompt: `prompts/03-wizard-basics.md` (after the owner's checklist below pa
 | 00 | Repos, structure, tooling | ✅ done | w1kyu/easyarr + w1kyu/umbrel-app-store, CI green |
 | 01 | Umbrel app + compose stack | ✅ done | v0.0.1 installed + restarted on owner's Umbrel (x86); CI green amd64/arm64 |
 | 02 | Dashboard skeleton + design system + CI | ✅ done (owner test pending) | v0.0.2; image ghcr.io/w1kyu/easyarr amd64/arm64; stack test green on d72a564 |
-| 03 | Wizard basics (steps 1–4) | ⬜ todo | |
+| 03 | Wizard basics (steps 1–4) | ✅ done (owner test pending) | v0.0.3; wizard e2e green locally, in CI and against the stack (amd64 + arm64) |
 | 04 | VPN (wrapper, kill switch, wizard step) | ⬜ todo | |
 | 05 | Wiring engine + service proxy | ⬜ todo | |
 | 06 | Wizard steps 6–9 | ⬜ todo | |
@@ -47,6 +49,8 @@ Results of SPEC **[VERIFY]** items. Format: `- YYYY-MM-DD — <fact> — <source
 - 2026-10-30 — umbrelOS UI lives in `packages/ui` (Tailwind config, `index.css` material/glass tokens, shadcn-style `components/ui/*`); its LICENSE is PolyForm Noncommercial 1.0.0 with **no** "Required Notice:" line → our PROVENANCE.md + verbatim LICENSE.md satisfy §14.1. — https://github.com/getumbrel/umbrel/tree/11e7f5bdfcb5bb8b46f39edd6defb4c37641763a/packages/ui
 - 2026-10-30 — qBittorrent 5 reads web-UI settings from `[WebUI]` (`Port`, `AuthSubnetWhitelist…`, `HostHeaderValidation`); it migrates `[Preferences] WebUI\\*` once (upgrade.cpp `migrateWebUISettings`, `[Meta] MigrationVersion` 11) and rewrites the file on start → init writes `[WebUI]` directly. — https://github.com/qbittorrent/qBittorrent/blob/release-5.3.0/src/app/upgrade.cpp
 - 2026-10-30 — umbrelOS only copies an app's committed `data/` scaffolding on fresh install → new bind-mount sources need a `hooks/pre-start` for existing installs (D-034). — umbreld app.ts (same umbrel commit)
+- 2026-10-31 — Jellyfin usernames must match `^(?!\s)[\w\ \-'._@+]+(?<!\s)$` (and not be `.`/`..`) → EasyArr allows the subset `^[A-Za-z0-9][A-Za-z0-9._-]{1,31}$` (D-036). — https://github.com/jellyfin/jellyfin/blob/a46fa4559daaea352257d0196b56e392c18dd09c/Jellyfin.Server.Implementations/Users/UserManager.cs
+- 2026-10-31 — With `permissions: [GPU]`, umbreld maps `/dev/dri` (+ `/dev/kfd` for ROCm) and NVIDIA devices with `NVIDIA_VISIBLE_DEVICES=all` into every service, plus the device groups → the dashboard detects a GPU from `/dev/dri/renderD*`, `/dev/nvidia*` or that env var (D-037). — https://github.com/getumbrel/umbrel/blob/11e7f5bdfcb5bb8b46f39edd6defb4c37641763a/packages/umbreld/source/modules/hardware/gpu.ts
 - 2026-10-30 — pnpm 12 fails `install` in CI on unapproved build scripts (`ERR_PNPM_IGNORED_BUILDS`) → `allowBuilds: { esbuild: true }` in `pnpm-workspace.yaml`. — CI run for 9552a61
 
 ## Open [VERIFY] items
@@ -74,8 +78,15 @@ Copy from SPEC as they get resolved. Highest priority first:
 - Bazarr, Recyclarr, Unpackerr and Cleanuparr configs plus sub-path settings (SABnzbd `url_base`, qBittorrent
   reverse proxy) are not seeded yet (phase 05, D-031).
 - Service tiles on the home screen show static status pills (no live status until phase 07).
+- The wizard ends after step 4 for now; the home screen says so and offers "Review your answers".
+- The account isn't applied to Jellyfin/Jellyseerr yet (phase 05); changing it later = going back
+  through the wizard until Settings exist (phase 07).
 
 ## Ideas / later
+- "Both" download method: decide in phase 05 whether Usenet is preferred (Servarr delay profiles) —
+  the docs currently only say EasyArr "takes whichever has it".
+- Main JS chunk is ~710 KB (225 KB gzip) — split routes (wizard/dashboard/settings) in phase 07/10.
+- Password reset + account change belong in Settings (phase 07); docs viewer polish in phase 10.
 - The template's comment says the store name shows as "<name> App Store" (→ "w1kyu Apps App Store");
   current umbrelOS UI shows `meta.name` as-is in the menu. Owner: check how it looks after adding the store.
 - Add a Renovate config (planned in phase 11) — could also bump GitHub Actions versions.
@@ -84,6 +95,45 @@ Copy from SPEC as they get resolved. Highest priority first:
 - umbrelOS 2.0 `environment:` manifest settings could expose a few safe knobs (e.g. TZ) in Umbrel's app settings.
 
 ## Session log
+### 2026-10-31 — Phase 03: wizard framework + steps 1–4 (Hermes agent on the owner's Umbrel)
+- Start: repo + CI green on 2d27e6f. Phase 02 owner test not done yet; EasyArr isn't installed on
+  the Umbrel right now (Umbrel MCP) — started phase 03 anyway as asked ("continue").
+- Shared (`@easyarr/shared`): wizard step registry (order, `isVisible`, schemas, no-skip rule),
+  account/download schemas with i18n-key messages, password strength estimator, system-check
+  verdicts (`evaluateSystem`) — all unit-tested.
+- Server: `GET /api/system-check` (arch, RAM, free space on read-only `/data`, GPU from umbreld's
+  device mapping), `GET /api/wizard`, `GET/POST /api/wizard/:step` (validated, serialized writes,
+  409 on skipping ahead). Account: username + scrypt hash in state.json, plaintext only in
+  secrets.json (redacted from logs at once), never returned. State/secrets schema v2 + migrations.
+  Non-JSON POSTs → 415 (CSRF guard, D-038).
+- Web: `/setup/<step>` wizard (Stepper, title, "What's this?", Back/Next, focus handling), steps
+  Welcome (flow, legal note, Start / Restore-coming-soon), System check (✅/⚠️/❌, re-check,
+  "continue anyway" for ❌), Account (fields, strength meter, confirm, family-accounts note),
+  Download method (cards with pros/cons + help links). `/` and `/setup` resume at the first open
+  step. In-app help: `docs/*.md` bundled, dialog + `/help/<page>`.
+- Docs drafts: `how-it-works`, `system-requirements`, `torrents-101`, `usenet-101`, `family-accounts`.
+- Tests: 103 unit tests (incl. jsdom wizard flow, i18n key coverage, doc links) + Playwright e2e
+  (`e2e/`, 8 tests: steps 1–4, refresh, help dialog, validation, password never returned) — green
+  locally, in CI (`Wizard e2e`) and against the Docker stack on amd64 + arm64 (`umbrel-app.yml`).
+- Checked in a browser at desktop + 390 px against the real hardware values of this Umbrel
+  (amd64, 23.3 GB RAM, 5.6 TB free; no GPU visible from the Hermes sandbox — the real app should
+  find the i3-8100's Intel graphics).
+- Umbrel app v0.0.3: dashboard + init on `sha-6286334@sha256:666a4744…`, dashboard mounts
+  `/data` read-only. Umbrel linter: 0 errors (2 expected warnings). Synced to the store.
+- Caught by the stack e2e: the image shipped without help pages (`.dockerignore` excluded `docs/`).
+  Fixed: Dockerfile copies `docs/`, the web build fails without help pages, the image smoke test
+  checks for them.
+- Decisions D-036…D-039.
+- Owner checklist (phase 03 — install 0.0.3 fresh, this covers the phase 02 list too):
+  - [ ] Install EasyArr 0.0.3 from the w1kyu Apps store (store refreshes every ~5 min)
+  - [ ] Opening EasyArr starts the wizard; go through steps 1–4 — is the wording clear for a beginner?
+  - [ ] System check shows correct values (amd64, ~23 GB RAM, free space of your 6 TB mirror,
+        graphics **found** — the i3-8100 has Intel UHD 630)
+  - [ ] Refresh the page in the middle (e.g. on step 3) — you stay on the same step
+  - [ ] "What's this?" links open the help pages
+  - [ ] Looks right on the phone; logo/look feedback (phase 02 list)
+  - [ ] Jellyfin (port 39096) and Jellyseerr (39055) still open; app restarts fine
+
 ### 2026-10-30 — Phase 02: dashboard skeleton, design system, image (Hermes agent on the owner's Umbrel)
 - Server (`dashboard/server`): Fastify + helmet (no HSTS/upgrade-insecure-requests, D-032), pino logger with
   secret redaction, versioned JSON state/secrets store (atomic, mode 600), `/api/health`, SPA + `/licenses`.
