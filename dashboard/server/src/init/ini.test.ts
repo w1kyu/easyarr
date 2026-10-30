@@ -32,4 +32,11 @@ describe('IniFile', () => {
     ini.set('misc', 'b', '2', ' = ');
     expect(ini.toString()).toBe('[misc]\na = 1\nb = 2\n[servers]\n[[news.example]]\nname = x\n');
   });
+
+  it('removes keys', () => {
+    const ini = new IniFile('[a]\nx=1\ny=2\n');
+    expect(ini.remove('a', 'x')).toBe(true);
+    expect(ini.remove('a', 'x')).toBe(false);
+    expect(ini.toString()).toBe('[a]\ny=2\n');
+  });
 });

@@ -107,17 +107,21 @@ export async function runInit(cfg: InitConfig, log: Logger): Promise<InitReport>
     const ini = new IniFile(raw ?? '');
     let changed = false;
     const changedKeys: string[] = [];
+    // qBittorrent ≥ 5 keeps web-UI settings in [WebUI] (it migrated them out of
+    // [Preferences] WebUI\\* once, gated by [Meta] MigrationVersion). Old-style keys are ignored
+    // after that migration — or, before it, would overwrite ours — so drop legacy duplicates.
     const own_ = (key: string, value: string) => {
-      if (ini.set('Preferences', key, value)) {
+      const legacy = ini.remove('Preferences', `WebUI\\${key}`);
+      if (ini.set('WebUI', key, value) || legacy) {
         changed = true;
-        changedKeys.push(key);
+        changedKeys.push(`WebUI/${key}`);
       }
     };
     // Owned: port + access from the Umbrel Docker network (dashboard proxy, *arr apps).
-    own_('WebUI\\Port', '8090');
-    own_('WebUI\\AuthSubnetWhitelistEnabled', 'true');
-    own_('WebUI\\AuthSubnetWhitelist', `${cfg.networkIp}/16`);
-    own_('WebUI\\HostHeaderValidation', 'false');
+    own_('Port', '8090');
+    own_('AuthSubnetWhitelistEnabled', 'true');
+    own_('AuthSubnetWhitelist', `${cfg.networkIp}/16`);
+    own_('HostHeaderValidation', 'false');
     // Defaults, only on first creation: qBittorrent rewrites and migrates its file on start, so
     // re-adding defaults it dropped would flip-flop on every start (idempotency).
     if (raw === undefined) {

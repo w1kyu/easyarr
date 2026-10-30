@@ -61,8 +61,9 @@ describe('init', () => {
     expect(keys['sonarr']).toMatch(/^[a-f0-9]{32}$/);
     expect(new Set(Object.values(keys)).size).toBe(Object.values(keys).length);
     const qbt = await read('qbittorrent/qBittorrent/qBittorrent.conf');
-    expect(qbt).toContain('WebUI\\AuthSubnetWhitelist=10.21.0.0/16');
-    expect(qbt).toContain('WebUI\\Port=8090');
+    expect(qbt).toMatch(/\[WebUI\][^[]*AuthSubnetWhitelist=10\.21\.0\.0\/16/);
+    expect(qbt).toMatch(/\[WebUI\][^[]*\nPort=8090/);
+    expect(qbt).not.toContain('WebUI\\Port');
     const sab = await read('sabnzbd/sabnzbd.ini');
     expect(sab).toContain(`api_key = ${keys['sabnzbd']}`);
     expect(sab).toContain('host_whitelist = w1kyu-easyarr_vpn_1');
@@ -119,6 +120,45 @@ describe('init', () => {
     const report = await runInit(cfg, log);
     expect(report.changes).toEqual([]);
     expect(await snapshot(root)).toEqual(before);
+  });
+
+  it('moves legacy qBittorrent 4.x web-UI keys to [WebUI] and keeps other settings', async () => {
+    const qbtFile = path.join(cfg.appDataDir, 'qbittorrent/qBittorrent/qBittorrent.conf');
+    await fs.mkdir(path.dirname(qbtFile), { recursive: true });
+    await fs.writeFile(
+      qbtFile,
+      '[Preferences]\nWebUI\\Port=8080\nWebUI\\Address=*\nConnection\\UPnP=false\n',
+    );
+    await runInit(cfg, log);
+    const qbt = await fs.readFile(qbtFile, 'utf8');
+    expect(qbt).not.toContain('WebUI\\Port');
+    expect(qbt).toContain('WebUI\\Address=*');
+    expect(qbt).toContain('Connection\\UPnP=false');
+    expect(qbt).toMatch(/\[WebUI\][^[]*\nPort=8090/);
+    expect((await runInit(cfg, log)).changes).toEqual([]);
+  });
+
+  it('accepts the file qBittorrent 5 writes back (sorted sections)', async () => {
+    await runInit(cfg, log);
+    const qbtFile = path.join(cfg.appDataDir, 'qbittorrent/qBittorrent/qBittorrent.conf');
+    await fs.writeFile(
+      qbtFile,
+      [
+        '[BitTorrent]',
+        'Session\\DefaultSavePath=/data/downloads/torrents',
+        '',
+        '[Meta]',
+        'MigrationVersion=12',
+        '',
+        '[WebUI]',
+        'AuthSubnetWhitelist=10.21.0.0/16',
+        'AuthSubnetWhitelistEnabled=true',
+        'HostHeaderValidation=false',
+        'Port=8090',
+        '',
+      ].join('\n'),
+    );
+    expect((await runInit(cfg, log)).changes).toEqual([]);
   });
 
   it('never touches files inside the media folders', async () => {

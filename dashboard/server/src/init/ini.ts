@@ -66,6 +66,14 @@ export class IniFile {
     return true;
   }
 
+  /** Removes a key. Returns true if the file changed. */
+  remove(section: string, key: string): boolean {
+    const i = this.findKey(section, key);
+    if (i === -1) return false;
+    this.lines.splice(i, 1);
+    return true;
+  }
+
   /** Sets a value only if the key is missing. Returns true if the file changed. */
   setDefault(section: string, key: string, value: string, sep = '='): boolean {
     if (this.get(section, key) !== undefined) return false;
