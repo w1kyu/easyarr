@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Make sure bind-mount sources added after the first release exist on existing installs
+# (umbrelOS only copies committed data/ scaffolding on fresh installs). Idempotent.
+set -euo pipefail
+
+APP_DIR="${APP_DATA_DIR:-$(readlink -f "$(dirname "${BASH_SOURCE[0]}")/..")}"
+DATA_DIR="${APP_DATA_ROOT:-${APP_DIR}/data}"
+
+# Added in 0.0.2: EasyArr's own state (state.json, secrets.json).
+if [[ ! -d "${DATA_DIR}/easyarr" ]]; then
+  mkdir -p "${DATA_DIR}/easyarr"
+  chown 1000:1000 "${DATA_DIR}/easyarr"
+  chmod 700 "${DATA_DIR}/easyarr"
+fi

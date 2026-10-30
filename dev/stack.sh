@@ -77,6 +77,9 @@ check() { # check <description> <expect: ok|fail> <command...>
   fi
 }
 
+init_is_idempotent() { compose run --rm --no-deps init 2>&1 | grep -q 'everything already in place'; }
+dashboard_serves_app() { curl -fsS -m 10 http://localhost:39000/ | grep -q 'id="root"'; }
+
 leaktest() {
   local probe=(docker run --rm --network umbrel_main_network "${BUSYBOX}")
 
@@ -105,8 +108,13 @@ leaktest() {
   check "http://$(c vpn):8080/ answers (SABnzbd)" ok "${probe[@]}" sh -c \
     "wget -S -O /dev/null -T 10 http://$(c vpn):8080/ 2>&1 | grep -q 'HTTP/1'"
 
+  echo "== Init seeded the service configs (UrlBase) and the dashboard API is up"
+  check "sonarr answers under its url base /apps/sonarr" ok "${probe[@]}" wget -q -O /dev/null -T 10 "http://$(c vpn):8989/apps/sonarr/ping"
+  check "dashboard /api/health" ok "${probe[@]}" wget -q -O /dev/null -T 10 "http://$(c dashboard):3000/api/health"
+  check "init is idempotent (second run changes nothing)" ok init_is_idempotent
+
   echo "== Published ports"
-  check "dashboard placeholder on :39000" ok curl -fsS -m 10 -o /dev/null http://localhost:39000/
+  check "dashboard web app on :39000" ok dashboard_serves_app
   check "Jellyfin on :39096" ok curl -fsS -m 10 -o /dev/null http://localhost:39096/health
   check "Jellyseerr on :39055" ok curl -fsS -m 10 -o /dev/null http://localhost:39055/api/v1/status
 

@@ -1,6 +1,6 @@
 # EasyArr — Umbrel app definition (SPEC §3, §5, §6, §19).
 #
-# Phase 01 layout. The VPN-side services share the `vpn` container's network namespace
+# Layout. The VPN-side services share the `vpn` container's network namespace
 # (network_mode: "service:vpn"), so they talk to each other via localhost:<port> and are
 # reached from outside via the container name w1kyu-easyarr_vpn_1:<port>. Internal ports
 # must therefore never collide (see SPEC §3).
@@ -8,57 +8,37 @@
 # Until Phase 04 (VPN wrapper) the `vpn` service runs plain Gluetun with a deliberately
 # unusable WireGuard config: the kill switch is up, the tunnel never connects, so nothing
 # inside the VPN namespace can reach the internet (D-025).
-version: '3.7'
-
 services:
   app_proxy:
     environment:
       APP_HOST: w1kyu-easyarr_dashboard_1
       APP_PORT: 3000
 
-  # One-shot: creates the shared /data tree with the right owner (D-024).
-  # Replaced by the dashboard image's `init` command in Phase 02.
+  # One-shot (SPEC §7.4): /data tree, API keys, minimal service configs. Idempotent (D-031).
   init:
-    image: busybox:1.38.0@sha256:a46257e06c82ad85242d0d38077d0a52d9896389ca60a1a59d3463db586e5fa4
+    image: ghcr.io/w1kyu/easyarr:sha-cacad18@sha256:532f54b5ba946be1597f6c852c23745110b574c83d133c25fb504bf3fe884e89
+    user: '0:0'
+    command: ['init']
     restart: on-failure
+    environment:
+      NETWORK_IP: ${NETWORK_IP}
+      PUID: '1000'
+      PGID: '1000'
     volumes:
       - ${UMBREL_ROOT}/data/storage/EasyArr:/data
-    command:
-      - sh
-      - -c
-      - >-
-        set -e;
-        for d in
-        . downloads downloads/torrents
-        downloads/torrents/movies downloads/torrents/tv downloads/torrents/music
-        downloads/usenet downloads/usenet/incomplete downloads/usenet/complete
-        downloads/usenet/complete/movies downloads/usenet/complete/tv downloads/usenet/complete/music
-        media media/movies media/tv media/music
-        backups;
-        do mkdir -p "/data/$$d"; chown 1000:1000 "/data/$$d"; chmod 2775 "/data/$$d"; done;
-        echo "EasyArr folders ready"
+      - ${APP_DATA_DIR}/data:/appdata
 
-  # Placeholder web page so the app opens inside Umbrel (replaced in Phase 02).
+  # Dashboard + setup wizard (phase 02: shell only).
   dashboard:
-    image: busybox:1.38.0@sha256:a46257e06c82ad85242d0d38077d0a52d9896389ca60a1a59d3463db586e5fa4
+    image: ghcr.io/w1kyu/easyarr:sha-cacad18@sha256:532f54b5ba946be1597f6c852c23745110b574c83d133c25fb504bf3fe884e89
     restart: on-failure
-    user: '1000:1000'
     depends_on:
       init:
         condition: service_completed_successfully
-    command:
-      - sh
-      - -c
-      - >-
-        mkdir -p /tmp/www &&
-        printf '%s' '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Installing…</title><style>body{font-family:system-ui,sans-serif;background:#0b0b0f;color:#fff;display:grid;place-items:center;min-height:100vh;margin:0}main{max-width:32rem;padding:2rem;text-align:center}p{color:#ffffffaa;line-height:1.5}</style></head><body><main><h1>Almost there</h1><p>Your media stack is installed. The setup wizard is coming in a future update.</p><p>Jellyfin: port 39096 · Requests: port 39055</p></main></body></html>' > /tmp/www/index.html &&
-        exec httpd -f -v -p 3000 -h /tmp/www
-    healthcheck:
-      test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://localhost:3000/']
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 10s
+    environment:
+      TZ: 'Etc/UTC'
+    volumes:
+      - ${APP_DATA_DIR}/data/easyarr:/easyarr
 
   # Owns the network namespace for every download/search service (SPEC §5).
   vpn:
