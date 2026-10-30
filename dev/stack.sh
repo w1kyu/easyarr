@@ -97,9 +97,13 @@ leaktest() {
     docker exec "$(c qbittorrent)" curl -fsS -m 8 -o /dev/null http://localhost:8989/ping
 
   echo "== From the Docker network (where the dashboard lives) via $(c vpn)"
-  for port_path in 8090/ 8080/ 9696/ping 8191/ 8989/ping 7878/ping 8686/ping 6767/ 11011/health; do
+  for port_path in 8090/ 9696/ping 8191/ 8989/ping 7878/ping 8686/ping 6767/ 11011/health; do
     check "http://$(c vpn):${port_path}" ok "${probe[@]}" wget -q -O /dev/null -T 10 "http://$(c vpn):${port_path}"
   done
+  # SABnzbd answers 403 to unknown Host headers until its host_whitelist is seeded (phase 05),
+  # so only check that it answers over HTTP at all.
+  check "http://$(c vpn):8080/ answers (SABnzbd)" ok "${probe[@]}" sh -c \
+    "wget -S -O /dev/null -T 10 http://$(c vpn):8080/ 2>&1 | grep -q 'HTTP/1'"
 
   echo "== Published ports"
   check "dashboard placeholder on :39000" ok curl -fsS -m 10 -o /dev/null http://localhost:39000/
