@@ -93,3 +93,45 @@
 **Decision:** Phases may be executed by the Hermes agent running on the owner's umbrelOS server (repo at `/opt/data/easyarr`) instead of Claude Code on a laptop. There, `gh` is not installed; GitHub actions (repo creation, CI status) use the REST API with the owner's token instead. The Docker daemon is not reachable from that sandbox, so Docker/buildx-dependent work (image builds, e2e) is verified in GitHub Actions, not locally.
 **Why:** That's where the owner ran phase 00; installing a Docker socket into the agent sandbox would contradict the project's own security stance.
 **Consequences:** Later phases that need local `docker compose` (01, 04, 05) must either run in CI or on a machine with Docker; note this in each phase's session log.
+
+### D-023 — Storage path, data root and ownership (2026-10-30)
+**Decision:** The shared media folder is mounted as `${UMBREL_ROOT}/data/storage/EasyArr:/data` in every file-handling container. Per-service config lives in `${APP_DATA_DIR}/data/<service>` → `/config` (committed `.gitkeep` scaffolding). The manifest declares `storage: dataRoot: data`. PUID/PGID `1000`, `UMASK=002`.
+**Why:** umbrelOS 2.0 rewrites `${UMBREL_ROOT}/data/storage/...` to `${UMBREL_ROOT}/home/...` (shown as Files → Home → EasyArr), and older versions expect the legacy path. Official apps use the same convention (e.g. paperless). `dataRoot: data` lets users move app data to another drive on 2.0, and Umbrel's packaging guide asks new apps to include it. Umbrel installs package files as `1000:1000`.
+**Alternatives considered:** `${UMBREL_ROOT}/home/EasyArr` directly (2.0-only); using the shared `Downloads` folder (mixes EasyArr data with the user's other downloads and breaks the "one EasyArr folder" promise in SPEC §6).
+
+### D-024 — Phase 01 init container (2026-10-30)
+**Decision:** Until phase 02, `init` is a pinned `busybox` one-shot that creates the `/data` tree and runs `chown 1000:1000` + `chmod 2775` on each folder of the tree. It never recurses, so it doesn't touch user files. Every service waits for it with `depends_on: condition: service_completed_successfully`. Phase 02 replaces it with the dashboard image's `init` command. The API-key strategy (seed vs read, SPEC §7.4) is decided there, where it's implemented.
+**Why:** It needs no custom image yet and is idempotent. The compose condition is supported on umbrelOS: official apps such as affine and plane use it.
+
+### D-025 — Temporary kill switch: Gluetun with an unusable WireGuard config (2026-10-30)
+**Decision:** Until the VPN wrapper exists (phase 04), the `vpn` service runs plain Gluetun with `VPN_SERVICE_PROVIDER=custom` and WireGuard pointed at `192.0.2.1:51820`. That is TEST-NET-1 (RFC 5737), which is never routed. The keys are Gluetun's public documentation examples, not secrets. Gluetun brings up its firewall and keeps retrying, so the namespace has no route out. `FIREWALL_OUTBOUND_SUBNETS=${NETWORK_IP}/16` allows traffic to other containers on Umbrel's network.
+**Why:** With no config at all, Gluetun exits. The container then restart-loops and dependent containers lose their namespace. A valid-but-dead config keeps the namespace alive with the kill switch active. CI proves it: `dev/stack.sh leaktest` checks IP, DNS and HTTP from inside the namespace on amd64 and arm64.
+**Consequences:** The `vpn` container reports *unhealthy* until a real VPN is configured, so dependents use `condition: service_started`. Known gaps, closed by the wrapper (phase 04): (1) a sub-second window at container start before Gluetun installs its rules, (2) a Gluetun crash drops the rules and dependents lose networking until restarted.
+
+### D-026 — Addressing VPN-side services: container names, not `vpn` (2026-10-30)
+**Decision:** Code and config outside the VPN namespace reach VPN-side services as `w1kyu-easyarr_vpn_1:<port>`. Inside the namespace, services use `localhost:<port>`. Other services are reached as `w1kyu-easyarr_<service>_1`. SPEC §3/§5.2 updated.
+**Why:** Every Umbrel app shares `umbrel_main_network`, so a short service alias like `vpn` could clash with another app's service. umbreld always sets `container_name: <app-id>_<service>_1`, and the official guide tells apps to use those names.
+
+### D-027 — GPU via Umbrel's `GPU` permission (2026-10-30)
+**Decision:** The manifest requests `permissions: [GPU]`, and the compose file maps no `/dev/dri` itself. Supersedes the options listed in SPEC §18.
+**Why:** On umbrelOS 2.0, umbreld adds the host's GPU devices and groups to the app's services when a GPU exists and does nothing when there is none. It also strips manual `/dev/dri` mappings. The official Jellyfin app works the same way. Side effect: every EasyArr service gets the device mapping, not only Jellyfin. That's harmless, but it can't be scoped.
+
+### D-028 — Image sources (2026-10-30)
+**Decision:** Images come from these sources:
+- linuxserver images from Docker Hub (`linuxserver/<app>:<version>`), like the official Umbrel apps.
+- Gluetun from `qmcgaw/gluetun`.
+- FlareSolverr, Recyclarr, Unpackerr and Cleanuparr from their official GHCR images.
+- Jellyseerr is now **Seerr** (`ghcr.io/seerr-team/seerr`); the official Umbrel Jellyseerr app moved to it too. The service keeps the name `jellyseerr` for now (UI wording is decided in phase 06/07).
+
+Every image is pinned as `tag@sha256:<multi-arch index digest>`. All images were checked for both `linux/amd64` and `linux/arm64`.
+**Why:** These are maintained upstream sources, and Umbrel's linter accepts them (`--check-images` passes). Pinning by digest is required by CLAUDE.md and the Umbrel guidelines.
+
+### D-029 — Host ports, restart policy, healthchecks (2026-10-30)
+**Decision:**
+- Ports: manifest port `39000`, Jellyfin `39096:8096`, Jellyseerr `39055:5055`. All three are unused in the official store and in Big Bear's community store. Jellyfin's `7359/udp` LAN discovery is **not** published, because it would collide with the official Jellyfin app.
+- Restart policy: every long-running service uses `restart: on-failure`, the Umbrel convention.
+- Healthchecks: added wherever the image has a usable HTTP endpoint and tool (curl/wget).
+
+### D-030 — Dev stack + CI run the real Umbrel compose (2026-10-30)
+**Decision:** `dev/docker-compose.dev.yml` is an *override* on top of the Umbrel compose, not a copy. It adds the `umbrel_main_network` network, the Umbrel container names, a disabled `app_proxy` and the dashboard published on 39000. `dev/stack.sh` sets Umbrel-like env vars and runs `up | wait | leaktest | down`. CI (`umbrel-app.yml`) runs Umbrel's official linter plus the stack + leak test on amd64 **and** arm64 runners.
+**Why:** One source of truth for the stack. It also gives a real Docker test of the kill switch even though the agent sandbox has no Docker (D-022). This still doesn't replace testing on a real Umbrel.

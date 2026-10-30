@@ -74,10 +74,10 @@ All services are **always installed**. The wizard decides which ones are wired u
 | Lidarr | Music | `lscr.io/linuxserver/lidarr` | **VPN** | 8686 | via dashboard proxy |
 | Bazarr | Subtitles | `lscr.io/linuxserver/bazarr` | **VPN** | 6767 | via dashboard proxy |
 | Recyclarr | Applies TRaSH quality profiles to Sonarr/Radarr | `ghcr.io/recyclarr/recyclarr` | **VPN** | — | none |
-| Unpackerr | Extracts RAR downloads | `golift/unpackerr` | **VPN** | — | none |
-| Cleanuparr | Removes stalled/broken downloads | `ghcr.io/cleanuparr/cleanuparr` **[VERIFY image + port]** | **VPN** | 11011 **[VERIFY]** | via dashboard proxy |
+| Unpackerr | Extracts RAR downloads | `ghcr.io/unpackerr/unpackerr` | **VPN** | — | none |
+| Cleanuparr | Removes stalled/broken downloads | `ghcr.io/cleanuparr/cleanuparr` (env `PORT`, `BASE_PATH`) | **VPN** | 11011 | via dashboard proxy |
 | Jellyfin | Media server | `lscr.io/linuxserver/jellyfin` | normal | 8096 | published port |
-| Jellyseerr | Request page | `fallenbagel/jellyseerr` **[VERIFY project/image status]** | normal | 5055 | published port |
+| Jellyseerr | Request page | `ghcr.io/seerr-team/seerr` (Jellyseerr merged into **Seerr**, D-028) | normal | 5055 | published port |
 | init | One-shot: folders, seed configs | `ghcr.io/w1kyu/easyarr` (cmd `init`) | normal | — | none |
 | dashboard | Wizard, dashboard, wiring engine, backups, diagnostics | `ghcr.io/w1kyu/easyarr` | normal | 3000 | Umbrel `app_proxy` (behind Umbrel login) |
 
@@ -88,7 +88,9 @@ Notes:
   so they share one port space → internal ports above are chosen to **not collide**
   (qBittorrent moved to 8090 because SABnzbd uses 8080).
 - Containers inside the VPN namespace reach each other via `localhost:<port>`.
-  Containers outside reach them via `vpn:<port>` (the Gluetun container's hostname).
+  Containers outside reach them via `w1kyu-easyarr_vpn_1:<port>` (Umbrel's injected container name;
+  the short alias `vpn` is not safe on the shared `umbrel_main_network`, D-026).
+- linuxserver images come from Docker Hub (`linuxserver/<app>`), all images pinned `tag@sha256:<index digest>` (D-028).
 
 ---
 
@@ -174,7 +176,8 @@ init (one-shot)                            Recyclarr, Unpackerr, Cleanuparr
 - Inbound from the Docker network to service ports must keep working in all states
   (so the dashboard can always reach the *arr apps, even with the VPN down).
 - Acceptance test: with VPN unconfigured, `curl` to the internet from inside qBittorrent fails;
-  `curl vpn:8989` from the dashboard succeeds.
+  `curl w1kyu-easyarr_vpn_1:8989` from the dashboard succeeds.
+  Automated in `dev/stack.sh leaktest`, run in CI on amd64 + arm64 (D-030).
 
 ### 5.3 VPN wrapper (`vpn/wrapper.sh`) — live reload without Docker socket
 Problem: the wizard must change VPN settings at runtime, but EasyArr does **not** mount the Docker
@@ -217,7 +220,8 @@ Design:
 | dashboard | via `app_proxy`; `port:` in umbrel-app.yml = **39000** | Umbrel opens the app here |
 | Jellyfin | **39096** → 8096 | TV/phone apps need a direct URL |
 | Jellyseerr | **39055** → 5055 | family request page |
-**[VERIFY]** these ports are unused by apps in the official Umbrel store and popular community stores.
+Verified unused in the official store and Big Bear's community store (2026-10-30). Jellyfin's 7359/udp
+discovery port is not published (would clash with the official Jellyfin app, D-029).
 
 ---
 
@@ -225,7 +229,7 @@ Design:
 
 One shared folder on Umbrel's main storage, visible in the Umbrel Files app:
 ```
-${UMBREL_ROOT}/home/EasyArr/              # [VERIFY: correct umbrelOS 1.x user-storage path]
+${UMBREL_ROOT}/home/EasyArr/              # compose uses ${UMBREL_ROOT}/data/storage/EasyArr; umbrelOS 2.0 rewrites it (D-023)
   downloads/
     torrents/{movies,tv,music}
     usenet/{incomplete,complete/{movies,tv,music}}
@@ -236,7 +240,7 @@ ${UMBREL_ROOT}/home/EasyArr/              # [VERIFY: correct umbrelOS 1.x user-s
   Hardlinks fail across separate mounts even on the same disk (EXDEV), so never split
   `downloads` and `media` into two mounts.
 - Per-service configs: `${APP_DATA_DIR}/data/<service>/` → `/config`.
-- PUID/PGID 1000 (Umbrel user) **[VERIFY]**; `UMASK=002`.
+- PUID/PGID 1000 (Umbrel user, verified); `UMASK=002`.
 - `init` creates the tree with correct ownership on every start (idempotent).
 - External drives: v2.
 
@@ -283,8 +287,8 @@ ALL  /apps/:service/*                 # reverse proxy to services
 ```
 
 ### 7.4 init command (one-shot, runs before services)
-`depends_on: { init: { condition: service_completed_successfully } }` for all services **[VERIFY
-Umbrel supports this compose condition]**.
+`depends_on: { init: { condition: service_completed_successfully } }` for all services (verified:
+used by official Umbrel apps).
 - Create `/data` tree, fix ownership.
 - Seed minimal config files **only if absent**: Servarr `config.xml` (UrlBase, AuthenticationMethod,
   ApiKey, Port), qBittorrent.conf (WebUI port 8090, sub-path settings, subnet whitelist, save paths),
@@ -565,10 +569,9 @@ Style: short sentences, numbered steps, one action per step, screenshots where h
 ## 18. Hardware & GPU
 
 - Multi-arch images only (linux/amd64 + linux/arm64). Verify every third-party image supports both.
-- Jellyfin hardware transcoding (Intel/AMD VAAPI/QSV via `/dev/dri`): the app must install and run
-  **with or without** `/dev/dri` present. **[VERIFY** how the official Umbrel Jellyfin app handles
-  devices; options: bind-mount `/dev/dri` (creates empty dir if absent) + device cgroup rules, or
-  `devices:` only if Umbrel tolerates missing devices**]**. System check reports GPU availability;
+- Jellyfin hardware transcoding: the manifest requests `permissions: [GPU]`; umbrelOS 2.0 then maps the
+  host's GPU devices (DRI, ROCm, NVIDIA) into the app when present and nothing when absent. The compose
+  file never maps `/dev/dri` itself (umbreld strips it) (D-027). System check reports GPU availability;
   wiring enables hardware acceleration in Jellyfin only when a usable device exists.
 - Resource limits: consider memory limits for heavy services to protect the rest of the Umbrel.
 
@@ -580,10 +583,11 @@ Style: short sentences, numbered steps, one action per step, screenshots where h
   tagline, description (beginner-friendly), releaseNotes, developer `w1kyu`, website/repo/support
   (GitHub), port 39000, gallery, path "", no default credentials (wizard creates them).
 - `docker-compose.yml`: `app_proxy` with `APP_HOST: w1kyu-easyarr_dashboard_1`, `APP_PORT: 3000`
-  **[VERIFY current naming convention]**; Umbrel env vars (`APP_DATA_DIR`, `UMBREL_ROOT`, `APP_SEED`
-  **[VERIFY]**); restart policies; healthchecks; `depends_on` with conditions.
-- Follow the official umbrel-apps guidelines and linter **[VERIFY: run their lint tooling if available]**
-  so a future official-store submission is easy.
+  (verified); Umbrel env vars `APP_DATA_DIR`, `UMBREL_ROOT`, `NETWORK_IP`, `APP_SEED`, `APP_PASSWORD`,
+  `DEVICE_DOMAIN_NAME` (verified, see PROGRESS.md); `restart: on-failure`; healthchecks; `depends_on`
+  with conditions.
+- `storage: dataRoot: data` + `permissions: [GPU]` in the manifest (D-023, D-027).
+- Umbrel's official linter (`getumbrel/umbrel-apps/.tools/lint-apps.mjs --check-images`) runs in CI.
 
 ---
 
