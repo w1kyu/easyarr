@@ -1,0 +1,25 @@
+/* EasyArr design tokens (own code, MIT). The umbrelOS material/window tokens come from
+   ../vendor/umbrel/index.css; here we only set what umbrelOS normally sets at runtime
+   (brand colour from the wallpaper) and EasyArr's own identity. */
+:root {
+  /* inter-ui v4 ships the variable font as "InterVariable". */
+  --font-inter: 'InterVariable';
+  /* Brand colour (HSL triplets, consumed by the vendored Tailwind config). Violet → blue like the logo. */
+  --color-brand: 258 90% 66%;
+  --color-brand-lighter: 258 90% 72%;
+  --color-brand-lightest: 258 90% 80%;
+  --easyarr-gradient: linear-gradient(135deg, #8b5cf6 0%, #2563eb 100%);
+  color-scheme: dark;
+}
+
+@supports (font-variation-settings: normal) {
+  :root {
+    --font-inter: 'InterVariable';
+  }
+}
+
+/* Only <html> gets the base colour: a background on body/#root would cover the fixed wallpaper. */
+html {
+  min-height: 100%;
+  background: #0b0b14;
+}

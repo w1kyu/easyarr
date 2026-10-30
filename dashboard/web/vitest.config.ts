@@ -1,15 +1,19 @@
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
 
+const src = (p: string) => fileURLToPath(new URL(p, import.meta.url));
+
 export default defineConfig({
   resolve: {
-    // Test against shared sources directly, no prior build needed.
     alias: {
-      '@easyarr/shared': fileURLToPath(new URL('../shared/src/index.ts', import.meta.url)),
+      '@/': src('./src/vendor/umbrel/'),
+      '~/': src('./src/'),
+      '@easyarr/shared': src('../shared/src/index.ts'),
     },
   },
   test: {
     name: 'web',
-    include: ['src/**/*.test.ts', 'test/**/*.test.ts'],
+    environment: 'jsdom',
+    include: ['src/**/*.test.{ts,tsx}'],
   },
 });

@@ -1,0 +1,4 @@
+/* Order matters: Inter font, then the vendored umbrelOS styles (Tailwind + tokens), then ours. */
+@import 'inter-ui/inter-variable-latin.css';
+@import '../vendor/umbrel/index.css';
+@import './tokens.css';

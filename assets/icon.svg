@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="EasyArr logo">
+  <defs>
+    <linearGradient id="ea-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#8B5CF6"/>
+      <stop offset="1" stop-color="#2563EB"/>
+    </linearGradient>
+    <linearGradient id="ea-shine" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff" stop-opacity=".22"/>
+      <stop offset=".55" stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" rx="60" fill="url(#ea-bg)"/>
+  <rect width="256" height="256" rx="60" fill="url(#ea-shine)"/>
+  <path d="M104 62c0-8 8.7-12.9 15.6-8.8l58 34.6c6.7 4 6.7 13.6 0 17.6l-58 34.6c-6.9 4.1-15.6-.8-15.6-8.8z" fill="#fff"/>
+  <path d="M84 168l44 34 44-34" fill="none" stroke="#fff" stroke-width="18" stroke-linecap="round" stroke-linejoin="round" stroke-opacity=".9"/>
+</svg>
