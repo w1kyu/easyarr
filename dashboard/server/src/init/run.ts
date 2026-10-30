@@ -66,6 +66,7 @@ export async function runInit(cfg: InitConfig, log: Logger): Promise<InitReport>
   const secrets = secretsStore(stateDir);
   const loaded = await secrets.load();
   if (loaded.created) changes.push('created easyarr/secrets.json');
+  if (loaded.migrated) changes.push('migrated easyarr/secrets.json');
   const apiKeys = { ...loaded.value.apiKeys };
 
   // 3. Servarr apps: config.xml with our owned keys + an API key we know.

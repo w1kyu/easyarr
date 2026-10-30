@@ -9,6 +9,7 @@ export async function startServer(config: ServeConfig): Promise<void> {
   await stateStore(config.stateDir).load();
   const secrets = await secretsStore(config.stateDir).load();
   registerSecrets(Object.values(secrets.value.apiKeys));
+  if (secrets.value.account) registerSecrets([secrets.value.account.password]);
 
   const app = await buildApp({ config, logger: log });
   const close = async (signal: string) => {

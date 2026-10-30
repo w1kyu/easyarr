@@ -10,6 +10,8 @@ export interface ServeConfig {
   logLevel: string;
   /** EasyArr's own state (state.json, secrets.json). Mounted from ${APP_DATA_DIR}/data/easyarr. */
   stateDir: string;
+  /** EasyArr's media folder (read-only in the dashboard): free space for the system check. */
+  dataDir: string;
   /** Built web app (index.html + assets). */
   webDir: string;
   /** License notices shipped in the image (SPEC §14.1). */
@@ -45,6 +47,7 @@ export function loadServeConfig(env: Env = process.env): ServeConfig {
     version: env['EASYARR_VERSION'] ?? '0.0.0-dev',
     logLevel: env['LOG_LEVEL'] ?? 'info',
     stateDir: path.resolve(env['EASYARR_STATE_DIR'] ?? '/easyarr'),
+    dataDir: path.resolve(env['EASYARR_DATA_ROOT'] ?? '/data'),
     webDir: path.resolve(env['EASYARR_WEB_DIR'] ?? path.join(here, '../../web/dist')),
     licensesDir: path.resolve(env['EASYARR_LICENSES_DIR'] ?? '/licenses'),
   };

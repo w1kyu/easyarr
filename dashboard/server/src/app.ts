@@ -5,14 +5,23 @@ import fastifyStatic from '@fastify/static';
 import { APP_NAME } from '@easyarr/shared';
 import Fastify, { LogController, type FastifyBaseLogger, type FastifyInstance } from 'fastify';
 import type { Logger } from 'pino';
+import type { SystemInfo } from '@easyarr/shared';
 import type { ServeConfig } from './config.js';
+import { collectSystemInfo } from './system/check.js';
+import { wizardRoutes } from './wizard/routes.js';
 
 export interface BuildAppOptions {
-  config: Pick<ServeConfig, 'version' | 'webDir' | 'licensesDir'>;
+  config: Pick<ServeConfig, 'version' | 'webDir' | 'licensesDir' | 'stateDir' | 'dataDir'>;
   logger?: Logger;
+  /** Override hardware detection (tests, e2e). */
+  collectSystemInfo?: () => Promise<SystemInfo>;
 }
 
-export async function buildApp({ config, logger }: BuildAppOptions): Promise<FastifyInstance> {
+export async function buildApp({
+  config,
+  logger,
+  collectSystemInfo: collect,
+}: BuildAppOptions): Promise<FastifyInstance> {
   const app = Fastify({
     ...(logger ? { loggerInstance: logger as FastifyBaseLogger } : { logger: false }),
     logController: new LogController({ disableRequestLogging: true }),
@@ -36,7 +45,27 @@ export async function buildApp({ config, logger }: BuildAppOptions): Promise<Fas
     crossOriginEmbedderPolicy: false,
   });
 
+  // State-changing API calls must be JSON. Browsers only send JSON cross-site after a CORS
+  // preflight, which we never answer, so other sites can't post to the API behind the user's
+  // Umbrel login (simple form posts use text/plain or form encodings) (D-038).
+  app.addHook('onRequest', async (request, reply) => {
+    if (!request.url.startsWith('/api/') || ['GET', 'HEAD', 'OPTIONS'].includes(request.method)) {
+      return;
+    }
+    const type = String(request.headers['content-type'] ?? '')
+      .split(';')[0]
+      ?.trim();
+    if (type !== 'application/json') {
+      return reply.code(415).send({ error: 'unsupported_media_type' });
+    }
+  });
+
   app.get('/api/health', async () => ({ status: 'ok', name: APP_NAME, version: config.version }));
+
+  await app.register(wizardRoutes, {
+    stateDir: config.stateDir,
+    collectSystemInfo: collect ?? (() => collectSystemInfo({ dataDir: config.dataDir })),
+  });
 
   // License notices shipped in the image (SPEC §14.1), linked from the About page.
   if (existsSync(config.licensesDir)) {

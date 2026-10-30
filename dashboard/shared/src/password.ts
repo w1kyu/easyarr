@@ -66,7 +66,13 @@ const COMMON = new Set([
   'plex',
 ]);
 
-const SEQUENCES = ['abcdefghijklmnopqrstuvwxyz', '01234567890', 'qwertyuiop', 'asdfghjkl', 'zxcvbnm'];
+const SEQUENCES = [
+  'abcdefghijklmnopqrstuvwxyz',
+  '01234567890',
+  'qwertyuiop',
+  'asdfghjkl',
+  'zxcvbnm',
+];
 
 function hasSequence(pw: string, length = 4): boolean {
   const lower = pw.toLowerCase();

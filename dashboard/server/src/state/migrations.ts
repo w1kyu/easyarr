@@ -30,6 +30,14 @@ export function migrate(
   return { doc: current, migrated };
 }
 
-/** state.json migrations (none yet — schema 1 is the first). */
-export const stateMigrations: readonly Migration[] = [];
-export const secretsMigrations: readonly Migration[] = [];
+/** state.json migrations. */
+export const stateMigrations: readonly Migration[] = [
+  // v2 (phase 03): the owner's account.
+  { from: 1, migrate: (doc) => ({ ...doc, account: null }) },
+];
+
+/** secrets.json migrations. */
+export const secretsMigrations: readonly Migration[] = [
+  // v2 (phase 03): the account password.
+  { from: 1, migrate: (doc) => ({ ...doc, account: null }) },
+];

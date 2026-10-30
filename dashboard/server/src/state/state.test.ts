@@ -19,7 +19,7 @@ describe('state store', () => {
   it('creates state.json and secrets.json with mode 600', async () => {
     const s = await stateStore(dir).load();
     expect(s.created).toBe(true);
-    expect(s.value.schemaVersion).toBe(1);
+    expect(s.value.schemaVersion).toBe(2);
     await secretsStore(dir).load();
     for (const f of ['state.json', 'secrets.json']) {
       const st = await fs.stat(path.join(dir, f));
@@ -52,6 +52,29 @@ describe('state store', () => {
   it('refuses files from a newer EasyArr', async () => {
     await fs.writeFile(path.join(dir, 'state.json'), JSON.stringify({ schemaVersion: 99 }));
     await expect(stateStore(dir).load()).rejects.toThrow(/newer EasyArr/);
+  });
+});
+
+describe('real migrations', () => {
+  it('v1 → v2 adds an empty account to state.json and secrets.json, keeping everything else', async () => {
+    const v1State = {
+      schemaVersion: 1,
+      createdAt: '2026-10-30T00:00:00.000Z',
+      wizard: { completedSteps: ['welcome'], answers: { welcome: { started: true } } },
+      ui: { mode: 'advanced' },
+    };
+    const v1Secrets = { schemaVersion: 1, apiKeys: { sonarr: 'a'.repeat(32) } };
+    await fs.writeFile(path.join(dir, 'state.json'), JSON.stringify(v1State));
+    await fs.writeFile(path.join(dir, 'secrets.json'), JSON.stringify(v1Secrets));
+
+    const state = await stateStore(dir).load();
+    expect(state.migrated).toBe(true);
+    expect(state.value).toEqual({ ...v1State, schemaVersion: 2, account: null });
+    const secrets = await secretsStore(dir).load();
+    expect(secrets.value).toEqual({ ...v1Secrets, schemaVersion: 2, account: null });
+    // Persisted: a second load doesn't migrate again.
+    expect((await stateStore(dir).load()).migrated).toBe(false);
+    expect((await secretsStore(dir).load()).migrated).toBe(false);
   });
 });
 

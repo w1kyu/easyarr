@@ -9,6 +9,7 @@ describe('config', () => {
       port: 3000,
       stateDir: '/easyarr',
       licensesDir: '/licenses',
+      dataDir: '/data',
       host: '0.0.0.0',
     });
     expect(loadInitConfig({})).toMatchObject({

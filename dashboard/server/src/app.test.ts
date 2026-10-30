@@ -13,7 +13,16 @@ afterAll(async () => {
   await fs.rm(webDir, { recursive: true, force: true });
 });
 
-const make = () => buildApp({ config: { version: '1.2.3', webDir, licensesDir: '/nonexistent' } });
+const make = () =>
+  buildApp({
+    config: {
+      version: '1.2.3',
+      webDir,
+      licensesDir: '/nonexistent',
+      stateDir: path.join(webDir, 'state'),
+      dataDir: webDir,
+    },
+  });
 
 describe('http app', () => {
   it('GET /api/health', async () => {
