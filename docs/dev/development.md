@@ -7,7 +7,26 @@ pnpm install
 pnpm lint && pnpm typecheck && pnpm test && pnpm build
 ```
 
-## 2. Run the whole stack on a laptop
+## 2. Dashboard development (no Docker needed)
+
+```sh
+pnpm dev     # server on :3000 (tsx watch) + web on :5173 (Vite, proxies /api to :3000)
+```
+
+Open http://localhost:5173. In dev builds, http://localhost:5173/dev/ui shows every UI component.
+The dev server keeps its state in `dev/data/dashboard-state/`. To try `init` against throwaway
+folders:
+
+```sh
+cd dashboard/server && pnpm build
+EASYARR_DATA_ROOT=/tmp/ea/data EASYARR_APPDATA_DIR=/tmp/ea/appdata node dist/index.js init
+```
+
+UI code copied from umbrelOS lives in `dashboard/web/src/vendor/umbrel/` and is imported as `@/…`.
+Our own code is imported as `~/…`. If you vendor another file, add it to `PROVENANCE.md`.
+`pnpm lint` fails otherwise (SPEC §14.1).
+
+## 3. Run the whole stack on a laptop
 
 Needs Docker with Compose v2. `dev/stack.sh` runs the real Umbrel compose
 (`umbrel/w1kyu-easyarr/docker-compose.yml`) plus a small override (`dev/docker-compose.dev.yml`)
@@ -28,7 +47,7 @@ Then open:
 
 | What | URL |
 |---|---|
-| Dashboard (placeholder until phase 02) | http://localhost:39000 |
+| Dashboard | http://localhost:39000 |
 | Jellyfin | http://localhost:39096 |
 | Jellyseerr | http://localhost:39055 |
 
@@ -38,7 +57,7 @@ dashboard proxy (`/apps/<service>/`) from phase 05 onwards.
 CI (`.github/workflows/umbrel-app.yml`) runs Umbrel's official app linter, plus
 `up → wait → leaktest` on both amd64 and arm64 for every change under `umbrel/` or `dev/`.
 
-## 3. Test on a real Umbrel
+## 4. Test on a real Umbrel
 
 A local compose run doesn't count as proof that the app works on umbrelOS. Before you release,
 test the full install on a real device.
@@ -81,7 +100,7 @@ an agent check app state and logs. Copying files onto the device still needs SSH
 - Kill switch: `docker exec w1kyu-easyarr_qbittorrent_1 curl -m 8 https://1.1.1.1` must fail.
 - Files app: **Home → EasyArr** contains `downloads`, `media` and `backups`.
 
-## 4. Where things live on umbrelOS
+## 5. Where things live on umbrelOS
 
 | What | Path on the device | In compose |
 |---|---|---|

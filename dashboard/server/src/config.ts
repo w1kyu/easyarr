@@ -44,17 +44,17 @@ export function loadServeConfig(env: Env = process.env): ServeConfig {
     port: int(env['PORT'], 3000, 'PORT'),
     version: env['EASYARR_VERSION'] ?? '0.0.0-dev',
     logLevel: env['LOG_LEVEL'] ?? 'info',
-    stateDir: env['EASYARR_STATE_DIR'] ?? '/easyarr',
-    webDir: env['EASYARR_WEB_DIR'] ?? path.resolve(here, '../../web/dist'),
-    licensesDir: env['EASYARR_LICENSES_DIR'] ?? '/licenses',
+    stateDir: path.resolve(env['EASYARR_STATE_DIR'] ?? '/easyarr'),
+    webDir: path.resolve(env['EASYARR_WEB_DIR'] ?? path.join(here, '../../web/dist')),
+    licensesDir: path.resolve(env['EASYARR_LICENSES_DIR'] ?? '/licenses'),
   };
 }
 
 export function loadInitConfig(env: Env = process.env): InitConfig {
   return {
     logLevel: env['LOG_LEVEL'] ?? 'info',
-    dataRoot: env['EASYARR_DATA_ROOT'] ?? '/data',
-    appDataDir: env['EASYARR_APPDATA_DIR'] ?? '/appdata',
+    dataRoot: path.resolve(env['EASYARR_DATA_ROOT'] ?? '/data'),
+    appDataDir: path.resolve(env['EASYARR_APPDATA_DIR'] ?? '/appdata'),
     networkIp: env['NETWORK_IP'] ?? '10.21.0.0',
     uid: int(env['PUID'], 1000, 'PUID'),
     gid: int(env['PGID'], 1000, 'PGID'),

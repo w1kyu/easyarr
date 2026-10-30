@@ -106,12 +106,18 @@ export async function runInit(cfg: InitConfig, log: Logger): Promise<InitReport>
     const raw = await readFileIfExists(file);
     const ini = new IniFile(raw ?? '');
     let changed = false;
+    const changedKeys: string[] = [];
+    const own_ = (key: string, value: string) => {
+      if (ini.set('Preferences', key, value)) {
+        changed = true;
+        changedKeys.push(key);
+      }
+    };
     // Owned: port + access from the Umbrel Docker network (dashboard proxy, *arr apps).
-    changed = ini.set('Preferences', 'WebUI\\Port', '8090') || changed;
-    changed = ini.set('Preferences', 'WebUI\\AuthSubnetWhitelistEnabled', 'true') || changed;
-    changed =
-      ini.set('Preferences', 'WebUI\\AuthSubnetWhitelist', `${cfg.networkIp}/16`) || changed;
-    changed = ini.set('Preferences', 'WebUI\\HostHeaderValidation', 'false') || changed;
+    own_('WebUI\\Port', '8090');
+    own_('WebUI\\AuthSubnetWhitelistEnabled', 'true');
+    own_('WebUI\\AuthSubnetWhitelist', `${cfg.networkIp}/16`);
+    own_('WebUI\\HostHeaderValidation', 'false');
     // Defaults, only on first creation: qBittorrent rewrites and migrates its file on start, so
     // re-adding defaults it dropped would flip-flop on every start (idempotency).
     if (raw === undefined) {
@@ -123,7 +129,9 @@ export async function runInit(cfg: InitConfig, log: Logger): Promise<InitReport>
       await ensureDir(path.dirname(file), 0o755, own, [], cfg.appDataDir);
       await writeService(file, ini.toString(), own);
       changes.push(
-        `${raw === undefined ? 'created' : 'updated'} qbittorrent/qBittorrent/qBittorrent.conf`,
+        raw === undefined
+          ? 'created qbittorrent/qBittorrent/qBittorrent.conf'
+          : `updated qbittorrent/qBittorrent/qBittorrent.conf (${changedKeys.join(', ')})`,
       );
     }
   }

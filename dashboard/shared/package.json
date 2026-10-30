@@ -15,7 +15,6 @@
     }
   },
   "scripts": {
-    "dev": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run"
