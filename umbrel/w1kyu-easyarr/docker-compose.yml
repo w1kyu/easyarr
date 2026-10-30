@@ -16,7 +16,7 @@ services:
 
   # One-shot (SPEC §7.4): /data tree, API keys, minimal service configs. Idempotent (D-031).
   init:
-    image: ghcr.io/w1kyu/easyarr:sha-d5435e3@sha256:8ed86a629ee14d2eaec7b34fe62e7f6df0f7925dd3391e7f964d7b8dbf241fbc
+    image: ghcr.io/w1kyu/easyarr:sha-6286334@sha256:666a4744a494ab2cc224d70fd4d94a9a720d6235710858fbab4c1af4addb139f
     user: '0:0'
     command: ['init']
     restart: on-failure
@@ -30,7 +30,7 @@ services:
 
   # Dashboard + setup wizard.
   dashboard:
-    image: ghcr.io/w1kyu/easyarr:sha-d5435e3@sha256:8ed86a629ee14d2eaec7b34fe62e7f6df0f7925dd3391e7f964d7b8dbf241fbc
+    image: ghcr.io/w1kyu/easyarr:sha-6286334@sha256:666a4744a494ab2cc224d70fd4d94a9a720d6235710858fbab4c1af4addb139f
     restart: on-failure
     depends_on:
       init:
