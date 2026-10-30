@@ -26,7 +26,7 @@ rm -rf "${STORE_DIR:?}/${APP_ID}"
 cp -R "${SRC}" "${STORE_DIR}/${APP_ID}"
 
 SHA="$(git -C "${ROOT}" rev-parse --short HEAD)"
-VERSION="$(sed -n 's/^version: *"\{0,1\}\([^"]*\)"\{0,1\}$/\1/p' "${SRC}/umbrel-app.yml")"
+VERSION="$(sed -n 's/^version: *//p' "${SRC}/umbrel-app.yml" | tr -d "\"' ")"
 
 git -C "${STORE_DIR}" add -A "${APP_ID}"
 if git -C "${STORE_DIR}" diff --cached --quiet; then
