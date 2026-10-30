@@ -4,15 +4,15 @@
 > Newest session log entries go on top.
 
 ## Current phase
-**Phase 02 — 🟨 in progress.** Phase 01 confirmed on the owner's Umbrel (2026-10-30).
-Current prompt: `prompts/02-dashboard-skeleton.md`.
+**Phase 02 — ✅ done by the agent, waiting for the owner's test (v0.0.2).**
+Next prompt: `prompts/03-wizard-basics.md` (after the owner's checklist below passes).
 
 ## Phase status
 | Phase | Title | Status | Notes |
 |---|---|---|---|
 | 00 | Repos, structure, tooling | ✅ done | w1kyu/easyarr + w1kyu/umbrel-app-store, CI green |
 | 01 | Umbrel app + compose stack | ✅ done | v0.0.1 installed + restarted on owner's Umbrel (x86); CI green amd64/arm64 |
-| 02 | Dashboard skeleton + design system + CI | 🟨 in progress | |
+| 02 | Dashboard skeleton + design system + CI | ✅ done (owner test pending) | v0.0.2; image ghcr.io/w1kyu/easyarr amd64/arm64; stack test green on d72a564 |
 | 03 | Wizard basics (steps 1–4) | ⬜ todo | |
 | 04 | VPN (wrapper, kill switch, wizard step) | ⬜ todo | |
 | 05 | Wiring engine + service proxy | ⬜ todo | |
@@ -44,6 +44,10 @@ Results of SPEC **[VERIFY]** items. Format: `- YYYY-MM-DD — <fact> — <source
 - 2026-10-30 — Dev loop: community stores are git checkouts in `/home/umbrel/umbrel/app-stores/<user>-<repo>-github-<sha256(url)[:8]>` (ours: `w1kyu-umbrel-app-store-github-3363c2d3`), refreshed every 5 min; `sudo umbreld client apps.install.mutate --appId …` etc. — app-repository.ts/app-store.ts (same umbrel commit) + umbrel-apps `.agents/skills/umbrel-test-app/SKILL.md`
 - 2026-10-30 — All SPEC §3 images publish linux/amd64 + linux/arm64 (registry manifest check + Umbrel linter `--check-images`). Cleanuparr: `ghcr.io/cleanuparr/cleanuparr`, port 11011 (`PORT`), supports `BASE_PATH`. Jellyseerr → Seerr (`ghcr.io/seerr-team/seerr`, used by the official Umbrel app). — https://github.com/Cleanuparr/Cleanuparr/blob/4e6b55dc1e18de7f33a575396c4b68ad6b9286ab/code/Dockerfile
 - 2026-10-30 — Gluetun v3.41.3 with a dead WireGuard endpoint keeps running (restarts the tunnel internally) with the firewall up; inside the namespace IP, DNS and HTTP egress fail while inbound from the Docker network works. SABnzbd refuses unknown Host headers (needs `host_whitelist`, phase 05). — CI run 41067981634 (`dev/stack.sh leaktest`)
+- 2026-10-30 — umbrelOS UI lives in `packages/ui` (Tailwind config, `index.css` material/glass tokens, shadcn-style `components/ui/*`); its LICENSE is PolyForm Noncommercial 1.0.0 with **no** "Required Notice:" line → our PROVENANCE.md + verbatim LICENSE.md satisfy §14.1. — https://github.com/getumbrel/umbrel/tree/11e7f5bdfcb5bb8b46f39edd6defb4c37641763a/packages/ui
+- 2026-10-30 — qBittorrent 5 reads web-UI settings from `[WebUI]` (`Port`, `AuthSubnetWhitelist…`, `HostHeaderValidation`); it migrates `[Preferences] WebUI\\*` once (upgrade.cpp `migrateWebUISettings`, `[Meta] MigrationVersion` 11) and rewrites the file on start → init writes `[WebUI]` directly. — https://github.com/qbittorrent/qBittorrent/blob/release-5.3.0/src/app/upgrade.cpp
+- 2026-10-30 — umbrelOS only copies an app's committed `data/` scaffolding on fresh install → new bind-mount sources need a `hooks/pre-start` for existing installs (D-034). — umbreld app.ts (same umbrel commit)
+- 2026-10-30 — pnpm 12 fails `install` in CI on unapproved build scripts (`ERR_PNPM_IGNORED_BUILDS`) → `allowBuilds: { esbuild: true }` in `pnpm-workspace.yaml`. — CI run for 9552a61
 
 ## Open [VERIFY] items
 Copy from SPEC as they get resolved. Highest priority first:
@@ -57,8 +61,8 @@ Copy from SPEC as they get resolved. Highest priority first:
 - [ ] Servarr backup/restore API endpoints
 - [x] Port range 39000/39096/39055 free in official + popular community stores
 - [x] Cleanuparr image name, port, config format (config is created via its UI/API; format TBD in phase 05)
-- [ ] umbrelOS UI code: where components/design tokens live upstream; exact LICENSE text incl. any "Required Notice"
-- [ ] Origin + license of umbrelOS wallpapers, fonts and icons before vendoring any of them
+- [x] umbrelOS UI code: where components/design tokens live upstream; exact LICENSE text incl. any "Required Notice"
+- [x] Origin + license of umbrelOS wallpapers, fonts and icons before vendoring any of them (none vendored; own wallpaper, Inter from `inter-ui` (OFL), Lucide icons)
 
 ## Known issues
 - `vpn` shows **unhealthy** until a VPN is configured. This is expected and intended (D-025).
@@ -67,7 +71,9 @@ Copy from SPEC as they get resolved. Highest priority first:
   lose networking until they are restarted.
 - SABnzbd refuses requests through other hostnames until `host_whitelist` is seeded (phase 05).
 - Recyclarr and Unpackerr run with empty configs (they idle and log warnings) until wiring exists (phase 05).
-- The app has no icon yet (phase 02 creates the logo).
+- Bazarr, Recyclarr, Unpackerr and Cleanuparr configs plus sub-path settings (SABnzbd `url_base`, qBittorrent
+  reverse proxy) are not seeded yet (phase 05, D-031).
+- Service tiles on the home screen show static status pills (no live status until phase 07).
 
 ## Ideas / later
 - The template's comment says the store name shows as "<name> App Store" (→ "w1kyu Apps App Store");
@@ -78,6 +84,29 @@ Copy from SPEC as they get resolved. Highest priority first:
 - umbrelOS 2.0 `environment:` manifest settings could expose a few safe knobs (e.g. TZ) in Umbrel's app settings.
 
 ## Session log
+### 2026-10-30 — Phase 02: dashboard skeleton, design system, image (Hermes agent on the owner's Umbrel)
+- Server (`dashboard/server`): Fastify + helmet (no HSTS/upgrade-insecure-requests, D-032), pino logger with
+  secret redaction, versioned JSON state/secrets store (atomic, mode 600), `/api/health`, SPA + `/licenses`.
+- `init` (same image, root): `/data` tree, API keys seeded or adopted, minimal Servarr/qBittorrent/SABnzbd
+  configs; idempotent incl. after services rewrite their files (unit tests + `dev/stack.sh leaktest` in CI) (D-031).
+- Web (`dashboard/web`): React 19/Vite/Tailwind 4/Radix/react-router/TanStack Query/i18next (D-033).
+  Owner-approved umbrelOS UI files vendored to `src/vendor/umbrel/` with LICENSE + PROVENANCE; CI guard
+  `scripts/check-vendor.mjs` in `pnpm lint`. Own logo (`assets/icon.svg`), own pre-blurred wallpaper,
+  stepper/status pill/empty state, `/dev/ui` showcase (dev only). Checked in a browser at desktop + 390 px.
+- Image: `dashboard/Dockerfile` (build on $BUILDPLATFORM, node:26.13.0-alpine runtime, `serve` as uid 1000,
+  notices in `/licenses`); `.github/workflows/image.yml` → `ghcr.io/w1kyu/easyarr` (edge, sha-*, semver) with
+  smoke test (D-034). Package public.
+- Umbrel app v0.0.2: dashboard + init use `ghcr.io/w1kyu/easyarr:sha-c17ca1b@sha256:822b1628…`; manifest icon;
+  `hooks/pre-start` creates `data/easyarr` on existing installs. Umbrel linter: 0 errors (2 expected warnings).
+  CI green on d72a564 (lint/test/build + stack/kill-switch amd64 + arm64). Fresh clone passes all checks.
+- Fixes along the way: SPA fallback swallowed missing assets; relative config paths; pnpm 12 ignored builds;
+  qBittorrent 5 `[WebUI]` layout (init flip-flopped every start).
+- Owner checklist (phase 02):
+  - [ ] Update EasyArr to 0.0.2 in the Umbrel App Store (store refreshes every ~5 min)
+  - [ ] Open EasyArr: logo, "Setup is coming soon" and the app tiles appear; looks at home in umbrelOS
+  - [ ] Looks right on the phone
+  - [ ] Jellyfin and Jellyseerr still open; app restarts fine
+  - [ ] Feedback on look & logo
 ### 2026-10-30 — Phase 01 verified on the owner's Umbrel (umbrelOS 2.0, Dell Precision 3630, x86_64)
 - Owner: store added, EasyArr v0.0.1 installed, placeholder, Jellyfin and Jellyseerr open, restart OK.
 - Agent via Umbrel MCP: app `ready`, no operation failures; app data scaffolding populated
