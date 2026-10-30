@@ -1,0 +1,11 @@
+**/node_modules
+**/dist
+**/coverage
+.git
+dev/data
+umbrel
+docs
+prompts
+*.md
+!NOTICE.md
+!dashboard/web/src/vendor/umbrel/*.md
