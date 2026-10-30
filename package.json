@@ -9,18 +9,20 @@
   },
   "scripts": {
     "dev": "pnpm --parallel --filter \"./dashboard/*\" dev",
-    "lint": "eslint . && prettier --check .",
+    "lint": "eslint . && prettier --check . && node scripts/check-vendor.mjs",
     "format": "prettier --write .",
     "typecheck": "pnpm -r typecheck",
     "test": "vitest run",
     "test:e2e": "echo \"No e2e tests yet (added in phase 05)\"",
-    "build": "pnpm -r build"
+    "build": "pnpm -r build",
+    "check:vendor": "node scripts/check-vendor.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/node": "^26.6.6",
     "eslint": "^10.13.0",
     "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react-hooks": "^7.1.1",
     "globals": "^17.13.0",
     "prettier": "^3.9.10",
     "typescript": "~6.0.3",
