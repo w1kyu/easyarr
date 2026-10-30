@@ -5,11 +5,12 @@ storage:
 category: media
 name: EasyArr
 icon: https://raw.githubusercontent.com/w1kyu/easyarr/main/assets/icon.svg
-version: '0.0.2'
+version: '0.0.3'
 tagline: Your own Netflix-style media setup, wired up for you
 description: >-
   ⚠️ PREVIEW — not ready for everyday use yet. This early build installs all services, but the
-  setup wizard is still being built and downloading is switched off until you can add a VPN.
+  setup wizard is still being built (first 4 steps so far) and downloading is switched off until
+  you can add a VPN.
 
 
   EasyArr sets up a complete media automation stack on your Umbrel and connects everything for
@@ -28,9 +29,10 @@ description: >-
 
   Jellyfin opens on port 39096 and the request page on port 39055 of your Umbrel.
 releaseNotes: >-
-  The EasyArr dashboard arrives: a new home screen in the style of umbrelOS with all included apps,
-  quick links to Jellyfin and Jellyseerr, and the EasyArr logo. Behind the scenes, EasyArr now
-  prepares the service settings it needs for the setup wizard (coming next).
+  The setup wizard begins: a welcome page, an automatic check of your Umbrel (processor, memory,
+  free space, graphics), creating your account, and choosing torrents, Usenet or both. Your
+  progress is saved after every step. "What's this?" links open short help pages right in the app.
+  VPN setup comes next.
 
 developer: w1kyu
 website: https://github.com/w1kyu/easyarr

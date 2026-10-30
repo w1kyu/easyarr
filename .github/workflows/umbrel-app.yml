@@ -6,11 +6,13 @@ on:
     paths:
       - 'umbrel/**'
       - 'dev/**'
+      - 'e2e/**'
       - '.github/workflows/umbrel-app.yml'
   pull_request:
     paths:
       - 'umbrel/**'
       - 'dev/**'
+      - 'e2e/**'
       - '.github/workflows/umbrel-app.yml'
   workflow_dispatch:
 
@@ -61,6 +63,19 @@ jobs:
         run: dev/stack.sh wait 900
       - name: Kill-switch leak test + reachability
         run: dev/stack.sh leaktest
+      # Wizard e2e against the real stack (the dashboard image pinned in the compose).
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Wizard e2e against the stack (Playwright)
+        env:
+          E2E_BASE_URL: http://localhost:39000
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm exec playwright install --with-deps chromium
+          pnpm test:e2e
       - name: Show state and logs
         if: always()
         run: |

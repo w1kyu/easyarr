@@ -309,7 +309,7 @@ into docs, Back/Next, progress indicator. Answers saved per step (refresh-safe).
 | # | Step | Content |
 |---|---|---|
 | 1 | **Welcome** | What EasyArr does, short legal note (use only for content you have the right to download/share; you're responsible for local laws). Buttons: **Start setup** / **Restore from backup** (→ §11). |
-| 2 | **System check** (automatic) | Arch, RAM, free disk, GPU. Plain verdicts: ✅ / ⚠️ / ❌ with explanation. Thresholds: RAM < 4 GB ❌ (allow continue with warning), 4–8 GB ⚠️, ≥ 8 GB ✅; disk < 50 GB free ⚠️. No GPU → "Jellyfin works, heavy transcoding will be slow". |
+| 2 | **System check** (automatic) | Arch, RAM, free disk, GPU. Plain verdicts: ✅ / ⚠️ / ❌ with explanation. Thresholds: RAM < 4 GB ❌ (allow continue with warning), 4–8 GB ⚠️, ≥ 8 GB ✅ (measured with slack for what the OS reports, D-037); disk < 50 GB free ⚠️. No GPU → "Jellyfin works, heavy transcoding will be slow". |
 | 3 | **Create your account** | Username + password (strength meter). Used for Jellyfin admin (and Jellyseerr via Jellyfin login), plus any service that needs its own auth. Explain that family accounts are created later (link to doc). |
 | 4 | **How do you want to download?** | Torrents / Usenet / Both. Cards with pros/cons. Usenet card links to *Usenet 101*. |
 | 5 | **VPN** | See §9. Must end with a successful connection test (or explicit "skip for now" which keeps the kill switch closed → downloads won't work; clearly explained). |
