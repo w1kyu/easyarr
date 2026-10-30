@@ -4,25 +4,15 @@
 > Newest session log entries go on top.
 
 ## Current phase
-**Phase 01 — 🟨 built, waiting for the owner's test on a real Umbrel.** The app is in the
-`w1kyu Apps` store (v0.0.1). CI proves on amd64 and arm64 that all containers come up healthy and that the kill switch holds.
-Once the owner's checklist below passes, mark 01 ✅. Next prompt: `prompts/02-dashboard-skeleton.md`.
-
-### Owner test checklist — phase 01 (on your Umbrel)
-- [ ] App Store → ⋯ → Community App Stores → add `https://github.com/w1kyu/umbrel-app-store` → it shows **w1kyu Apps**
-- [ ] Install **EasyArr**; opening it shows the "Almost there" placeholder page
-- [ ] `http://umbrel.local:39096` shows the Jellyfin setup page; `http://umbrel.local:39055` shows Jellyseerr
-- [ ] Files → Home → **EasyArr** contains `downloads`, `media`, `backups`
-- [ ] Restart the app (right-click icon → Restart) → still opens
-- [ ] Uninstall + reinstall works
-- [ ] Optional (needs SSH): `sudo docker exec w1kyu-easyarr_qbittorrent_1 curl -m 8 https://1.1.1.1` fails
+**Phase 02 — 🟨 in progress.** Phase 01 confirmed on the owner's Umbrel (2026-10-30).
+Current prompt: `prompts/02-dashboard-skeleton.md`.
 
 ## Phase status
 | Phase | Title | Status | Notes |
 |---|---|---|---|
 | 00 | Repos, structure, tooling | ✅ done | w1kyu/easyarr + w1kyu/umbrel-app-store, CI green |
-| 01 | Umbrel app + compose stack | 🟨 awaiting owner test | v0.0.1 in store; CI stack + leak test green (amd64/arm64) |
-| 02 | Dashboard skeleton + design system + CI | ⬜ todo | |
+| 01 | Umbrel app + compose stack | ✅ done | v0.0.1 installed + restarted on owner's Umbrel (x86); CI green amd64/arm64 |
+| 02 | Dashboard skeleton + design system + CI | 🟨 in progress | |
 | 03 | Wizard basics (steps 1–4) | ⬜ todo | |
 | 04 | VPN (wrapper, kill switch, wizard step) | ⬜ todo | |
 | 05 | Wiring engine + service proxy | ⬜ todo | |
@@ -88,6 +78,14 @@ Copy from SPEC as they get resolved. Highest priority first:
 - umbrelOS 2.0 `environment:` manifest settings could expose a few safe knobs (e.g. TZ) in Umbrel's app settings.
 
 ## Session log
+### 2026-10-30 — Phase 01 verified on the owner's Umbrel (umbrelOS 2.0, Dell Precision 3630, x86_64)
+- Owner: store added, EasyArr v0.0.1 installed, placeholder, Jellyfin and Jellyseerr open, restart OK.
+- Agent via Umbrel MCP: app `ready`, no operation failures; app data scaffolding populated
+  (`data/<service>/` configs created by each service); storage data root movable (`canMoveExternally: true`);
+  logs show the kill switch holding on the real device (Gluetun retries against 192.0.2.1; Prowlarr/Radarr
+  DNS lookups fail with "Resource temporarily unavailable"); memory use ≈1.1 GB idle.
+- Not checked by the agent: `Home/EasyArr` (not granted to MCP) — owner confirmed Files shows it.
+
 ### 2026-10-30 — Phase 01: Umbrel app + compose stack (Hermes agent on the owner's Umbrel)
 - Research: read umbreld 2.0 source (getumbrel/umbrel@11e7f5b) + umbrel-apps@7eef63f incl. its packaging/testing
   agent guides and linter; resolved the phase's [VERIFY] items (see Verified facts).
