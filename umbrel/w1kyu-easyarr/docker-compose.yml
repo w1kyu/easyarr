@@ -48,7 +48,7 @@ services:
 
   # Owns the network namespace for every download/search service (SPEC §5).
   vpn:
-    image: ghcr.io/w1kyu/easyarr-vpn:sha-dbbe22b@sha256:1cfce5f6f9466bc95c597ab214aa54eac4114a549c7504de8a5d7cdb0401b8d3
+    image: ghcr.io/w1kyu/easyarr-vpn:sha-bbccd9c@sha256:1df456259646ae2dc1ebc787b59b010eae4ff72c12e7f209740a02d43652d092
     restart: on-failure
     cap_add:
       - NET_ADMIN

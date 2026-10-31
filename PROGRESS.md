@@ -128,7 +128,7 @@ Copy from SPEC as they get resolved. Highest priority first:
   connected, home IP hidden, port forwarding) — 3 consecutive local runs green. Stack test now also
   saves a dead-end VPN through the dashboard and checks no egress while Gluetun tries + during a
   reload, the vpn container stays healthy, other apps get 403, Gluetun's control server needs the key.
-- Umbrel app v0.0.4: vpn = `easyarr-vpn:sha-dbbe22b@sha256:1cfce5f6…`, services wait for
+- Umbrel app v0.0.4: vpn = `easyarr-vpn:sha-bbccd9c@sha256:1df45625…`, services wait for
   `vpn` healthy, dashboard + init `sha-19fe549@sha256:c679f7b8…`, dashboard mounts the VPN folder
   and gets `NETWORK_IP`. Linter: 0 errors.
 - Caught by the stack leak test: with no VPN, apps could still look up names through Docker's DNS
