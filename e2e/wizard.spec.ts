@@ -104,7 +104,12 @@ test('step 4: choose a download method', async ({ page }) => {
 test('step 5: "Skip for now" explains honestly that downloads stay off', async ({ page }) => {
   await page.goto('/setup/vpn');
   await expect(page.getByText('Step 5 of 5')).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Best for torrents' })).toBeVisible();
+  // On the stack the leak test has already saved a VPN, so step 5 opens that provider first.
+  const list = page.getByRole('heading', { name: 'Best for torrents' });
+  const other = page.getByRole('button', { name: 'Other provider' });
+  await expect(list.or(other)).toBeVisible();
+  if (await other.isVisible()) await other.click();
+  await expect(list).toBeVisible();
   await page.getByRole('button', { name: 'Skip for now' }).click();
   const dialog = page.getByRole('dialog');
   await expect(dialog.getByText(/EasyArr never downloads without a VPN/)).toBeVisible();
