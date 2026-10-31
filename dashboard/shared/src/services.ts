@@ -26,8 +26,13 @@ export interface ServiceInfo {
   network: 'vpn' | 'normal';
   /** Internal port, or null for headless services. */
   port: number | null;
-  /** Path prefix the dashboard proxies the UI under (phase 05), null if not proxied. */
+  /** Path prefix the dashboard proxies the UI under (SPEC §5.5), null if not proxied. */
   urlBase: string | null;
+  /**
+   * The service has no URL-base setting: the proxy removes the prefix before forwarding, and the
+   * service must only use relative links (D-045).
+   */
+  stripPrefix?: boolean;
   /** Host port when the UI is published directly (SPEC §5.6). */
   publishedPort?: number;
 }
@@ -59,6 +64,7 @@ export const SERVICES: readonly ServiceInfo[] = [
     network: 'vpn',
     port: 8090,
     urlBase: '/apps/qbittorrent',
+    stripPrefix: true,
   },
   { id: 'sabnzbd', name: 'SABnzbd', network: 'vpn', port: 8080, urlBase: '/apps/sabnzbd' },
   { id: 'bazarr', name: 'Bazarr', network: 'vpn', port: 6767, urlBase: '/apps/bazarr' },
@@ -88,4 +94,16 @@ export function containerName(service: string): string {
 /** Host that reaches a service from outside the VPN namespace (D-026). */
 export function serviceHost(id: ServiceId): string {
   return getService(id).network === 'vpn' ? containerName('vpn') : containerName(id);
+}
+
+/** Services whose web UI the dashboard proxies under their urlBase (SPEC §5.5). */
+export function proxiedServices(): ServiceInfo[] {
+  return SERVICES.filter((s) => s.urlBase !== null && s.port !== null);
+}
+
+/** Base URL that reaches a service's HTTP port from the dashboard (D-026). */
+export function serviceUrl(id: ServiceId): string {
+  const s = getService(id);
+  if (s.port === null) throw new Error(`${id} has no HTTP port`);
+  return `http://${serviceHost(id)}:${s.port}`;
 }

@@ -12,6 +12,7 @@ import { Mutex } from './state/mutex.js';
 import { collectSystemInfo } from './system/check.js';
 import { VpnFiles } from './vpn/files.js';
 import { GluetunClient } from './vpn/gluetun.js';
+import { proxyRoutes } from './proxy/routes.js';
 import { PortSync, QbittorrentClient } from './vpn/port-sync.js';
 import { vpnRoutes } from './vpn/routes.js';
 import { VpnService } from './vpn/service.js';
@@ -22,7 +23,10 @@ export type AppConfig = Pick<
   'version' | 'webDir' | 'licensesDir' | 'stateDir' | 'dataDir'
 > &
   Partial<
-    Pick<ServeConfig, 'vpnDir' | 'gluetunUrl' | 'qbittorrentUrl' | 'homeIpUrls' | 'trustedClients'>
+    Pick<
+      ServeConfig,
+      'vpnDir' | 'gluetunUrl' | 'qbittorrentUrl' | 'homeIpUrls' | 'trustedClients' | 'serviceUrls'
+    >
   >;
 
 export interface Services {
@@ -96,15 +100,19 @@ export async function buildApp({
   });
 
   app.addHook('onRequest', async (request, reply) => {
-    if (!request.url.startsWith('/api/') || request.url.startsWith('/api/health')) return;
-    // Only Umbrel's app gateway (behind the Umbrel login) and loopback may use the API. Every Umbrel
-    // app shares one Docker network, so without this any other app could read or change EasyArr's
-    // settings. The socket address is used on purpose: X-Forwarded-For can be forged (D-041).
+    const isApi = request.url.startsWith('/api/') && !request.url.startsWith('/api/health');
+    const isApp = request.url.startsWith('/apps/');
+    if (!isApi && !isApp) return;
+    // Only Umbrel's app gateway (behind the Umbrel login) and loopback may use the API and the
+    // proxied service UIs. Every Umbrel app shares one Docker network, so without this any other app
+    // could read or change EasyArr's settings or reach Sonarr & co. through us. The socket address
+    // is used on purpose: X-Forwarded-For can be forged (D-041, D-045).
     const remote = normalizeIp(request.socket.remoteAddress);
     if (!trusted.has(remote)) {
       request.log.warn({ remote }, 'API request from an untrusted address refused');
       return reply.code(403).send({ error: 'forbidden' });
     }
+    if (isApp) return; // the services bring their own body formats; CSRF is checked by the proxy
     // State-changing API calls must be JSON. Browsers only send JSON cross-site after a CORS
     // preflight, which we never answer, so other sites can't post to the API behind the user's
     // Umbrel login (simple form posts use text/plain or form encodings) (D-038).
@@ -125,6 +133,7 @@ export async function buildApp({
     lock: svc.lock,
   });
   await app.register(vpnRoutes, { vpn: svc.vpn, portSync: svc.portSync });
+  await app.register(proxyRoutes, { serviceUrls: config.serviceUrls ?? {} });
 
   // License notices shipped in the image (SPEC §14.1), linked from the About page.
   if (existsSync(config.licensesDir)) {
@@ -146,6 +155,7 @@ export async function buildApp({
     // API routes and missing files (anything with an extension) are real 404s.
     if (
       pathname.startsWith('/api/') ||
+      pathname.startsWith('/apps/') ||
       /\.[a-z0-9]+$/i.test(pathname) ||
       request.method !== 'GET' ||
       !hasWeb

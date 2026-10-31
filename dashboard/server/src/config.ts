@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { APP_ID } from '@easyarr/shared';
+import { APP_ID, SERVICES, type ServiceId } from '@easyarr/shared';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -24,6 +24,8 @@ export interface ServeConfig {
   qbittorrentUrl: string;
   /** Services that tell us our own public IP (outside the VPN) for the "home IP hidden" check. */
   homeIpUrls: string[];
+  /** Upstream overrides for the service proxy and wiring (dev/e2e), e.g. sonarr=http://127.0.0.1:8989. */
+  serviceUrls: Partial<Record<ServiceId, string>>;
   /**
    * Addresses allowed to call the API: loopback plus Umbrel's app gateway (the Docker network's
    * gateway, NETWORK_IP + 1). Other apps on Umbrel's shared network are refused (D-041).
@@ -68,6 +70,20 @@ const list = (v: string | undefined) =>
     .map((s) => s.trim())
     .filter(Boolean);
 
+/** "sonarr=http://a:1, radarr=http://b:2" → { sonarr: 'http://a:1', radarr: 'http://b:2' } */
+export function parseServiceUrls(value: string | undefined): Partial<Record<ServiceId, string>> {
+  const out: Partial<Record<ServiceId, string>> = {};
+  for (const item of list(value)) {
+    const [id, url] = item.split('=', 2);
+    const known = SERVICES.find((s) => s.id === id);
+    if (!known || !url || !/^https?:\/\/[^/]+$/.test(url)) {
+      throw new Error(`EASYARR_SERVICE_URLS: expected <service>=http://host:port, got "${item}"`);
+    }
+    out[known.id] = url;
+  }
+  return out;
+}
+
 export function loadServeConfig(env: Env = process.env): ServeConfig {
   const vpnHost = `${APP_ID}_vpn_1`;
   const gateway = env['NETWORK_IP'] ? networkGateway(env['NETWORK_IP']) : null;
@@ -86,6 +102,7 @@ export function loadServeConfig(env: Env = process.env): ServeConfig {
     homeIpUrls: env['EASYARR_HOME_IP_URLS']
       ? list(env['EASYARR_HOME_IP_URLS'])
       : ['https://api.ipify.org?format=json', 'https://ipv4.icanhazip.com'],
+    serviceUrls: parseServiceUrls(env['EASYARR_SERVICE_URLS']),
     trustedClients: [
       '127.0.0.1',
       '::1',
