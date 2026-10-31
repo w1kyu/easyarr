@@ -209,3 +209,25 @@ All other values are left alone. A second run changes nothing (unit-tested, and 
 - **Help viewer:** `docs/*.md` are bundled with `import.meta.glob` (one small chunk per page) and rendered with `react-markdown` + `remark-gfm` (MIT, no raw HTML). "What's this?" opens a dialog; `/help/<page>` shows the page.
 - **After step 4** (until phase 04): the home screen says the first part is done and offers "Review your answers".
 - **E2E:** Playwright (`e2e/`) walks steps 1–4 as one user, including refresh, help dialog and validation. It runs against a local dashboard with temporary state (CI job `Wizard e2e`) and against the full Docker stack in `umbrel-app.yml`.
+
+### D-040 — VPN container: wrapper around Gluetun, kill switch owned by EasyArr (2026-10-31)
+**Decision:** The `vpn` service runs `ghcr.io/w1kyu/easyarr-vpn` = Gluetun v3.41.3 + a POSIX-shell wrapper (PID 1 under tini).
+- The wrapper applies a **default-deny** firewall (only loopback and the Docker network subnet are allowed, plus a guard rule that drops anything leaving the Docker interface without its own source address) *before* anything else, and again whenever Gluetun isn't running (waiting for settings, reload, crash, shutdown). Inbound from the Docker network to service ports always works, so the dashboard can reach Sonarr & co. even without a VPN.
+- It never exits on VPN changes: the dashboard writes `vpn.env`; the wrapper restarts only the Gluetun process. Crash loops back off; the counter resets after 5 stable minutes.
+- `vpn.env` keys are **allowlisted** (provider, protocol, credentials, server filters, port forwarding). Firewall, DNS, control-server and other Gluetun settings can't be changed from the dashboard side, so a bug or attacker there can't switch the kill switch off.
+- An **iptables guard** shadows every iptables binary Gluetun may call and turns `-P OUTPUT/FORWARD ACCEPT` into DROP (Gluetun resets policies to ACCEPT while reconfiguring).
+- The container health check means "kill switch in place", not "VPN connected" — a container without a VPN account is healthy and safe.
+**Why:** Plain Gluetun exits or opens up while reconfiguring and needs a container restart (which restarts every service in the namespace) for new settings. SPEC §5.3 requires zero leaks in every state. Tested: `vpn/test/smoke.sh` in CI (amd64 + arm64): unconfigured, invalid config, reload and crash → no egress; Docker network → service port works.
+
+### D-041 — VPN files, control-server auth, API access (2026-10-31)
+**Decision:**
+- `${APP_DATA_DIR}/data/vpn` is `/gluetun` in the vpn container and `/vpn` in the dashboard. `easyarr/` (0700, uid 1000) holds `vpn.env` + `custom/` (0600, written by the dashboard), `status.json` + `gluetun.log` (written by the wrapper). Secrets also live in `secrets.json`; `state.json` keeps only non-secret settings and the last test result.
+- Gluetun's control server (:8000) is locked with an **API key** (`auth/config.toml`, written by init; the wrapper writes a random lock-out key if the file is missing). The dashboard sends it as `X-API-Key`.
+- The dashboard's `/api/*` (except `/api/health`) only answers **loopback and Umbrel's app gateway** (`NETWORK_IP + 1`), by socket address (X-Forwarded-For is ignored). Every Umbrel app shares one Docker network; without this any other app could read or change EasyArr's VPN settings.
+- Wizard step 5 is "configured" only after a passed connection test of the *current* settings; "skip" keeps the kill switch closed.
+- The "home IP hidden" check asks a public what-is-my-IP service from the dashboard (outside the VPN) and compares it with Gluetun's public IP. If that service is unreachable the test passes but says it couldn't double-check.
+**Why:** SPEC §5.4/§9; least privilege between containers.
+
+### D-042 — VPN provider catalog and server list (2026-10-31)
+**Decision:** `@easyarr/shared/vpn-providers.ts` lists every Gluetun provider with per-protocol fields, port-forwarding support (`auto` / `static` / `none`) and a tutorial. Groups: *Best for torrents* (port forwarding: Proton VPN, PIA, AirVPN, PrivateVPN, Perfect Privacy), *Also works*, *Custom* (WireGuard `.conf` / OpenVPN `.ovpn`). Tests compare it with Gluetun's own provider/WireGuard/port-forwarding lists. Server locations come from Gluetun v3.41.3's `servers.json` (`scripts/gen-vpn-servers.mjs`, checked in CI with `--check`), so the country picker only offers locations Gluetun can actually select (incl. "port forwarding only" and "free only" filters). IPv6 WireGuard addresses are dropped (Docker on Umbrel has no IPv6). Port forwarding: the dashboard keeps qBittorrent's listening port equal to the forwarded port (every 30 s and right after a passed test).
+**Why:** One source of truth for the form, the validation and Gluetun's settings; a beginner can't pick a combination Gluetun would reject.
