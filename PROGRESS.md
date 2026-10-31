@@ -134,6 +134,8 @@ Copy from SPEC as they get resolved. Highest priority first:
 - Caught by the stack leak test: with no VPN, apps could still look up names through Docker's DNS
   (127.0.0.11 → host resolver, outside the VPN). Fixed: the kill switch blocks Docker's DNS (D-043);
   image smoke test and stack test check lookups fail.
+- Final: CI, VPN image, Umbrel linter and the stack + kill-switch test green on amd64 + arm64 for
+  19c8ad4; fresh clone green (152 unit tests); store synced (v0.0.4, store 5a36ec1).
 - Decisions D-040…D-043.
 - Owner checklist (phase 04 — update to / install 0.0.4):
   - [ ] Wizard step 5: set up your VPN following only the in-app guide
