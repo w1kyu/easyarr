@@ -17,11 +17,15 @@ RUN apk add --no-cache tini
 
 COPY vpn/rootfs/ /
 COPY LICENSE /licenses/EasyArr-LICENSE
-# The guard shadows every iptables variant Gluetun may pick (D-040).
+# The guard shadows every iptables variant Gluetun may pick (D-040); /usr/local/sbin must come first
+# in PATH for Gluetun's exec lookups.
+ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 RUN chmod 755 /easyarr/*.sh /easyarr/iptables-guard \
+ && mkdir -p /usr/local/sbin \
  && for n in iptables iptables-nft iptables-legacy ip6tables ip6tables-nft ip6tables-legacy; do \
       ln -sf /easyarr/iptables-guard "/usr/local/sbin/$n"; \
     done \
+ && echo "iptables -> $(command -v iptables)" \
  && [ "$(command -v iptables)" = /usr/local/sbin/iptables ]
 
 ENV EASYARR_VPN_DIR=/gluetun/easyarr \
