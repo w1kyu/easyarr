@@ -4,7 +4,7 @@ import { z } from 'zod';
  * state.json — everything EasyArr remembers except secrets (SPEC §7.2).
  * Bump STATE_SCHEMA_VERSION and add a migration in migrations.ts for every breaking change.
  */
-export const STATE_SCHEMA_VERSION = 3;
+export const STATE_SCHEMA_VERSION = 4;
 
 export const vpnTestResultSchema = z.object({
   ok: z.boolean(),
@@ -17,6 +17,29 @@ export const vpnTestResultSchema = z.object({
   homeIpHidden: z.boolean().nullable(),
 });
 export type VpnTestResult = z.infer<typeof vpnTestResultSchema>;
+
+/** A resource the wiring engine created or adopted in a service (SPEC §10.2, D-047). */
+export const ledgerEntrySchema = z.object({
+  /** Stable logical key, e.g. "sonarr.downloadclient.qbittorrent". */
+  key: z.string(),
+  service: z.string(),
+  kind: z.string(),
+  /** The service's own id for it (stringified). */
+  id: z.string(),
+  name: z.string(),
+  createdAt: z.string(),
+  /** true = it existed already (e.g. made by the user) and EasyArr only took note of it. */
+  adopted: z.boolean(),
+});
+export type LedgerEntry = z.infer<typeof ledgerEntrySchema>;
+
+export const wiringRunSchema = z.object({
+  at: z.string(),
+  mode: z.enum(['run', 'repair', 'startup']),
+  ok: z.boolean(),
+  changes: z.number().int(),
+});
+export type WiringRunSummary = z.infer<typeof wiringRunSchema>;
 
 export const stateSchema = z.object({
   schemaVersion: z.literal(STATE_SCHEMA_VERSION),
@@ -50,6 +73,13 @@ export const stateSchema = z.object({
       lastTest: vpnTestResultSchema.nullable(),
     })
     .nullable(),
+  /** Wiring engine (v4, phase 05): what EasyArr created in each service, and settings it set once. */
+  wiring: z.object({
+    ledger: z.array(ledgerEntrySchema),
+    /** Keys of one-time settings already applied (never re-applied: the user may have changed them). */
+    applied: z.array(z.string()),
+    lastRun: wiringRunSchema.nullable(),
+  }),
 });
 export type State = z.infer<typeof stateSchema>;
 
@@ -61,6 +91,7 @@ export function defaultState(now = new Date()): State {
     ui: { mode: 'simple' },
     account: null,
     vpn: null,
+    wiring: { ledger: [], applied: [], lastRun: null },
   };
 }
 
