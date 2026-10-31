@@ -15,15 +15,16 @@ const issues = (input: unknown) => {
 };
 
 describe('wizard registry', () => {
-  it('lists steps 1–4 in order, each with a schema', () => {
+  it('lists steps 1–5 in order, each with a schema', () => {
     expect(WIZARD_STEPS.map((s) => s.id)).toEqual([...WIZARD_STEP_IDS]);
-    expect(WIZARD_STEP_IDS).toEqual(['welcome', 'system', 'account', 'download']);
+    expect(WIZARD_STEP_IDS).toEqual(['welcome', 'system', 'account', 'download', 'vpn']);
   });
 
   it('resumes at the first unfinished visible step', () => {
     expect(nextWizardStep({}, [])).toBe('welcome');
     expect(nextWizardStep({}, ['welcome', 'system'])).toBe('account');
-    expect(nextWizardStep({}, ['welcome', 'system', 'account', 'download'])).toBeNull();
+    expect(nextWizardStep({}, ['welcome', 'system', 'account', 'download'])).toBe('vpn');
+    expect(nextWizardStep({}, ['welcome', 'system', 'account', 'download', 'vpn'])).toBeNull();
     // Order of completion doesn't matter, gaps are found.
     expect(nextWizardStep({}, ['account', 'welcome'])).toBe('system');
   });
@@ -47,8 +48,8 @@ describe('wizard registry', () => {
     ).toEqual({ welcome: { started: true }, account: { username: 'kevin' } });
   });
 
-  it('all steps 1–4 are always visible', () => {
-    expect(visibleWizardSteps({ download: { method: 'usenet' } })).toHaveLength(4);
+  it('all steps 1–5 are always visible', () => {
+    expect(visibleWizardSteps({ download: { method: 'usenet' } })).toHaveLength(5);
   });
 });
 

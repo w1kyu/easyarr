@@ -71,6 +71,26 @@ describe('init', () => {
     expect(st.mode & 0o777).toBe(0o600);
   });
 
+  it("prepares the VPN folder and locks Gluetun's control server to the dashboard key", async () => {
+    await runInit(cfg, log);
+    const key = (await secrets()).apiKeys['gluetun'];
+    expect(key).toMatch(/^[a-f0-9]{32}$/);
+    const toml = await read('vpn/auth/config.toml');
+    expect(toml).toContain(`apikey = "${key}"`);
+    expect(toml).toContain('auth = "apikey"');
+    expect(toml).not.toContain('"none"');
+    expect(toml).toContain('"GET /v1/publicip/ip"');
+    expect(toml).not.toContain('PUT');
+    const mode = async (rel: string) =>
+      (await fs.stat(path.join(cfg.appDataDir, rel))).mode & 0o777;
+    expect(await mode('vpn/auth/config.toml')).toBe(0o600);
+    expect(await mode('vpn/easyarr')).toBe(0o700);
+    expect(await mode('vpn/easyarr/custom')).toBe(0o700);
+    // A lock file the VPN wrapper wrote earlier is replaced by ours.
+    await fs.writeFile(path.join(cfg.appDataDir, 'vpn/auth/config.toml'), 'locked');
+    expect((await runInit(cfg, log)).changes).toEqual(['wrote vpn/auth/config.toml']);
+  });
+
   it('is idempotent: a second run changes nothing', async () => {
     await runInit(cfg, log);
     const before = await snapshot(root);

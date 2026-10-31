@@ -34,10 +34,14 @@ export function migrate(
 export const stateMigrations: readonly Migration[] = [
   // v2 (phase 03): the owner's account.
   { from: 1, migrate: (doc) => ({ ...doc, account: null }) },
+  // v3 (phase 04): VPN settings.
+  { from: 2, migrate: (doc) => ({ ...doc, vpn: null }) },
 ];
 
 /** secrets.json migrations. */
 export const secretsMigrations: readonly Migration[] = [
   // v2 (phase 03): the account password.
   { from: 1, migrate: (doc) => ({ ...doc, account: null }) },
+  // v3 (phase 04): VPN secrets.
+  { from: 2, migrate: (doc) => ({ ...doc, vpn: null }) },
 ];

@@ -37,6 +37,26 @@ export interface InitReport {
   changes: string[];
 }
 
+/** Routes of Gluetun's control server the dashboard uses (everything else stays locked). */
+export const GLUETUN_ROUTES = [
+  'GET /v1/version',
+  'GET /v1/vpn/status',
+  'GET /v1/publicip/ip',
+  'GET /v1/portforward',
+] as const;
+
+export function gluetunAuthConfig(apiKey: string): string {
+  return [
+    '# Written by EasyArr init — changes are overwritten.',
+    '[[roles]]',
+    'name = "easyarr-dashboard"',
+    'auth = "apikey"',
+    `apikey = "${apiKey}"`,
+    `routes = [${GLUETUN_ROUTES.map((r) => `"${r}"`).join(', ')}]`,
+    '',
+  ].join('\n');
+}
+
 export function generateApiKey(): string {
   return randomBytes(16).toString('hex');
 }
@@ -179,7 +199,29 @@ export async function runInit(cfg: InitConfig, log: Logger): Promise<InitReport>
     }
   }
 
-  // 6. Persist keys (only if something changed).
+  // 6. VPN folder (D-041): EasyArr's files for the wrapper (vpn.env, status, custom configs) and the
+  //    API key the dashboard uses for Gluetun's control server. Gluetun reads the auth file when it
+  //    starts; without it every control-server route stays locked.
+  {
+    const vpnDir = path.join(cfg.appDataDir, 'vpn');
+    await ensureDir(path.join(vpnDir, 'easyarr'), 0o700, own, changes, cfg.appDataDir);
+    await ensureDir(path.join(vpnDir, 'easyarr', 'custom'), 0o700, own, changes, cfg.appDataDir);
+    await ensureDir(path.join(vpnDir, 'auth'), 0o700, own, changes, cfg.appDataDir);
+    const key =
+      apiKeys['gluetun'] && /^[a-f0-9]{32}$/.test(apiKeys['gluetun'])
+        ? apiKeys['gluetun']
+        : generateApiKey();
+    apiKeys['gluetun'] = key;
+    const authFile = path.join(vpnDir, 'auth', 'config.toml');
+    const desired = gluetunAuthConfig(key);
+    if ((await readFileIfExists(authFile)) !== desired) {
+      await writeFileAtomic(authFile, desired, 0o600);
+      await own(authFile);
+      changes.push('wrote vpn/auth/config.toml');
+    }
+  }
+
+  // 7. Persist keys (only if something changed).
   const keysChanged = JSON.stringify(apiKeys) !== JSON.stringify(loaded.value.apiKeys);
   if (keysChanged) {
     await secrets.save({ ...loaded.value, apiKeys });

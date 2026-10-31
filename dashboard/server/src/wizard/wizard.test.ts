@@ -68,6 +68,7 @@ describe('wizard API', () => {
         { id: 'system', completed: false },
         { id: 'account', completed: false },
         { id: 'download', completed: false },
+        { id: 'vpn', completed: false },
       ],
       next: 'welcome',
       answers: {},
@@ -94,7 +95,7 @@ describe('wizard API', () => {
     const res = await post(app, 'account', GOOD);
     expect(res.statusCode).toBe(409);
     expect(res.json()).toEqual({ error: 'previous_steps_incomplete', issues: [] });
-    expect((await post(app, 'vpn', {})).statusCode).toBe(404);
+    expect((await post(app, 'teleport', {})).statusCode).toBe(404);
     expect((await app.inject({ method: 'GET', url: '/api/wizard/nope' })).statusCode).toBe(404);
   });
 
@@ -192,10 +193,18 @@ describe('wizard API', () => {
     });
   });
 
-  it('finishes steps 1–4 (next = null) and keeps the chosen method', async () => {
+  it('after step 4 the VPN step is next; it can be skipped, but "configured" needs a passed test', async () => {
     const app = await make();
     await finishThrough(app, 'download');
-    const view = (await app.inject({ method: 'GET', url: '/api/wizard' })).json();
+    let view = (await app.inject({ method: 'GET', url: '/api/wizard' })).json();
+    expect(view.next).toBe('vpn');
+    const untested = await post(app, 'vpn', { mode: 'configured' });
+    expect(untested.statusCode).toBe(400);
+    expect(untested.json().issues).toEqual([
+      { path: 'mode', message: 'wizard.error.vpnNotTested' },
+    ]);
+    expect((await post(app, 'vpn', { mode: 'skipped' })).statusCode).toBe(200);
+    view = (await app.inject({ method: 'GET', url: '/api/wizard' })).json();
     expect(view.next).toBeNull();
     expect(view.answers.download).toEqual({ method: 'both' });
     expect((await post(app, 'download', { method: 'fax' })).statusCode).toBe(400);

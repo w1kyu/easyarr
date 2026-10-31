@@ -64,14 +64,19 @@ export const downloadAnswersSchema = z.object({
 });
 export type DownloadAnswers = z.infer<typeof downloadAnswersSchema>;
 
+/** Step 5: the VPN is set up and tested, or the user skipped it for now (kill switch stays closed). */
+export const vpnAnswersSchema = z.object({ mode: z.enum(['configured', 'skipped']) });
+export type VpnAnswers = z.infer<typeof vpnAnswersSchema>;
+
 export interface WizardAnswers {
   welcome?: WelcomeAnswers;
   system?: SystemAnswers;
   account?: AccountAnswers;
   download?: DownloadAnswers;
+  vpn?: VpnAnswers;
 }
 
-export const WIZARD_STEP_IDS = ['welcome', 'system', 'account', 'download'] as const;
+export const WIZARD_STEP_IDS = ['welcome', 'system', 'account', 'download', 'vpn'] as const;
 export type WizardStepId = (typeof WIZARD_STEP_IDS)[number];
 
 export interface WizardStepDef {
@@ -89,6 +94,7 @@ export const WIZARD_STEPS: readonly WizardStepDef[] = [
   { id: 'system', answers: systemAnswersSchema, isVisible: always },
   { id: 'account', answers: accountAnswersSchema, isVisible: always },
   { id: 'download', answers: downloadAnswersSchema, isVisible: always },
+  { id: 'vpn', answers: vpnAnswersSchema, isVisible: always },
 ];
 
 export function isWizardStepId(id: string): id is WizardStepId {

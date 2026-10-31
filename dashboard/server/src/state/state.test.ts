@@ -19,7 +19,7 @@ describe('state store', () => {
   it('creates state.json and secrets.json with mode 600', async () => {
     const s = await stateStore(dir).load();
     expect(s.created).toBe(true);
-    expect(s.value.schemaVersion).toBe(2);
+    expect(s.value.schemaVersion).toBe(3);
     await secretsStore(dir).load();
     for (const f of ['state.json', 'secrets.json']) {
       const st = await fs.stat(path.join(dir, f));
@@ -56,7 +56,7 @@ describe('state store', () => {
 });
 
 describe('real migrations', () => {
-  it('v1 → v2 adds an empty account to state.json and secrets.json, keeping everything else', async () => {
+  it('v1 → v3 adds an empty account + VPN to state.json and secrets.json, keeping everything else', async () => {
     const v1State = {
       schemaVersion: 1,
       createdAt: '2026-10-30T00:00:00.000Z',
@@ -69,9 +69,9 @@ describe('real migrations', () => {
 
     const state = await stateStore(dir).load();
     expect(state.migrated).toBe(true);
-    expect(state.value).toEqual({ ...v1State, schemaVersion: 2, account: null });
+    expect(state.value).toEqual({ ...v1State, schemaVersion: 3, account: null, vpn: null });
     const secrets = await secretsStore(dir).load();
-    expect(secrets.value).toEqual({ ...v1Secrets, schemaVersion: 2, account: null });
+    expect(secrets.value).toEqual({ ...v1Secrets, schemaVersion: 3, account: null, vpn: null });
     // Persisted: a second load doesn't migrate again.
     expect((await stateStore(dir).load()).migrated).toBe(false);
     expect((await secretsStore(dir).load()).migrated).toBe(false);

@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { loadInitConfig, loadServeConfig } from './config.js';
+import { loadInitConfig, loadServeConfig, networkGateway } from './config.js';
 
 describe('config', () => {
   it('uses container defaults', () => {
@@ -24,6 +24,17 @@ describe('config', () => {
     const c = loadServeConfig({ EASYARR_WEB_DIR: 'web/dist', EASYARR_STATE_DIR: './state' });
     expect(path.isAbsolute(c.webDir)).toBe(true);
     expect(path.isAbsolute(c.stateDir)).toBe(true);
+  });
+
+  it('trusts loopback and the Docker gateway of NETWORK_IP; finds Gluetun by container name', () => {
+    const c = loadServeConfig({ NETWORK_IP: '10.21.0.0', EASYARR_TRUSTED_CLIENTS: '192.168.1.5' });
+    expect(c.trustedClients).toEqual(['127.0.0.1', '::1', '10.21.0.1', '192.168.1.5']);
+    expect(loadServeConfig({}).trustedClients).toEqual(['127.0.0.1', '::1']);
+    expect(c.gluetunUrl).toBe('http://w1kyu-easyarr_vpn_1:8000');
+    expect(c.qbittorrentUrl).toBe('http://w1kyu-easyarr_vpn_1:8090');
+    expect(c.vpnDir).toBe('/vpn');
+    expect(networkGateway('10.21.0.0')).toBe('10.21.0.1');
+    expect(networkGateway('nope')).toBeNull();
   });
 
   it('rejects invalid numbers', () => {

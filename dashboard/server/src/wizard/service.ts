@@ -2,6 +2,7 @@ import {
   accountInputSchema,
   canOpenWizardStep,
   downloadAnswersSchema,
+  vpnAnswersSchema,
   getWizardStep,
   nextWizardStep,
   parseWizardAnswers,
@@ -14,22 +15,18 @@ import {
 } from '@easyarr/shared';
 import type { z } from 'zod';
 import { hashPassword } from '../auth/password.js';
+import { ApiError, type Issue } from '../http-errors.js';
 import { registerSecrets } from '../logger.js';
 import { secretsStore, stateStore, type State } from '../state/index.js';
+import type { Mutex } from '../state/mutex.js';
 
-export interface Issue {
-  path: string;
-  /** An i18n key (`wizard.error.*`) when we wrote the rule, otherwise zod's English message. */
-  message: string;
-}
-
-export class WizardError extends Error {
+export class WizardError extends ApiError {
   constructor(
-    readonly status: 400 | 404 | 409,
-    readonly code: 'invalid' | 'unknown_step' | 'previous_steps_incomplete',
-    readonly issues: Issue[] = [],
+    status: 400 | 404 | 409,
+    code: 'invalid' | 'unknown_step' | 'previous_steps_incomplete',
+    issues: Issue[] = [],
   ) {
-    super(code);
+    super(status, code, issues);
   }
 }
 
@@ -47,17 +44,14 @@ function parseOrThrow<T>(schema: z.ZodType<T>, body: unknown): T {
  * resumes where the user left off. Writes are serialised — state.json is read-modify-written.
  */
 export class WizardService {
-  private queue: Promise<unknown> = Promise.resolve();
-
   constructor(
     private readonly stateDir: string,
     private readonly systemCheck: () => Promise<SystemCheckResult>,
+    private readonly lock: Mutex,
   ) {}
 
   private serialize<T>(fn: () => Promise<T>): Promise<T> {
-    const run = this.queue.then(fn, fn);
-    this.queue = run.catch(() => undefined);
-    return run;
+    return this.lock.run(fn);
   }
 
   async view(): Promise<WizardView> {
@@ -117,6 +111,22 @@ export class WizardService {
         case 'download':
           stepAnswers = parseOrThrow(downloadAnswersSchema, body);
           break;
+        case 'vpn': {
+          // "configured" only after a successful connection test of the current settings
+          // (SPEC §8 step 5); "skipped" keeps the kill switch closed.
+          const parsed = parseOrThrow(vpnAnswersSchema, body);
+          const test = state.vpn?.lastTest;
+          if (
+            parsed.mode === 'configured' &&
+            !(test?.ok && test.at >= (state.vpn?.configuredAt ?? ''))
+          ) {
+            throw new WizardError(400, 'invalid', [
+              { path: 'mode', message: 'wizard.error.vpnNotTested' },
+            ]);
+          }
+          stepAnswers = parsed;
+          break;
+        }
       }
       // Belt and braces: what we store must match the step's stored-answers schema.
       parseOrThrow(getWizardStep(id).answers, stepAnswers);

@@ -5,3 +5,4 @@ export * from './system-check.js';
 export * from './wizard.js';
 export * from './vpn-providers.js';
 export * from './vpn-servers.generated.js';
+export * from './vpn-status.js';
