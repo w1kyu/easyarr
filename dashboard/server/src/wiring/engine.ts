@@ -161,7 +161,7 @@ export class StepContext {
    * Applies a setting once. Afterwards it's the user's: EasyArr never re-applies it, not even
    * on repair (only connections are repaired). Returns true if it was applied now.
    */
-  async once(key: string, apply: () => Promise<boolean | void>): Promise<boolean> {
+  async once(key: string, apply: () => Promise<boolean | undefined>): Promise<boolean> {
     if (this.snapshot.applied.includes(key)) return false;
     const changed = await apply();
     if (changed !== false) this.changes += 1;

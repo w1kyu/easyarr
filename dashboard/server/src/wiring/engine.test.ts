@@ -72,6 +72,7 @@ function setup() {
         });
         await ctx.once('sonarr.hardlinks', async () => {
           svc.setting = 'hardlinks-on';
+          return true;
         });
       },
     },
@@ -125,11 +126,12 @@ describe('wiring engine (SPEC §10.2)', () => {
   it('never overwrites user changes: a changed resource and a changed setting stay', async () => {
     const { svc, engine } = setup();
     await engine.run('run', plan);
-    svc.items.get('1')!.value = 'user-changed';
+    const item = svc.items.get('1');
+    if (item) item.value = 'user-changed';
     svc.setting = 'user-turned-it-off';
     const r = await engine.run('run', plan);
     expect(r.changes).toBe(0);
-    expect(svc.items.get('1')!.value).toBe('user-changed');
+    expect(svc.items.get('1')?.value).toBe('user-changed');
     expect(svc.setting).toBe('user-turned-it-off');
   });
 
