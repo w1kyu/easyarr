@@ -4,18 +4,21 @@ import type { VpnFieldId, VpnProtocol } from './vpn-providers.js';
 
 export type VpnConnection = 'not_configured' | 'connecting' | 'connected' | 'error' | 'unknown';
 
-export type VpnProblemCode =
-  | 'wrongKey'
-  | 'authFailed'
-  | 'noServer'
-  | 'invalidSettings'
-  | 'certificate'
-  | 'unreachable'
-  | 'system'
-  | 'controlServer'
-  | 'vpnContainer'
-  | 'homeIpVisible'
-  | 'unknown';
+/** Plain-language problems; the web shows `vpn.problem.<code>.title` / `.fix`. */
+export const VPN_PROBLEM_CODES = [
+  'wrongKey',
+  'authFailed',
+  'noServer',
+  'invalidSettings',
+  'certificate',
+  'unreachable',
+  'system',
+  'controlServer',
+  'vpnContainer',
+  'homeIpVisible',
+  'unknown',
+] as const;
+export type VpnProblemCode = (typeof VPN_PROBLEM_CODES)[number];
 
 export interface PortForwardingView {
   /** off = not wanted / not supported; auto/static as in the catalog. */

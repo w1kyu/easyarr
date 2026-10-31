@@ -124,7 +124,17 @@ export class VpnService {
         ...(resolvedEndpointIp ? { resolvedEndpointIp } : {}),
       });
       if (input.provider === 'custom' && input.protocol === 'openvpn' && fields.ovpnConfig) {
-        await this.opts.files.writeCustomOvpn(fields.ovpnConfig);
+        // Gluetun only accepts an IP in `remote` (the kill switch blocks DNS before the tunnel is
+        // up), so names are looked up once here, like custom WireGuard endpoints.
+        let ovpn: string;
+        try {
+          ovpn = await resolveOvpnRemotes(fields.ovpnConfig, this.opts.resolve ?? defaultResolve);
+        } catch {
+          throw new VpnError(400, 'invalid', [
+            { path: 'fields.ovpnConfig', message: 'vpn.error.endpointResolve' },
+          ]);
+        }
+        await this.opts.files.writeCustomOvpn(ovpn);
       } else {
         await this.opts.files.removeCustomOvpn();
       }
@@ -207,6 +217,14 @@ export class VpnService {
     const diagnosis = diagnoseGluetunLog(logLines);
     const configuredAt = Math.floor(Date.parse(st.configuredAt) / 1000);
 
+    // The wrapper picks up new settings within a second; until then status.json (and the log)
+    // still describe the old settings, e.g. the crash that made the user fix their password.
+    if (wrapper.since < configuredAt - 1) {
+      if (nowSec - configuredAt > 30) {
+        return { ...base, connection: 'error', problem: { code: 'vpnContainer', line: null } };
+      }
+      return { ...base, connection: 'connecting' };
+    }
     if (wrapper.state === 'crashed' || wrapper.state === 'stopped') {
       return {
         ...base,
@@ -214,10 +232,7 @@ export class VpnService {
         problem: diagnosis ?? { code: 'unknown', line: null },
       };
     }
-    // The wrapper picks up new settings within a second; until then the old Gluetun may still run.
-    if (wrapper.state !== 'running' || wrapper.since < configuredAt - 1) {
-      return { ...base, connection: 'connecting' };
-    }
+    if (wrapper.state !== 'running') return { ...base, connection: 'connecting' };
     const runningFor = base.runningFor ?? 0;
     const timeout = this.opts.connectTimeoutSec ?? 90;
     try {
@@ -359,6 +374,21 @@ export class VpnService {
     }
     return null;
   }
+}
+
+/** Replaces host names in `remote <host> [port] [proto]` lines with their IPv4 address. */
+export async function resolveOvpnRemotes(
+  text: string,
+  resolve: (host: string) => Promise<string>,
+): Promise<string> {
+  const lines = text.split(/\r?\n/);
+  const out: string[] = [];
+  for (const line of lines) {
+    const m = /^(\s*remote\s+)(\S+)(.*)$/.exec(line);
+    if (m?.[1] && m[2] && !isIP(m[2])) out.push(`${m[1]}${await resolve(m[2])}${m[3] ?? ''}`);
+    else out.push(line);
+  }
+  return out.join('\n');
 }
 
 /** Values in Gluetun's env that are secrets (keys, users, passwords, certificates). */

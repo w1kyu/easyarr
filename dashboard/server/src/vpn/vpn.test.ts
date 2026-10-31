@@ -226,6 +226,15 @@ describe('VPN settings API', () => {
       fields: { ovpnConfig: 'client\nremote 198.51.100.9 1194\n' },
     });
     expect(await vpnFile('custom/client.ovpn')).toContain('remote 198.51.100.9');
+    // A host name in `remote` is looked up on save (Gluetun only takes IPs).
+    await postJson(app, '/api/vpn/config', {
+      provider: 'custom',
+      protocol: 'openvpn',
+      fields: { ovpnConfig: 'client\nremote nl1.example.org 1194 udp\ndev tun\n' },
+    });
+    expect(await vpnFile('custom/client.ovpn')).toBe(
+      'client\nremote 198.51.100.4 1194 udp\ndev tun',
+    );
     expect((await fs.stat(path.join(vpnDir, 'easyarr/custom/client.ovpn'))).mode & 0o777).toBe(
       0o600,
     );
@@ -292,6 +301,19 @@ describe('VPN status', () => {
     expect(await get(app, '/api/vpn/status')).toMatchObject({
       connection: 'error',
       problem: { code: 'wrongKey', line: expect.stringContaining('private key is not valid') },
+    });
+  });
+
+  it('ignores a crash from before the settings were saved; a wrapper that never reacts is reported', async () => {
+    const app = await make();
+    await writeWrapperStatus('crashed', nowMs - 60_000, { exitCode: 1 });
+    await fs.writeFile(path.join(vpnDir, 'easyarr', 'gluetun.log'), 'ERROR AUTH_FAILED\n');
+    await postJson(app, '/api/vpn/config', proton());
+    expect((await get(app, '/api/vpn/status')).connection).toBe('connecting');
+    nowMs += 60_000;
+    expect(await get(app, '/api/vpn/status')).toMatchObject({
+      connection: 'error',
+      problem: { code: 'vpnContainer' },
     });
   });
 
