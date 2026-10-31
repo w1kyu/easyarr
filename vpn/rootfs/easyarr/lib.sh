@@ -93,3 +93,15 @@ backoff_seconds() {
   [ "$_s" -gt 60 ] && _s=60
   echo "$_s"
 }
+
+# client_ips FILE — the valid IPv4 addresses in FILE (one per line, '#' comments), at most 16.
+# The dashboard writes its own address and the request page's there (D-046).
+client_ips() {
+  [ -r "$1" ] || return 0
+  sed 's/#.*//; s/[[:space:]]//g' "$1" | awk -F. '
+    NF == 4 && $0 ~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/ {
+      ok = 1
+      for (i = 1; i <= 4; i++) if ($i > 255 || $i ~ /^0[0-9]/) ok = 0
+      if (ok && !seen[$0]++ && n++ < 16) print $0
+    }'
+}

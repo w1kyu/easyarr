@@ -86,6 +86,31 @@ apply_guard() {
     _ipt -t mangle -I POSTROUTING 1 -o "$NET_IF" ! -s "$NET_IP" -j DROP
 }
 
+# Inbound allowlist (D-046): every Umbrel app shares one Docker network, and the services in here
+# trust whoever reaches them (the dashboard puts them behind the Umbrel login). New connections from
+# the Docker network are therefore only accepted from the addresses the dashboard lists in FILE (its
+# own and the request page's). An empty or missing list allows the whole network (first start,
+# before the dashboard has written it). Lives in the mangle table, next to the guard, where Gluetun
+# never looks; VPN traffic arrives from outside the Docker network and is never affected.
+apply_inbound_allowlist() {
+  "$IPT4" -t mangle -N EASYARR_IN 2>/dev/null || true
+  _ips=$(client_ips "$1")
+  _ipt -t mangle -F EASYARR_IN
+  if [ -n "$_ips" ]; then
+    for _ip in $_ips; do _ipt -t mangle -A EASYARR_IN -s "$_ip" -j RETURN; done
+    _ipt -t mangle -A EASYARR_IN -j DROP
+  fi
+  for _s in $OUTBOUND_SUBNETS; do
+    "$IPT4" -t mangle -C PREROUTING -i "$NET_IF" -s "$_s" -m conntrack --ctstate NEW -j EASYARR_IN 2>/dev/null ||
+      _ipt -t mangle -A PREROUTING -i "$NET_IF" -s "$_s" -m conntrack --ctstate NEW -j EASYARR_IN
+  done
+  if [ -n "$_ips" ]; then
+    log "inbound from the Docker network: only $(echo "$_ips" | tr '\n' ' ')"
+  else
+    log "inbound from the Docker network: anyone (no list yet)"
+  fi
+}
+
 # Default-deny egress. DROP policies come first, so there is no moment where traffic is allowed.
 # Only the filter table is flushed: the nat table holds Docker's embedded-DNS rules, mangle the guard.
 apply_deny() {

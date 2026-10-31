@@ -20,6 +20,7 @@ DIR=${EASYARR_VPN_DIR:-/gluetun/easyarr}
 ENV_FILE=$DIR/vpn.env
 RELOAD_FILE=$DIR/reload
 STATUS_FILE=$DIR/status.json
+CLIENTS_FILE=$DIR/allowed-clients
 LOG_FILE=$DIR/gluetun.log
 AUTH_FILE=${HTTP_CONTROL_SERVER_AUTH_CONFIG_FILEPATH:-/gluetun/auth/config.toml}
 GLUETUN_BIN=${GLUETUN_BIN:-/gluetun-entrypoint}
@@ -38,6 +39,8 @@ log "kill switch closed (default-deny egress)"
 
 mkdir -p "$DIR"
 save_resolv_conf
+CLIENTS_FP=$(fingerprint "$CLIENTS_FILE")
+apply_inbound_allowlist "$CLIENTS_FILE"
 
 # The control server must never be open without authentication. The dashboard's key is written by
 # EasyArr's init; if it's missing, lock every route with a random key instead of Gluetun's defaults.
@@ -157,6 +160,13 @@ while [ "$STOPPING" = 0 ]; do
   elif [ -n "$GLUETUN_PID" ] && [ "$CRASHES" -gt 0 ] && [ $((now - STARTED_AT)) -ge "$STABLE_AFTER" ]; then
     CRASHES=0
     write_status "$STATUS_FILE" running '' 0
+  fi
+
+  # Inbound allowlist changed (the dashboard or the request page got a new address).
+  cfp=$(fingerprint "$CLIENTS_FILE")
+  if [ "$cfp" != "$CLIENTS_FP" ]; then
+    CLIENTS_FP=$cfp
+    apply_inbound_allowlist "$CLIENTS_FILE"
   fi
 
   # Keep Gluetun's log from filling the disk.

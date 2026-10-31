@@ -63,6 +63,17 @@ check "Docker network -> service port inside works" ok wait_for 10 docker run --
 # A closed port on the gateway answers "refused" when allowed; a blocked packet would time out.
 check "inside -> Docker network works" ok docker run --rm --network container:ea-vpn "$BUSYBOX" sh -c "wget -T 5 -O /dev/null http://10.99.0.1:1/ 2>&1 | grep -q refused"
 
+echo "== Inbound allowlist (D-046): only listed Docker-network addresses reach the services"
+allowed() { docker run --rm --network "$NET" --ip 10.99.0.50 "$BUSYBOX" wget -q -T 5 -O /dev/null http://ea-vpn:8989/passwd; }
+other() { docker run --rm --network "$NET" --ip 10.99.0.51 "$BUSYBOX" wget -q -T 5 -O /dev/null http://ea-vpn:8989/passwd; }
+docker exec ea-vpn sh -c 'printf "10.99.0.50\n" > /gluetun/easyarr/allowed-clients'
+check "wrapper applied the list" ok wait_for 10 sh -c "docker exec ea-vpn iptables -t mangle -S EASYARR_IN | grep -q -- '-s 10.99.0.50/32'"
+check "listed address -> service port works" ok allowed
+check "other address -> service port blocked" fail other
+check "inside -> Docker network still works (replies aren't new connections)" ok docker run --rm --network container:ea-vpn "$BUSYBOX" sh -c "wget -T 5 -O /dev/null http://10.99.0.1:1/ 2>&1 | grep -q refused"
+docker exec ea-vpn rm /gluetun/easyarr/allowed-clients
+check "list removed -> anyone on the Docker network again" ok wait_for 10 other
+
 echo "== The guard keeps the kill switch closed"
 docker exec ea-vpn iptables -P OUTPUT ACCEPT 2>/dev/null || true
 check "'iptables -P OUTPUT ACCEPT' leaves the policy at DROP" ok sh -c "docker exec ea-vpn iptables -S OUTPUT | grep -qx -- '-P OUTPUT DROP'"
@@ -98,6 +109,10 @@ check "inside: name lookups blocked while Gluetun reconnects" fail docker run --
 check "no 'cannot remove outdated' errors from Gluetun" fail docker exec ea-vpn grep -q 'cannot remove outdated' /gluetun/easyarr/gluetun.log
 check "at most one VPN-server rule left" ok sh -c "[ \$(docker exec ea-vpn iptables -S OUTPUT | grep -c -- '--dport 51820') -le 1 ]"
 check "filter OUTPUT still parseable with Gluetun's rules" ok parseable OUTPUT
+docker exec ea-vpn sh -c 'printf "10.99.0.50\n" > /gluetun/easyarr/allowed-clients'
+sleep 3
+check "allowlist also holds while Gluetun runs" fail other
+check "listed address still gets in while Gluetun runs" ok allowed
 check "still healthy (kill switch in place)" ok sh -c "[ \"\$(docker inspect -f '{{.State.Health.Status}}' ea-vpn)\" = healthy ]"
 
 echo "== Removing vpn.env goes back to unconfigured"

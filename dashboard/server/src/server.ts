@@ -2,6 +2,7 @@ import type { ServeConfig } from './config.js';
 import { buildApp, createServices } from './app.js';
 import { createLogger, registerSecrets } from './logger.js';
 import { secretsStore, stateStore } from './state/index.js';
+import { ClientAllowlist } from './vpn/allowlist.js';
 
 export async function startServer(config: ServeConfig): Promise<void> {
   const log = createLogger(config.logLevel);
@@ -16,9 +17,13 @@ export async function startServer(config: ServeConfig): Promise<void> {
   const app = await buildApp({ config, logger: log, services });
   // Keep qBittorrent's port equal to the VPN's forwarded port (SPEC §5.4).
   services.portSync.start();
+  // Only this dashboard and the request page may connect to the VPN-side services (D-046).
+  const allowlist = new ClientAllowlist({ vpnDir: config.vpnDir, log });
+  allowlist.start();
   const close = async (signal: string) => {
     log.info({ signal }, 'shutting down');
     services.portSync.stop();
+    allowlist.stop();
     await app.close();
     process.exit(0);
   };

@@ -108,6 +108,19 @@ case $(cat "$T/status.json") in
 esac
 eq "status.json is world-readable (dashboard runs as 1000)" "$(stat -c %a "$T/status.json")" "644"
 
+# --- client_ips -------------------------------------------------------------------------------
+printf '%s\n' '10.21.0.5' ' 10.21.0.9 # request page' '10.21.0.5' '999.1.1.1' '1.2.3' '10.21.0.7; rm -rf /' \
+  '-s 0.0.0.0/0' '0001.2.3.4' '010.21.0.1' '' 'abc' >"$T/clients"
+eq "client_ips: valid, deduplicated, comments and junk dropped" "$(client_ips "$T/clients" | tr '\n' ' ')" "10.21.0.5 10.21.0.9 "
+eq "client_ips: missing file = empty" "$(client_ips "$T/nope")" ""
+: >"$T/many"
+i=1
+while [ $i -le 20 ]; do
+  echo "10.21.1.$i" >>"$T/many"
+  i=$((i + 1))
+done
+eq "client_ips: at most 16" "$(client_ips "$T/many" | wc -l | tr -d ' ')" "16"
+
 # --- iptables-guard -----------------------------------------------------------------------------
 mkdir -p "$T/real" "$T/shim"
 # shellcheck disable=SC2016 # literal script

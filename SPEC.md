@@ -210,9 +210,11 @@ Design:
   Servarr `UrlBase`, Bazarr `base_url`, SABnzbd `url_base`, qBittorrent behind sub-path
   (host header / CSRF / clickjacking settings), Cleanuparr base path support**]**.
   If a service can't work behind a sub-path, document it in DECISIONS.md and publish a port instead.
-- Authentication inside these apps: Servarr "Disabled for local addresses", qBittorrent
-  "bypass auth for whitelisted subnets" = Docker subnet. Safe because they are only reachable
-  via the dashboard (which is behind the Umbrel login).
+- Authentication inside these apps is off (Servarr `External`, qBittorrent subnet whitelist = Docker
+  subnet). That is only safe because they are reachable via the dashboard alone: the proxy answers only
+  Umbrel's gateway and refuses cross-site requests (D-045), and the VPN wrapper accepts connections from
+  the Docker network only from the dashboard and the request page (D-046) — every Umbrel app shares one
+  Docker network.
 
 ### 5.6 Published ports (host)
 | Service | Host port | Why |
