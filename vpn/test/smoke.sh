@@ -77,6 +77,29 @@ check "inside: name lookups still blocked" fail docker run --rm --network contai
 check "still healthy (kill switch in place)" ok sh -c "[ \"\$(docker inspect -f '{{.State.Health.Status}}' ea-vpn)\" = healthy ]"
 check "Docker network -> service port inside still works" ok docker run --rm --network "$NET" "$BUSYBOX" wget -q -T 5 -O /dev/null http://ea-vpn:8989/passwd
 
+echo "== Gluetun can manage its own rules next to ours (D-044)"
+# Gluetun parses `iptables -L` to delete its outdated rules; anything it can't parse (negated
+# addresses, unknown targets) makes every reconnect leave the old VPN-server rule behind.
+parseable() { # parseable <chain>: only targets/fields Gluetun's parser (internal/firewall/list.go) knows
+  docker exec ea-vpn iptables -L "$1" --line-numbers -n -v | awk 'NR > 2 {
+    if ($4 !~ /^(ACCEPT|DROP|REJECT|REDIRECT)$/ || $9 ~ /^!/ || $10 ~ /^!/) { print "unparseable: " $0; bad = 1 }
+  } END { exit bad }'
+}
+check "filter OUTPUT rules are parseable by Gluetun" ok parseable OUTPUT
+check "filter INPUT rules are parseable by Gluetun" ok parseable INPUT
+check "the guard rule is in mangle POSTROUTING" ok sh -c "docker exec ea-vpn iptables -t mangle -S POSTROUTING | grep -F -- '-j DROP' | grep -qF -- '! -s'"
+# A real provider with a made-up key: Gluetun never gets a handshake, fails its health check and
+# reconnects to another server every few seconds, removing the previous server's rule each time.
+key=$(head -c 32 /dev/urandom | base64)
+docker exec ea-vpn sh -c "printf 'VPN_SERVICE_PROVIDER=mullvad\nVPN_TYPE=wireguard\nWIREGUARD_PRIVATE_KEY=$key\nWIREGUARD_ADDRESSES=10.64.0.2/32\nSERVER_COUNTRIES=Sweden\n' > /gluetun/easyarr/vpn.env"
+check "Gluetun reconnected at least 3 times" ok wait_for 90 sh -c "[ \$(docker exec ea-vpn grep -c 'Connecting to' /gluetun/easyarr/gluetun.log) -ge 3 ]"
+check "inside -> http://1.1.1.1 blocked while Gluetun reconnects" fail egress http://1.1.1.1
+check "inside: name lookups blocked while Gluetun reconnects" fail docker run --rm --network container:ea-vpn "$BUSYBOX" timeout 8 nslookup example.com 127.0.0.11
+check "no 'cannot remove outdated' errors from Gluetun" fail docker exec ea-vpn grep -q 'cannot remove outdated' /gluetun/easyarr/gluetun.log
+check "at most one VPN-server rule left" ok sh -c "[ \$(docker exec ea-vpn iptables -S OUTPUT | grep -c -- '--dport 51820') -le 1 ]"
+check "filter OUTPUT still parseable with Gluetun's rules" ok parseable OUTPUT
+check "still healthy (kill switch in place)" ok sh -c "[ \"\$(docker inspect -f '{{.State.Health.Status}}' ea-vpn)\" = healthy ]"
+
 echo "== Removing vpn.env goes back to unconfigured"
 docker exec ea-vpn rm /gluetun/easyarr/vpn.env
 check "status unconfigured" ok wait_for 10 sh -c "docker exec ea-vpn cat /gluetun/easyarr/status.json | grep -q '\"state\":\"unconfigured\"'"

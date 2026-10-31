@@ -74,17 +74,25 @@ _ip6t() {
   "$IPT6" "$@" 2>/dev/null || log "ip6tables $* failed"
 }
 
+# Guard: packets that leave the Docker interface must carry its own address. This drops packets of
+# connections that were opened through the tunnel and would otherwise be routed out unencrypted when
+# the tunnel goes away (Gluetun accepts ESTABLISHED traffic on every interface).
+# It lives in the mangle table (POSTROUTING sees the final interface and source), which Gluetun never
+# reads or changes. In the filter table it broke Gluetun: Gluetun parses `iptables -L` to delete its
+# own outdated rules and can't read a negated address ("!10.21.0.16"), so old VPN-server rules piled
+# up on every reconnect (D-044). Rule set here = only what Gluetun's parser understands.
+apply_guard() {
+  "$IPT4" -t mangle -C POSTROUTING -o "$NET_IF" ! -s "$NET_IP" -j DROP 2>/dev/null ||
+    _ipt -t mangle -I POSTROUTING 1 -o "$NET_IF" ! -s "$NET_IP" -j DROP
+}
+
 # Default-deny egress. DROP policies come first, so there is no moment where traffic is allowed.
-# Only the filter table is touched: the nat table holds Docker's embedded-DNS rules.
+# Only the filter table is flushed: the nat table holds Docker's embedded-DNS rules, mangle the guard.
 apply_deny() {
   for _c in INPUT FORWARD OUTPUT; do _ipt -P "$_c" DROP; done
+  apply_guard
   _ipt -F
   _ipt -X
-  # Guard (stays first while Gluetun runs, Gluetun only appends): packets that leave the Docker
-  # interface must carry its own address. This drops packets of connections that were opened through
-  # the tunnel and would otherwise be routed out unencrypted when the tunnel goes away (Gluetun accepts
-  # ESTABLISHED traffic on every interface).
-  _ipt -A OUTPUT -o "$NET_IF" ! -s "$NET_IP" -j DROP
   # Docker's embedded DNS (127.0.0.11, reached over loopback) answers by asking the host's resolver,
   # i.e. outside the VPN: every name an app looks up would be visible to the internet provider. It is
   # blocked for good (D-043); with Gluetun running, apps use Gluetun's DNS on 127.0.0.1 instead.
@@ -102,13 +110,14 @@ apply_deny() {
   _ip6t -A OUTPUT -o lo -j ACCEPT
 }
 
-# Is the kill switch in place? (policy DROP on OUTPUT + the guard rule)
+# Is the kill switch in place? (policy DROP on OUTPUT, the Docker-DNS block and the guard rule)
 deny_is_active() {
   _rules=$("$IPT4" -S OUTPUT 2>/dev/null) || return 1
   printf '%s\n' "$_rules" | grep -qx -- '-P OUTPUT DROP' || return 1
   # Option order in `-S` output differs between iptables versions, so match each part.
-  printf '%s\n' "$_rules" | grep -F -- "! -s $NET_IP/32" | grep -F -- "-o $NET_IF" | grep -qF -- '-j DROP' || return 1
   printf '%s\n' "$_rules" | grep -F -- "-d $DOCKER_DNS/32" | grep -qF -- '-j DROP' || return 1
+  _rules=$("$IPT4" -t mangle -S POSTROUTING 2>/dev/null) || return 1
+  printf '%s\n' "$_rules" | grep -F -- "! -s $NET_IP/32" | grep -F -- "-o $NET_IF" | grep -qF -- '-j DROP' || return 1
 }
 
 # What a crashed Gluetun can leave behind: tunnel interfaces and WireGuard policy routing.
