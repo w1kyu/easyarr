@@ -131,6 +131,7 @@ leaktest() {
     "curl -fsS -m 10 http://localhost:39000/api/vpn/status | grep -vq '\"connection\":\"connected\"'"
   for svc in qbittorrent sonarr; do
     check "$svc -> https://1.1.1.1 while Gluetun tries to connect" fail docker exec "$(c "$svc")" curl -sS -m 8 -o /dev/null https://1.1.1.1
+    check "$svc resolves example.com while Gluetun tries to connect" fail docker exec "$(c "$svc")" timeout 10 getent hosts example.com
   done
   check "dashboard asks for a reconnect" ok curl -fsS -m 10 -o /dev/null -X POST -H 'content-type: application/json' -d '{}' http://localhost:39000/api/vpn/reconnect
   check "qbittorrent -> https://1.1.1.1 during the reload" fail docker exec "$(c qbittorrent)" curl -sS -m 5 -o /dev/null https://1.1.1.1

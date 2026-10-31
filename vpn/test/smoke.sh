@@ -53,6 +53,10 @@ check "control: internet works outside the namespace" ok docker run --rm --netwo
 check "inside: busybox wget exists (guards the next checks)" ok docker run --rm --network container:ea-vpn "$BUSYBOX" which wget
 check "inside -> http://1.1.1.1 blocked" fail egress http://1.1.1.1
 check "inside -> http://example.com blocked" fail egress http://example.com
+check "inside: busybox nslookup exists (guards the next check)" ok docker run --rm --network container:ea-vpn "$BUSYBOX" which nslookup
+# Docker's DNS asks the host's resolver, outside the VPN (D-043).
+check "inside: name lookups via Docker's DNS blocked" fail docker run --rm --network container:ea-vpn "$BUSYBOX" timeout 8 nslookup example.com 127.0.0.11
+check "control: name lookups work outside the namespace" ok docker run --rm --network "$NET" "$BUSYBOX" timeout 8 nslookup example.com 127.0.0.11
 # Serves /etc, so /passwd is a file that exists (a directory would give 404).
 docker run -d --name ea-inside --network container:ea-vpn "$BUSYBOX" httpd -f -p 8989 -h /etc >/dev/null
 check "Docker network -> service port inside works" ok wait_for 10 docker run --rm --network "$NET" "$BUSYBOX" wget -q -T 5 -O /dev/null http://ea-vpn:8989/passwd
@@ -69,6 +73,7 @@ docker exec ea-vpn sh -c 'printf "VPN_SERVICE_PROVIDER=custom\nVPN_TYPE=wireguar
 check "wrapper reports crashed" ok wait_for 30 sh -c "docker exec ea-vpn cat /gluetun/easyarr/status.json | grep -q '\"state\":\"crashed\"'"
 check "Gluetun's error is in gluetun.log" ok wait_for 10 docker exec ea-vpn grep -qi 'key is not valid' /gluetun/easyarr/gluetun.log
 check "inside -> http://1.1.1.1 blocked" fail egress http://1.1.1.1
+check "inside: name lookups still blocked" fail docker run --rm --network container:ea-vpn "$BUSYBOX" timeout 8 nslookup example.com 127.0.0.11
 check "still healthy (kill switch in place)" ok sh -c "[ \"\$(docker inspect -f '{{.State.Health.Status}}' ea-vpn)\" = healthy ]"
 check "Docker network -> service port inside still works" ok docker run --rm --network "$NET" "$BUSYBOX" wget -q -T 5 -O /dev/null http://ea-vpn:8989/passwd
 

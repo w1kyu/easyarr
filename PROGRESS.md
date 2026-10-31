@@ -4,10 +4,10 @@
 > Newest session log entries go on top.
 
 ## Current phase
-**Phase 03 — ✅ done by the agent, waiting for the owner's test (v0.0.3).**
-The phase 02 checklist is still open too (EasyArr was not installed on the Umbrel on 2026-10-31,
-checked via Umbrel MCP) — one fresh install of 0.0.3 covers both checklists.
-Next prompt: `prompts/04-vpn.md` (after the owner's checklists below pass).
+**Phase 04 — ✅ done by the agent, waiting for the owner's test (v0.0.4).**
+The phase 02 + 03 checklists are still open too — one fresh install (or update) of 0.0.4 covers
+all three.
+Next prompt: `prompts/05-wiring.md` (after the owner's checklists below pass).
 
 ## Phase status
 | Phase | Title | Status | Notes |
@@ -16,7 +16,7 @@ Next prompt: `prompts/04-vpn.md` (after the owner's checklists below pass).
 | 01 | Umbrel app + compose stack | ✅ done | v0.0.1 installed + restarted on owner's Umbrel (x86); CI green amd64/arm64 |
 | 02 | Dashboard skeleton + design system + CI | ✅ done (owner test pending) | v0.0.2; image ghcr.io/w1kyu/easyarr amd64/arm64; stack test green on d72a564 |
 | 03 | Wizard basics (steps 1–4) | ✅ done (owner test pending) | v0.0.3; wizard e2e green locally, in CI and against the stack (amd64 + arm64) |
-| 04 | VPN (wrapper, kill switch, wizard step) | ⬜ todo | |
+| 04 | VPN (wrapper, kill switch, wizard step) | ✅ done (owner test pending) | v0.0.4; VPN image ghcr.io/w1kyu/easyarr-vpn amd64/arm64; leak tests green in CI (image smoke test + stack) |
 | 05 | Wiring engine + service proxy | ⬜ todo | |
 | 06 | Wizard steps 6–9 | ⬜ todo | |
 | 07 | Dashboard + settings | ⬜ todo | |
@@ -53,13 +53,20 @@ Results of SPEC **[VERIFY]** items. Format: `- YYYY-MM-DD — <fact> — <source
 - 2026-10-31 — With `permissions: [GPU]`, umbreld maps `/dev/dri` (+ `/dev/kfd` for ROCm) and NVIDIA devices with `NVIDIA_VISIBLE_DEVICES=all` into every service, plus the device groups → the dashboard detects a GPU from `/dev/dri/renderD*`, `/dev/nvidia*` or that env var (D-037). — https://github.com/getumbrel/umbrel/blob/11e7f5bdfcb5bb8b46f39edd6defb4c37641763a/packages/umbreld/source/modules/hardware/gpu.ts
 - 2026-10-30 — pnpm 12 fails `install` in CI on unapproved build scripts (`ERR_PNPM_IGNORED_BUILDS`) → `allowBuilds: { esbuild: true }` in `pnpm-workspace.yaml`. — CI run for 9552a61
 
+- 2026-10-31 — Gluetun v3.41.3 control server (:8000): routes `/v1/vpn/status`, `/v1/publicip/ip`, `/v1/portforward`; auth via a TOML role file (`HTTP_CONTROL_SERVER_AUTH_CONFIG_FILEPATH`, `auth = "apikey"`, header `X-API-Key`); unlisted routes are denied (D-041). — https://github.com/qdm12/gluetun/tree/v3.41.3/internal/server
+- 2026-10-31 — Gluetun port forwarding: automatic for Perfect Privacy, PIA, PrivateVPN, ProtonVPN; `PORT_FORWARD_ONLY` defaults on for PIA/ProtonVPN when `VPN_PORT_FORWARDING=on`; FREE_ONLY + PORT_FORWARD_ONLY rejected for ProtonVPN; Gluetun does not append `+pmp` to Proton OpenVPN users (EasyArr does). — https://github.com/qdm12/gluetun/blob/v3.41.3/internal/configuration/settings/serverselection.go, internal/provider/protonvpn/portforward.go
+- 2026-10-31 — Gluetun WireGuard providers: AirVPN (preshared key required), custom, FastestVPN, IVPN, Mullvad, NordVPN, ProtonVPN, Surfshark, Windscribe; default addresses only for NordVPN (10.5.0.2/32) and ProtonVPN (10.2.0.2/32); no native PIA WireGuard. — https://github.com/qdm12/gluetun/blob/v3.41.3/internal/configuration/settings/wireguard.go
+- 2026-10-31 — Custom OpenVPN in Gluetun: `remote` must be an IP (host names rejected, `errHostNotIP`), only the first remote is used → EasyArr resolves names on save. — https://github.com/qdm12/gluetun/blob/v3.41.3/internal/openvpn/extract/extract.go
+- 2026-10-31 — Gluetun resets iptables policies to ACCEPT while (re)configuring → EasyArr's iptables guard rewrites `-P OUTPUT/FORWARD ACCEPT` to DROP (D-040). — https://github.com/qdm12/gluetun/blob/v3.41.3/internal/firewall/enable.go
+- 2026-10-31 — Mullvad removed OpenVPN on 2026-01-15 (WireGuard only) and port forwarding in 2023. — https://mullvad.net/en/blog/removing-openvpn-15th-january-2026
+- 2026-10-31 — Provider setup steps for the 9 VPN guides were checked against the providers' help centres (sources listed in each guide's research; see docs/vpn/*.md "Last checked").
 ## Open [VERIFY] items
 Copy from SPEC as they get resolved. Highest priority first:
 - [x] Umbrel compose: `depends_on` conditions, restart policies allowed, `APP_SEED`, container naming for `APP_HOST`
 - [x] umbrelOS user storage path + PUID/PGID
 - [x] Jellyfin `/dev/dri` handling with/without GPU (→ `permissions: [GPU]`)
-- [ ] Gluetun control server endpoints + auth requirements; port-forwarding provider list
-- [ ] Gluetun DNS: can VPN-side apps resolve Docker container names (e.g. Jellyfin) once the tunnel is up?
+- [x] Gluetun control server endpoints + auth requirements; port-forwarding provider list
+- [x] Gluetun DNS: can VPN-side apps resolve Docker container names (e.g. Jellyfin) once the tunnel is up? → No, by design (D-043); use localhost / the dashboard.
 - [ ] Sub-path support per service (Servarr, Bazarr, SABnzbd incl. `host_whitelist`, qBittorrent, Cleanuparr `BASE_PATH`)
 - [ ] Jellyfin startup API + backup/restore API; Seerr setup API
 - [ ] Servarr backup/restore API endpoints
@@ -69,16 +76,18 @@ Copy from SPEC as they get resolved. Highest priority first:
 - [x] Origin + license of umbrelOS wallpapers, fonts and icons before vendoring any of them (none vendored; own wallpaper, Inter from `inter-ui` (OFL), Lucide icons)
 
 ## Known issues
-- `vpn` shows **unhealthy** until a VPN is configured. This is expected and intended (D-025).
-- Kill-switch gaps until the phase 04 wrapper exists: (1) a sub-second window when the `vpn` container starts,
-  before Gluetun has installed its firewall rules; (2) if the Gluetun process crashes, the dependent containers
-  lose networking until they are restarted.
+- NordVPN WireGuard guide uses the new "download WireGuard config" option in Nord's dashboard (Oct 2026);
+  not yet confirmed with a real account that its key works on every server Gluetun picks. Fallback if not:
+  the access-token method from Gluetun's wiki.
+- AirVPN only hands out reserved ports ≥ 2048; EasyArr accepts 1024–65535 (the guide says so).
+- Help links with `#section` open the top of the page (anchors aren't scrolled to yet; phase 10).
+- Settings → VPN doesn't exist yet (phase 07); changing the VPN = reopening wizard step 5 (`/setup/vpn`).
 - SABnzbd refuses requests through other hostnames until `host_whitelist` is seeded (phase 05).
 - Recyclarr and Unpackerr run with empty configs (they idle and log warnings) until wiring exists (phase 05).
 - Bazarr, Recyclarr, Unpackerr and Cleanuparr configs plus sub-path settings (SABnzbd `url_base`, qBittorrent
   reverse proxy) are not seeded yet (phase 05, D-031).
 - Service tiles on the home screen show static status pills (no live status until phase 07).
-- The wizard ends after step 4 for now; the home screen says so and offers "Review your answers".
+- The wizard ends after step 5 for now; the home screen says so and offers "Review your answers".
 - The account isn't applied to Jellyfin/Jellyseerr yet (phase 05); changing it later = going back
   through the wizard until Settings exist (phase 07).
 
@@ -95,6 +104,47 @@ Copy from SPEC as they get resolved. Highest priority first:
 - umbrelOS 2.0 `environment:` manifest settings could expose a few safe knobs (e.g. TZ) in Umbrel's app settings.
 
 ## Session log
+### 2026-10-31 — Phase 04: VPN wrapper, kill switch, provider catalog, wizard step 5 (Hermes agent on the owner's Umbrel)
+- Start: owner allowed phase 04 "if everything checks out" — installed 0.0.3 checked via Umbrel MCP
+  (status, logs, API health, services reachable) → OK.
+- VPN image `ghcr.io/w1kyu/easyarr-vpn` (`vpn/`): Gluetun v3.41.3 + POSIX-shell wrapper under tini —
+  default-deny kill switch before anything else and whenever Gluetun isn't running, waits for
+  `vpn.env`, live reload without restarting the container, crash back-off, `status.json`, capped
+  `gluetun.log`, allowlisted settings, iptables guard, health check = "kill switch in place" (D-040).
+  CI: shellcheck + unit tests (dash, busybox) and a Docker smoke test on amd64 + arm64
+  (unconfigured / invalid config / reload / crash → no egress; Docker network → service port works).
+- Provider catalog (`@easyarr/shared/vpn-providers.ts`): every Gluetun provider, fields per protocol,
+  port forwarding auto/static/none, free plan; server locations generated from Gluetun's
+  `servers.json` and checked in CI (D-042).
+- Server: `/api/vpn/config|status|test|reconnect`, Gluetun control-server client with API key (init
+  writes Gluetun's auth file), plain-language diagnosis from Gluetun's log, home-IP check, port sync
+  to qBittorrent, API restricted to loopback + Umbrel's gateway (D-041). State schema v3.
+- Web: wizard step 5 — searchable grouped provider list with badges, WireGuard pre-selected, guide
+  next to the form (collapsible on phones), Connect → live "Connecting…" → ✅/❌ result with fix
+  hints, "Skip for now" with an honest confirmation. Help pages moved to `/help/*` (sub-folders).
+- Docs: `docs/vpn/README.md` + guides for Proton VPN, Mullvad, NordVPN, Surfshark, PIA, AirVPN,
+  other providers and custom files (steps checked against the providers' help centres today).
+- Tests: 152 unit tests; e2e 10 tests incl. a fake VPN side (wrong password → plain reason → fix →
+  connected, home IP hidden, port forwarding) — 3 consecutive local runs green. Stack test now also
+  saves a dead-end VPN through the dashboard and checks no egress while Gluetun tries + during a
+  reload, the vpn container stays healthy, other apps get 403, Gluetun's control server needs the key.
+- Umbrel app v0.0.4: vpn = `easyarr-vpn:sha-dbbe22b@sha256:1cfce5f6…`, services wait for
+  `vpn` healthy, dashboard + init `sha-19fe549@sha256:c679f7b8…`, dashboard mounts the VPN folder
+  and gets `NETWORK_IP`. Linter: 0 errors.
+- Caught by the stack leak test: with no VPN, apps could still look up names through Docker's DNS
+  (127.0.0.11 → host resolver, outside the VPN). Fixed: the kill switch blocks Docker's DNS (D-043);
+  image smoke test and stack test check lookups fail.
+- Decisions D-040…D-043.
+- Owner checklist (phase 04 — update to / install 0.0.4):
+  - [ ] Wizard step 5: set up your VPN following only the in-app guide
+  - [ ] The test shows the VPN's IP + country and "Your home IP is hidden"
+  - [ ] Change a setting (e.g. another country) and press Connect again → reconnects, no reinstall
+  - [ ] Leak check (Umbrel → Settings → Advanced → Terminal):
+        `sudo docker exec w1kyu-easyarr_qbittorrent_1 curl -s -m 10 https://ipinfo.io/ip`
+        → with the VPN connected it prints the VPN's IP (not yours); after saving a wrong key or password
+        in step 5 the same command prints nothing / times out
+  - [ ] "Skip for now" text is clear; the app still works after skipping (Jellyfin opens)
+
 ### 2026-10-31 — Phase 03: wizard framework + steps 1–4 (Hermes agent on the owner's Umbrel)
 - Start: repo + CI green on 2d27e6f. Phase 02 owner test not done yet; EasyArr isn't installed on
   the Umbrel right now (Umbrel MCP) — started phase 03 anyway as asked ("continue").

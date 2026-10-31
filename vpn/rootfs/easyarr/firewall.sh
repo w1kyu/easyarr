@@ -9,6 +9,7 @@
 RUN_DIR=${RUN_DIR:-/run/easyarr}
 FW_ENV=$RUN_DIR/firewall.env
 WG_TABLE=51820 # Gluetun's WireGuard fwmark + routing table
+DOCKER_DNS=127.0.0.11 # Docker's embedded DNS server inside every container
 
 # Real binaries, skipping the guard shims in /usr/local/sbin.
 real_bin() {
@@ -84,6 +85,10 @@ apply_deny() {
   # the tunnel and would otherwise be routed out unencrypted when the tunnel goes away (Gluetun accepts
   # ESTABLISHED traffic on every interface).
   _ipt -A OUTPUT -o "$NET_IF" ! -s "$NET_IP" -j DROP
+  # Docker's embedded DNS (127.0.0.11, reached over loopback) answers by asking the host's resolver,
+  # i.e. outside the VPN: every name an app looks up would be visible to the internet provider. It is
+  # blocked for good (D-043); with Gluetun running, apps use Gluetun's DNS on 127.0.0.1 instead.
+  _ipt -A OUTPUT -d "$DOCKER_DNS" -j DROP
   _ipt -A INPUT -i lo -j ACCEPT
   _ipt -A OUTPUT -o lo -j ACCEPT
   for _s in $OUTBOUND_SUBNETS; do
@@ -103,6 +108,7 @@ deny_is_active() {
   printf '%s\n' "$_rules" | grep -qx -- '-P OUTPUT DROP' || return 1
   # Option order in `-S` output differs between iptables versions, so match each part.
   printf '%s\n' "$_rules" | grep -F -- "! -s $NET_IP/32" | grep -F -- "-o $NET_IF" | grep -qF -- '-j DROP' || return 1
+  printf '%s\n' "$_rules" | grep -F -- "-d $DOCKER_DNS/32" | grep -qF -- '-j DROP' || return 1
 }
 
 # What a crashed Gluetun can leave behind: tunnel interfaces and WireGuard policy routing.
