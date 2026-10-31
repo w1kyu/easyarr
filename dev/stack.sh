@@ -146,17 +146,31 @@ leaktest() {
   check "qbittorrent -> sonarr via localhost:8989" ok \
     docker exec "$(c qbittorrent)" curl -fsS -m 8 -o /dev/null http://localhost:8989/ping
 
-  echo "== From the Docker network (where the dashboard lives) via $(c vpn)"
+  echo "== The dashboard reaches the services via $(c vpn)"
+  local dash=(docker exec "$(c dashboard)")
+  check "dashboard has wget (guards the next checks)" ok "${dash[@]}" sh -c 'command -v wget'
   for port_path in 8090/ 9696/ping 8191/ 8989/ping 7878/ping 8686/ping 6767/ 11011/health; do
-    check "http://$(c vpn):${port_path}" ok "${probe[@]}" wget -q -O /dev/null -T 10 "http://$(c vpn):${port_path}"
+    check "dashboard -> http://$(c vpn):${port_path}" ok "${dash[@]}" wget -q -O /dev/null -T 10 "http://$(c vpn):${port_path}"
   done
   # SABnzbd answers 403 to unknown Host headers until its host_whitelist is seeded (phase 05),
   # so only check that it answers over HTTP at all.
-  check "http://$(c vpn):8080/ answers (SABnzbd)" ok "${probe[@]}" sh -c \
+  check "dashboard -> http://$(c vpn):8080/ answers (SABnzbd)" ok "${dash[@]}" sh -c \
     "wget -S -O /dev/null -T 10 http://$(c vpn):8080/ 2>&1 | grep -q 'HTTP/1'"
+  check "sonarr answers under its url base /apps/sonarr" ok "${dash[@]}" wget -q -O /dev/null -T 10 "http://$(c vpn):8989/apps/sonarr/ping"
+
+  echo "== Only the dashboard and the request page may connect to the services (D-046)"
+  check "dashboard wrote the allowed-clients list" ok wait_for 60 docker exec "$(c vpn)" grep -q '^[0-9]' /gluetun/easyarr/allowed-clients
+  check "request page (Jellyseerr) -> sonarr" ok wait_for 30 docker exec "$(c jellyseerr)" wget -q -O /dev/null -T 5 "http://$(c vpn):8989/ping"
+  check "another app on the Docker network -> sonarr is refused" fail "${probe[@]}" wget -q -O /dev/null -T 8 "http://$(c vpn):8989/ping"
+  check "another app on the Docker network -> qbittorrent is refused" fail "${probe[@]}" wget -q -O /dev/null -T 8 "http://$(c vpn):8090/"
+  check "another app on the Docker network -> flaresolverr is refused" fail "${probe[@]}" wget -q -O /dev/null -T 8 "http://$(c vpn):8191/"
+
+  echo "== Service UIs through the dashboard proxy (D-045)"
+  check "/apps/sonarr/ via :39000" ok curl -fsS -m 15 -o /dev/null http://localhost:39000/apps/sonarr/
+  check "/apps/qbittorrent/ via :39000" ok curl -fsS -m 15 -o /dev/null http://localhost:39000/apps/qbittorrent/
+  check "/apps/* refuses other apps" fail "${probe[@]}" wget -q -O /dev/null -T 8 "http://$(c dashboard):3000/apps/sonarr/"
 
   echo "== Init seeded the service configs (UrlBase) and the dashboard API is up"
-  check "sonarr answers under its url base /apps/sonarr" ok "${probe[@]}" wget -q -O /dev/null -T 10 "http://$(c vpn):8989/apps/sonarr/ping"
   check "dashboard /api/health" ok "${probe[@]}" wget -q -O /dev/null -T 10 "http://$(c dashboard):3000/api/health"
   check "init is idempotent (second run changes nothing)" ok init_is_idempotent
 
