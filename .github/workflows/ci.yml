@@ -25,6 +25,8 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
+      - name: VPN server list matches Gluetun
+        run: node scripts/gen-vpn-servers.mjs --check
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
