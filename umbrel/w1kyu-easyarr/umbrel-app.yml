@@ -5,7 +5,7 @@ storage:
 category: media
 name: EasyArr
 icon: https://raw.githubusercontent.com/w1kyu/easyarr/main/assets/icon.svg
-version: '0.0.4'
+version: '0.0.5'
 tagline: Your own Netflix-style media setup, wired up for you
 description: >-
   ⚠️ PREVIEW — not ready for everyday use yet. This early build installs all services, but the
@@ -29,11 +29,9 @@ description: >-
 
   Jellyfin opens on port 39096 and the request page on port 39055 of your Umbrel.
 releaseNotes: >-
-  VPN setup arrives (wizard step 5): pick your VPN from the list, follow the short guide shown next
-  to the form, press Connect, and EasyArr tests that it works and that your home IP is hidden.
-  Step-by-step guides for Proton VPN, Mullvad, NordVPN, Surfshark, PIA and AirVPN, plus any provider
-  with a WireGuard or OpenVPN file. Port forwarding is set in qBittorrent automatically. Until a VPN
-  is connected, downloading stays blocked — nothing is ever sent without it.
+  Fix for the VPN connection: when the VPN reconnected (for example after switching servers), old
+  firewall entries were left behind and piled up. They are now cleaned up properly. The kill switch
+  works exactly as before — nothing is ever sent without the VPN.
 
 developer: w1kyu
 website: https://github.com/w1kyu/easyarr
