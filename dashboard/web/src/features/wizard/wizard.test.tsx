@@ -22,8 +22,11 @@ function fakeServer(info: SystemInfo) {
     completed: [] as string[],
     answers: {} as WizardAnswers,
     account: null as null | { username: string },
+    vpn: null as null | Record<string, unknown>,
+    vpnConnection: 'connected' as string,
   };
   const posts: { step: string; body: unknown }[] = [];
+  const vpnPosts: { url: string; body: unknown }[] = [];
   const view = (): WizardView => ({
     steps: visibleWizardSteps(db.answers).map((id) => ({
       id,
@@ -38,6 +41,42 @@ function fakeServer(info: SystemInfo) {
   const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
     if (url === '/api/system-check') return json(evaluateSystem(info));
     if (url === '/api/wizard') return json(view());
+    if (url.startsWith('/api/vpn/')) {
+      const body = init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {};
+      if (init?.method === 'POST') vpnPosts.push({ url, body });
+      if (url === '/api/vpn/config' && init?.method === 'POST') {
+        db.vpn = {
+          provider: body['provider'],
+          protocol: body['protocol'],
+          locations: body['locations'],
+          portForwarding: body['portForwarding'],
+          forwardedPort: null,
+          freePlan: false,
+          fields: {},
+          savedSecrets: ['wgPrivateKey'],
+          lastTest: null,
+        };
+        return json({ config: db.vpn });
+      }
+      if (url === '/api/vpn/config') return json({ config: db.vpn });
+      if (url === '/api/vpn/status') {
+        return json({ connection: db.vpnConnection, wrapper: 'running', provider: 'protonvpn' });
+      }
+      if (url === '/api/vpn/test') {
+        const result = {
+          ok: true,
+          at: '2026-10-31T12:00:00Z',
+          code: null,
+          publicIp: '185.159.157.10',
+          country: 'Netherlands',
+          homeIpHidden: true,
+          portForwarding: { mode: 'auto', port: 51413, state: 'active' },
+          problemLine: null,
+        };
+        if (db.vpn) db.vpn['lastTest'] = result;
+        return json(result);
+      }
+    }
     const step = url.replace('/api/wizard/', '') as keyof WizardAnswers;
     const body = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>;
     posts.push({ step, body });
@@ -54,7 +93,7 @@ function fakeServer(info: SystemInfo) {
     if (!db.completed.includes(step)) db.completed.push(step);
     return json(view());
   });
-  return { db, posts, fetchMock };
+  return { db, posts, vpnPosts, fetchMock };
 }
 
 function renderAt(path: string) {
@@ -100,10 +139,10 @@ afterEach(() => {
 const next = () => fireEvent.click(screen.getByRole('button', { name: /^Next/ }));
 
 describe('setup wizard', () => {
-  it('walks through steps 1–4 and saves each one', async () => {
+  it('walks through steps 1–5 and saves each one (VPN skipped)', async () => {
     const router = renderAt('/setup');
     await screen.findByRole('heading', { name: 'Welcome to EasyArr' });
-    expect(screen.getByText('Step 1 of 4')).toBeTruthy();
+    expect(screen.getByText('Step 1 of 5')).toBeTruthy();
     expect(screen.getByRole('button', { name: /Restore from backup/ })).toHaveProperty(
       'disabled',
       true,
@@ -127,8 +166,22 @@ describe('setup wizard', () => {
     fireEvent.click(screen.getByRole('radio', { name: /Usenet/ }));
     next();
 
+    await screen.findByRole('heading', { name: 'Protect your downloads with a VPN' });
+    await screen.findByTestId('vpn-provider-protonvpn');
+    fireEvent.click(await screen.findByRole('button', { name: /Skip for now/ }));
+    await screen.findByRole('dialog');
+    expect(server.posts.map((p) => p.step)).not.toContain('vpn');
+    fireEvent.click(screen.getByRole('button', { name: /Skip — I'll set it up later/ }));
+
     await waitFor(() => expect(router.state.location.pathname).toBe('/'));
-    expect(server.posts.map((p) => p.step)).toEqual(['welcome', 'system', 'account', 'download']);
+    expect(server.posts.map((p) => p.step)).toEqual([
+      'welcome',
+      'system',
+      'account',
+      'download',
+      'vpn',
+    ]);
+    expect(server.posts[4]?.body).toEqual({ mode: 'skipped' });
     expect(server.posts[2]?.body).toEqual({ username: 'kevin', password: 'summer-rain7' });
     expect(server.db.answers.download).toEqual({ method: 'usenet' });
   });
@@ -139,7 +192,42 @@ describe('setup wizard', () => {
     const router = renderAt('/setup/download');
     await screen.findByRole('heading', { name: 'Create your account' });
     expect(router.state.location.pathname).toBe('/setup/account');
-    expect(screen.getByText('Step 3 of 4')).toBeTruthy();
+    expect(screen.getByText('Step 3 of 5')).toBeTruthy();
+  });
+
+  it('VPN step: pick a provider, connect, see the test result, continue', async () => {
+    server.db.completed = ['welcome', 'system', 'account', 'download'];
+    server.db.answers = { download: { method: 'torrents' } } as WizardAnswers;
+    const router = renderAt('/setup/vpn');
+    fireEvent.change(await screen.findByLabelText('Search VPN providers'), {
+      target: { value: 'proton' },
+    });
+    expect(screen.queryByTestId('vpn-provider-mullvad')).toBeNull();
+    fireEvent.click(screen.getByTestId('vpn-provider-protonvpn'));
+    await screen.findByTestId('vpn-provider-name');
+    // WireGuard is pre-selected; Proton only needs the key.
+    fireEvent.change(screen.getByLabelText('WireGuard private key'), {
+      target: { value: 'wOEI9rqqbDwnN8/Bpp22sVz48T71vJ4fYmFWujulwUU=' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Connect' }));
+    const result = await screen.findByTestId('vpn-result', {}, { timeout: 5000 });
+    expect(result.dataset['ok']).toBe('true');
+    expect(result.textContent).toContain('185.159.157.10 (Netherlands)');
+    expect(result.textContent).toContain('Your home IP is hidden');
+    expect(result.textContent).toContain('port 51413');
+    expect(server.vpnPosts[0]).toMatchObject({
+      url: '/api/vpn/config',
+      body: {
+        provider: 'protonvpn',
+        protocol: 'wireguard',
+        portForwarding: true,
+        fields: { wgPrivateKey: 'wOEI9rqqbDwnN8/Bpp22sVz48T71vJ4fYmFWujulwUU=' },
+      },
+    });
+    await waitFor(() => expect(screen.getByRole('button', { name: /^Next/ })).toBeTruthy());
+    next();
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'));
+    expect(server.posts.at(-1)).toEqual({ step: 'vpn', body: { mode: 'configured' } });
   });
 
   it('validates the account form before sending anything', async () => {

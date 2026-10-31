@@ -4,6 +4,7 @@ import type { StepFormProps } from './wizard-api';
 import { AccountStep } from './steps/account';
 import { DownloadStep } from './steps/download';
 import { SystemStep } from './steps/system';
+import { VpnNextLabel, VpnStep } from './steps/vpn';
 import { WelcomeStep } from './steps/welcome';
 
 export interface StepUi {
@@ -15,6 +16,10 @@ export interface StepUi {
   Form: ComponentType<StepFormProps>;
   /** Label of the primary button (defaults to "Next"). */
   nextLabel?: string;
+  /** A component rendering the label, for labels that depend on state. */
+  NextLabel?: ComponentType;
+  /** Use the full width (tutorial + form side by side). */
+  wide?: boolean;
   /** The Welcome step offers "Restore from backup" next to "Start setup" (phase 08). */
   offerRestore?: boolean;
 }
@@ -47,5 +52,13 @@ export const STEP_UI: Record<WizardStepId, StepUi> = {
     title: 'wizard.download.title',
     intro: 'wizard.download.intro',
     Form: DownloadStep,
+  },
+  vpn: {
+    title: 'wizard.vpn.title',
+    intro: 'wizard.vpn.intro',
+    doc: 'vpn/README',
+    Form: VpnStep,
+    NextLabel: VpnNextLabel,
+    wide: true,
   },
 };

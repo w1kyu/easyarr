@@ -1,5 +1,9 @@
 import {
   DOWNLOAD_METHODS,
+  VPN_FIELDS,
+  VPN_PROBLEM_CODES,
+  VPN_PROVIDERS,
+  providerProtocols,
   evaluateSystem,
   SERVICES,
   WIZARD_STEP_IDS,
@@ -28,7 +32,8 @@ const sources = {
     },
   ),
 };
-const PREFIXES = 'wizard|system|account|download|password|docs|home|field|footer|status|stepper';
+const PREFIXES =
+  'wizard|system|account|download|password|docs|home|field|footer|status|stepper|vpn';
 const literal = new RegExp(`['"\`]((?:${PREFIXES})\\.[A-Za-z0-9_.]+)['"\`]`, 'g');
 
 describe('en.json', () => {
@@ -83,6 +88,16 @@ describe('en.json', () => {
       dynamic.push(`password.hint.${h}`);
     }
     for (const m of DOWNLOAD_METHODS) dynamic.push(`download.${m}.title`, `download.${m}.summary`);
+    for (const g of ['recommended', 'works', 'custom']) {
+      dynamic.push(`vpn.group.${g}.title`, `vpn.group.${g}.body`);
+    }
+    for (const p of VPN_PROVIDERS)
+      for (const proto of providerProtocols(p)) dynamic.push(`vpn.protocol.${proto}`);
+    for (const id of Object.keys(VPN_FIELDS))
+      dynamic.push(`vpn.field.${id}.label`, `vpn.field.${id}.hint`);
+    for (const c of VPN_PROBLEM_CODES)
+      dynamic.push(`vpn.problem.${c}.title`, `vpn.problem.${c}.fix`);
+    for (const k of ['country', 'region', 'city']) dynamic.push(`vpn.location.${k}`);
     expect(missing(dynamic)).toEqual([]);
   });
 });

@@ -14,7 +14,7 @@ const children: RouteObject[] = [
   { index: true, element: <Start /> },
   { path: 'setup', element: <SetupIndex /> },
   { path: 'setup/:stepId', element: <WizardPage /> },
-  { path: 'help/:slug', element: <DocsPage /> },
+  { path: 'help/*', element: <DocsPage /> },
   ...(DevUi
     ? [
         {

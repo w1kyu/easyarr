@@ -71,10 +71,10 @@ export function WizardPage() {
   const ui = STEP_UI[stepId];
   const index = view.steps.findIndex((s) => s.id === stepId);
   const prev = index > 0 ? view.steps[index - 1] : undefined;
-  const { Form } = ui;
+  const { Form, NextLabel } = ui;
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
+    <div className={cn('mx-auto flex w-full flex-col gap-4', ui.wide ? 'max-w-6xl' : 'max-w-3xl')}>
       <Stepper current={index + 1} total={view.steps.length} />
       <GlassPanel className="flex flex-col gap-5">
         <header className="flex flex-col gap-1.5">
@@ -130,7 +130,13 @@ export function WizardPage() {
             disabled={saving}
             className="w-full sm:ml-auto sm:w-auto"
           >
-            {saving ? t('wizard.saving') : t(ui.nextLabel ?? 'wizard.next')}
+            {saving ? (
+              t('wizard.saving')
+            ) : NextLabel ? (
+              <NextLabel />
+            ) : (
+              t(ui.nextLabel ?? 'wizard.next')
+            )}
             {!saving && <ArrowRight className="size-3.5" aria-hidden />}
           </Button>
         </footer>

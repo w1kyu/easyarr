@@ -1,18 +1,16 @@
 /**
  * In-app help: the Markdown files in the repo's docs/ folder, bundled at build time (SPEC §16).
- * Only top-level pages are user docs; docs/dev/ and the folder README are for developers.
+ * User docs are the top-level pages and docs/vpn/ (slug `vpn/<name>`); docs/dev/ and the top-level
+ * README are for developers.
  */
 const loaders = import.meta.glob<string>(
-  ['../../../../../docs/*.md', '!../../../../../docs/README.md'],
-  {
-    query: '?raw',
-    import: 'default',
-  },
+  ['../../../../../docs/*.md', '../../../../../docs/vpn/*.md', '!../../../../../docs/README.md'],
+  { query: '?raw', import: 'default' },
 );
 
 const bySlug = new Map<string, () => Promise<string>>();
 for (const [file, load] of Object.entries(loaders)) {
-  const slug = file.split('/').pop()?.replace(/\.md$/, '');
+  const slug = file.replace(/^.*\/docs\//, '').replace(/\.md$/, '');
   if (slug) bySlug.set(slug, load);
 }
 
@@ -33,13 +31,24 @@ export function docTitle(markdown: string): string | null {
 }
 
 /**
- * Turns a link inside a doc into another doc's slug, or null for external links.
- * Handles `usenet-101.md`, `./usenet-101.md` and `usenet-101.md#pros`.
+ * Turns a link inside a doc into another doc's slug, or null for external links. Relative to the
+ * linking page's folder: `usenet-101.md`, `./vpn/protonvpn.md`, `../torrents-101.md#pros`.
  */
-export function docSlugFromHref(href: string): string | null {
+export function docSlugFromHref(href: string, fromSlug = ''): string | null {
   if (/^[a-z][a-z0-9+.-]*:/i.test(href) || href.startsWith('//') || href.startsWith('#')) {
     return null;
   }
-  const m = /^(?:\.\/)?([a-z0-9-]+)\.md(?:#.*)?$/i.exec(href);
-  return m?.[1] && hasDoc(m[1]) ? m[1] : null;
+  const target = href.replace(/#.*$/, '');
+  if (!/\.md$/i.test(target)) return null;
+  const parts = fromSlug.includes('/') ? fromSlug.split('/').slice(0, -1) : [];
+  for (const seg of target.replace(/\.md$/i, '').split('/')) {
+    if (seg === '' || seg === '.') continue;
+    if (seg === '..') {
+      if (parts.length === 0) return null;
+      parts.pop();
+    } else if (/^[A-Za-z0-9-]+$/.test(seg)) parts.push(seg);
+    else return null;
+  }
+  const slug = parts.join('/');
+  return hasDoc(slug) ? slug : null;
 }

@@ -6,6 +6,8 @@ test.describe.configure({ mode: 'serial' });
 
 const USER = 'e2e-owner';
 const PASSWORD = 'purple-train-river-7';
+const VPN_PASSWORD = 'correct-horse-vpn-9';
+const external = !!process.env['E2E_BASE_URL'];
 
 async function next(page: Page) {
   await page.getByRole('button', { name: /^Next/ }).click();
@@ -15,7 +17,7 @@ test('opening EasyArr on a fresh install starts the wizard at Welcome', async ({
   await page.goto('/');
   await expect(page).toHaveURL(/\/setup\/welcome$/);
   await expect(page.getByRole('heading', { name: 'Welcome to EasyArr' })).toBeVisible();
-  await expect(page.getByText('Step 1 of 4')).toBeVisible();
+  await expect(page.getByText('Step 1 of 5')).toBeVisible();
   await expect(page.getByText('Please use it responsibly')).toBeVisible();
   await expect(page.getByRole('button', { name: /Restore from backup/ })).toBeDisabled();
 });
@@ -86,9 +88,9 @@ test('the API never returns the password', async ({ request }) => {
   }
 });
 
-test('step 4: choose a download method and finish', async ({ page }) => {
+test('step 4: choose a download method', async ({ page }) => {
   await page.goto('/setup/download');
-  await expect(page.getByText('Step 4 of 4')).toBeVisible();
+  await expect(page.getByText('Step 4 of 5')).toBeVisible();
   await next(page);
   await expect(page.getByText('Please choose one of the options.')).toBeVisible();
   await page.getByRole('button', { name: 'Usenet explained' }).click();
@@ -96,6 +98,61 @@ test('step 4: choose a download method and finish', async ({ page }) => {
   await page.keyboard.press('Escape');
   await page.getByRole('radio', { name: 'Torrents' }).click();
   await next(page);
+  await expect(page).toHaveURL(/\/setup\/vpn$/);
+});
+
+test('step 5: "Skip for now" explains honestly that downloads stay off', async ({ page }) => {
+  await page.goto('/setup/vpn');
+  await expect(page.getByText('Step 5 of 5')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Best for torrents' })).toBeVisible();
+  await page.getByRole('button', { name: 'Skip for now' }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByText(/EasyArr never downloads without a VPN/)).toBeVisible();
+  await dialog.getByRole('button', { name: 'Set up a VPN now' }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page).toHaveURL(/\/setup\/vpn$/);
+});
+
+// The connect flow needs the fake VPN side from serve.mjs; the stack has no real VPN account.
+test('step 5: a wrong password gets a plain reason; fixing it connects and hides the home IP', async ({
+  page,
+}) => {
+  test.skip(external, 'needs the fake VPN (local run)');
+  await page.goto('/setup/vpn');
+  await page.getByLabel('Search VPN providers').fill('private internet');
+  await page.getByTestId('vpn-provider-pia').click();
+  await expect(page.getByTestId('vpn-guide')).toContainText('Private Internet Access');
+  await page.getByLabel('VPN username').fill('p1234567');
+  await page.getByLabel('VPN password').fill('wrong-password');
+  await page.getByRole('button', { name: 'Connect' }).click();
+  const result = page.getByTestId('vpn-result');
+  await expect(result).toHaveAttribute('data-ok', 'false', { timeout: 30_000 });
+  await expect(result).toContainText('Username or password was refused');
+  await expect(page.getByRole('button', { name: 'Skip for now' })).toBeVisible();
+
+  // Change the settings: no reinstall, the VPN reconnects with the new password.
+  await page.getByLabel('VPN password').fill(VPN_PASSWORD);
+  await page.getByRole('button', { name: 'Connect' }).click();
+  await expect(result).toHaveAttribute('data-ok', 'true', { timeout: 30_000 });
+  await expect(result).toContainText('185.159.157.10 (Netherlands)');
+  await expect(result).toContainText('Your home IP is hidden');
+  await expect(result).toContainText('Port forwarding is on (port 51413)');
+
+  const config = await page.request.get('/api/vpn/config');
+  expect(await config.text()).not.toContain(VPN_PASSWORD);
+
+  await next(page);
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByText('First part of the setup is done')).toBeVisible();
+});
+
+test('step 5 (stack): skipping keeps the kill switch closed and finishes the wizard', async ({
+  page,
+}) => {
+  test.skip(!external, 'local runs connect the fake VPN instead');
+  await page.goto('/setup/vpn');
+  await page.getByRole('button', { name: 'Skip for now' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: /Skip/ }).click();
   await expect(page).toHaveURL(/\/$/);
   await expect(page.getByText('First part of the setup is done')).toBeVisible();
 });

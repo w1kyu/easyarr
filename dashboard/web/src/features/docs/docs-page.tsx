@@ -12,7 +12,7 @@ const DocView = lazy(() => import('./doc-view'));
 /** Full-page docs viewer at /help/:slug (polished in phase 10). */
 export function DocsPage() {
   const { t } = useTranslation();
-  const { slug = '' } = useParams();
+  const { '*': slug = '' } = useParams();
   const navigate = useNavigate();
   if (!hasDoc(slug)) return <NotFound />;
   return (

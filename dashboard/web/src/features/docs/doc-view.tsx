@@ -31,7 +31,7 @@ export default function DocView({
         remarkPlugins={[remarkGfm]}
         components={{
           a: ({ href = '', children }) => {
-            const target = docSlugFromHref(href);
+            const target = docSlugFromHref(href, slug);
             if (target) {
               return (
                 <a

@@ -1,4 +1,12 @@
-import type { SystemCheckResult, WizardStepId, WizardView } from '@easyarr/shared';
+import type {
+  SystemCheckResult,
+  VpnConfigInput,
+  VpnConfigView,
+  VpnStatusView,
+  VpnTestView,
+  WizardStepId,
+  WizardView,
+} from '@easyarr/shared';
 
 export interface Health {
   status: 'ok';
@@ -55,4 +63,10 @@ export const api = {
   wizard: () => request<WizardView>('/api/wizard'),
   saveWizardStep: (step: WizardStepId, body: unknown) =>
     post<WizardView>(`/api/wizard/${step}`, body),
+  vpnConfig: () => request<{ config: VpnConfigView | null }>('/api/vpn/config'),
+  saveVpnConfig: (body: Partial<VpnConfigInput>) =>
+    post<{ config: VpnConfigView }>('/api/vpn/config', body),
+  vpnStatus: () => request<VpnStatusView>('/api/vpn/status'),
+  vpnTest: () => post<VpnTestView>('/api/vpn/test', {}),
+  vpnReconnect: () => post<{ ok: true }>('/api/vpn/reconnect', {}),
 };
