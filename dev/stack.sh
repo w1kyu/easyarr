@@ -50,8 +50,8 @@ wait_healthy() {
       name=$(docker inspect -f '{{.Name}}' "$id" | sed 's#^/##')
       state=$(docker inspect -f '{{.State.Status}}' "$id")
       health=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$id")
-      # init is a one-shot; vpn stays unhealthy until a real VPN is configured (Phase 04).
-      [[ "$name" == "$(c init)" || "$name" == "$(c vpn)" ]] && continue
+      # init is a one-shot. vpn is healthy when its kill switch is in place (no VPN account needed, D-040).
+      [[ "$name" == "$(c init)" ]] && continue
       if [[ "$state" != "running" ]]; then pending+=("$name=$state"); continue; fi
       [[ "$health" == "healthy" || "$health" == "none" ]] || pending+=("$name=$health")
     done
@@ -88,6 +88,26 @@ init_is_idempotent() {
 }
 dashboard_serves_app() { curl -fsS -m 10 http://localhost:39000/ | grep -q 'id="root"'; }
 
+# Retries a command for up to N seconds.
+wait_for() {
+  local secs=$1
+  shift
+  for _ in $(seq 1 "$secs"); do
+    "$@" >/dev/null 2>&1 && return 0
+    sleep 1
+  done
+  return 1
+}
+
+# Saves a custom WireGuard config whose endpoint is TEST-NET-1 (RFC 5737, never routed). The keys are
+# Gluetun's public documentation examples, not secrets.
+save_dead_end_vpn() {
+  local conf='[Interface]\nPrivateKey = wOEI9rqqbDwnN8/Bpp22sVz48T71vJ4fYmFWujulwUU=\nAddress = 10.64.222.21/32\n[Peer]\nPublicKey = wAUaJMhAq3NFutLHIdF8AN0B5WG8RndfQKLPTEDHal0=\nEndpoint = 192.0.2.1:51820\n'
+  curl -fsS -m 10 -o /dev/null -X POST -H 'content-type: application/json' \
+    -d "{\"provider\":\"custom\",\"protocol\":\"wireguard\",\"fields\":{\"wgConfig\":\"$conf\"}}" \
+    http://localhost:39000/api/vpn/config
+}
+
 leaktest() {
   local probe=(docker run --rm --network umbrel_main_network "${BUSYBOX}")
 
@@ -102,6 +122,24 @@ leaktest() {
     check "$svc -> http://example.com (DNS + HTTP)" fail docker exec "$(c "$svc")" curl -sS -m 8 -o /dev/null http://example.com
     check "$svc resolves example.com" fail docker exec "$(c "$svc")" getent hosts example.com
   done
+
+  echo "== With VPN settings that can never connect (TEST-NET endpoint), saved through the dashboard"
+  check "dashboard saves VPN settings (via the Umbrel-like gateway)" ok save_dead_end_vpn
+  check "wrapper started Gluetun with them" ok wait_for 60 sh -c \
+    "docker exec $(c vpn) cat /gluetun/easyarr/status.json | grep -q '\"state\":\"running\"'"
+  check "dashboard does not claim the VPN is connected" ok sh -c \
+    "curl -fsS -m 10 http://localhost:39000/api/vpn/status | grep -vq '\"connection\":\"connected\"'"
+  for svc in qbittorrent sonarr; do
+    check "$svc -> https://1.1.1.1 while Gluetun tries to connect" fail docker exec "$(c "$svc")" curl -sS -m 8 -o /dev/null https://1.1.1.1
+  done
+  check "dashboard asks for a reconnect" ok curl -fsS -m 10 -o /dev/null -X POST -H 'content-type: application/json' -d '{}' http://localhost:39000/api/vpn/reconnect
+  check "qbittorrent -> https://1.1.1.1 during the reload" fail docker exec "$(c qbittorrent)" curl -sS -m 5 -o /dev/null https://1.1.1.1
+  check "vpn container is still healthy (kill switch in place)" ok wait_for 30 sh -c \
+    "[ \"\$(docker inspect -f '{{.State.Health.Status}}' $(c vpn))\" = healthy ]"
+
+  echo "== Access control (D-041)"
+  check "other apps on the Docker network can't use the dashboard API" fail "${probe[@]}" wget -q -O /dev/null -T 10 "http://$(c dashboard):3000/api/wizard"
+  check "Gluetun's control server refuses requests without the key" fail "${probe[@]}" wget -q -O /dev/null -T 10 "http://$(c vpn):8000/v1/publicip/ip"
 
   echo "== Inside the VPN namespace, services reach each other on localhost"
   check "qbittorrent -> sonarr via localhost:8989" ok \

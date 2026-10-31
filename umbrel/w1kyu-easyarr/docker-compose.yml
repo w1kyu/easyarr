@@ -5,9 +5,9 @@
 # reached from outside via the container name w1kyu-easyarr_vpn_1:<port>. Internal ports
 # must therefore never collide (see SPEC §3).
 #
-# Until Phase 04 (VPN wrapper) the `vpn` service runs plain Gluetun with a deliberately
-# unusable WireGuard config: the kill switch is up, the tunnel never connects, so nothing
-# inside the VPN namespace can reach the internet (D-025).
+# The `vpn` service is EasyArr's VPN image (Gluetun + wrapper, D-040): its kill switch blocks all
+# internet traffic of these services whenever the VPN isn't connected, including before the user
+# has set one up. The services start only once the kill switch is in place (service_healthy).
 services:
   app_proxy:
     environment:
@@ -16,7 +16,7 @@ services:
 
   # One-shot (SPEC §7.4): /data tree, API keys, minimal service configs. Idempotent (D-031).
   init:
-    image: ghcr.io/w1kyu/easyarr:sha-6286334@sha256:666a4744a494ab2cc224d70fd4d94a9a720d6235710858fbab4c1af4addb139f
+    image: ghcr.io/w1kyu/easyarr:sha-19fe549@sha256:c679f7b8b53208729361e8cd830b154772d532959a86fb1adca3fd8cb09f490f
     user: '0:0'
     command: ['init']
     restart: on-failure
@@ -30,21 +30,25 @@ services:
 
   # Dashboard + setup wizard.
   dashboard:
-    image: ghcr.io/w1kyu/easyarr:sha-6286334@sha256:666a4744a494ab2cc224d70fd4d94a9a720d6235710858fbab4c1af4addb139f
+    image: ghcr.io/w1kyu/easyarr:sha-19fe549@sha256:c679f7b8b53208729361e8cd830b154772d532959a86fb1adca3fd8cb09f490f
     restart: on-failure
     depends_on:
       init:
         condition: service_completed_successfully
     environment:
       TZ: 'Etc/UTC'
+      # Umbrel's app gateway is NETWORK_IP + 1; only it (and loopback) may use the API (D-041).
+      NETWORK_IP: ${NETWORK_IP}
     volumes:
       - ${APP_DATA_DIR}/data/easyarr:/easyarr
+      # VPN settings for the wrapper + its status and log (D-041).
+      - ${APP_DATA_DIR}/data/vpn:/vpn
       # Read-only: the system check measures free space here (later: disk status on the dashboard).
       - ${UMBREL_ROOT}/data/storage/EasyArr:/data:ro
 
   # Owns the network namespace for every download/search service (SPEC §5).
   vpn:
-    image: qmcgaw/gluetun:v3.41.3@sha256:fa19cc76b2af13d57a8d3dc3066f2ada061b1c761b8aecf989b3877c0486e027
+    image: ghcr.io/w1kyu/easyarr-vpn:sha-dbbe22b@sha256:1cfce5f6f9466bc95c597ab214aa54eac4114a549c7504de8a5d7cdb0401b8d3
     restart: on-failure
     cap_add:
       - NET_ADMIN
@@ -52,23 +56,20 @@ services:
       - /dev/net/tun:/dev/net/tun
     environment:
       TZ: 'Etc/UTC'
-      # Temporary, deliberately unusable tunnel until Phase 04 (D-025):
-      # 192.0.2.1 is TEST-NET-1 (RFC 5737) and is never routed; the keys are Gluetun's
-      # public documentation examples, not secrets. Gluetun keeps its kill switch up and
-      # keeps retrying, so the namespace has no route to the internet.
-      VPN_SERVICE_PROVIDER: 'custom'
-      VPN_TYPE: 'wireguard'
-      WIREGUARD_ENDPOINT_IP: '192.0.2.1'
-      WIREGUARD_ENDPOINT_PORT: '51820'
-      WIREGUARD_PUBLIC_KEY: 'wAUaJMhAq3NFutLHIdF8AN0B5WG8RndfQKLPTEDHal0='
-      WIREGUARD_PRIVATE_KEY: 'wOEI9rqqbDwnN8/Bpp22sVz48T71vJ4fYmFWujulwUU='
-      WIREGUARD_ADDRESSES: '10.64.222.21/32'
+      # VPN settings come from the dashboard (easyarr/vpn.env), never from here (D-041).
       # Let VPN-side apps reach other containers on Umbrel's Docker network.
       FIREWALL_OUTBOUND_SUBNETS: '${NETWORK_IP}/16'
       UPDATER_PERIOD: '0'
       VERSION_INFORMATION: 'off'
     volumes:
       - ${APP_DATA_DIR}/data/vpn:/gluetun
+    # Healthy = kill switch in place, not "VPN connected" (D-040). Same as the image's HEALTHCHECK.
+    healthcheck:
+      test: ['CMD', '/easyarr/healthcheck.sh']
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
 
   qbittorrent:
     image: linuxserver/qbittorrent:5.3.0@sha256:75ecbb1c89ab7b0a21c4bde40b4820e4f1649d2d56d83b91913422155e8d2a5f
@@ -78,7 +79,7 @@ services:
       init:
         condition: service_completed_successfully
       vpn:
-        condition: service_started
+        condition: service_healthy
     environment:
       PUID: '1000'
       PGID: '1000'
@@ -104,7 +105,7 @@ services:
       init:
         condition: service_completed_successfully
       vpn:
-        condition: service_started
+        condition: service_healthy
     environment:
       PUID: '1000'
       PGID: '1000'
@@ -128,7 +129,7 @@ services:
       init:
         condition: service_completed_successfully
       vpn:
-        condition: service_started
+        condition: service_healthy
     environment:
       PUID: '1000'
       PGID: '1000'
@@ -151,7 +152,7 @@ services:
       init:
         condition: service_completed_successfully
       vpn:
-        condition: service_started
+        condition: service_healthy
     environment:
       TZ: 'Etc/UTC'
       LOG_LEVEL: 'info'
@@ -164,7 +165,7 @@ services:
       init:
         condition: service_completed_successfully
       vpn:
-        condition: service_started
+        condition: service_healthy
     environment:
       PUID: '1000'
       PGID: '1000'
@@ -188,7 +189,7 @@ services:
       init:
         condition: service_completed_successfully
       vpn:
-        condition: service_started
+        condition: service_healthy
     environment:
       PUID: '1000'
       PGID: '1000'
@@ -212,7 +213,7 @@ services:
       init:
         condition: service_completed_successfully
       vpn:
-        condition: service_started
+        condition: service_healthy
     environment:
       PUID: '1000'
       PGID: '1000'
@@ -236,7 +237,7 @@ services:
       init:
         condition: service_completed_successfully
       vpn:
-        condition: service_started
+        condition: service_healthy
     environment:
       PUID: '1000'
       PGID: '1000'
@@ -261,7 +262,7 @@ services:
       init:
         condition: service_completed_successfully
       vpn:
-        condition: service_started
+        condition: service_healthy
     environment:
       TZ: 'Etc/UTC'
     volumes:
@@ -276,7 +277,7 @@ services:
       init:
         condition: service_completed_successfully
       vpn:
-        condition: service_started
+        condition: service_healthy
     environment:
       TZ: 'Etc/UTC'
     volumes:
@@ -291,7 +292,7 @@ services:
       init:
         condition: service_completed_successfully
       vpn:
-        condition: service_started
+        condition: service_healthy
     environment:
       PUID: '1000'
       PGID: '1000'
