@@ -53,8 +53,9 @@ check "control: internet works outside the namespace" ok docker run --rm --netwo
 check "inside: busybox wget exists (guards the next checks)" ok docker run --rm --network container:ea-vpn "$BUSYBOX" which wget
 check "inside -> http://1.1.1.1 blocked" fail egress http://1.1.1.1
 check "inside -> http://example.com blocked" fail egress http://example.com
-docker run -d --name ea-inside --network container:ea-vpn "$BUSYBOX" httpd -f -p 8989 >/dev/null
-check "Docker network -> service port inside works" ok wait_for 10 docker run --rm --network "$NET" "$BUSYBOX" wget -q -T 5 -O /dev/null http://ea-vpn:8989/
+# Serves /etc, so /passwd is a file that exists (a directory would give 404).
+docker run -d --name ea-inside --network container:ea-vpn "$BUSYBOX" httpd -f -p 8989 -h /etc >/dev/null
+check "Docker network -> service port inside works" ok wait_for 10 docker run --rm --network "$NET" "$BUSYBOX" wget -q -T 5 -O /dev/null http://ea-vpn:8989/passwd
 # A closed port on the gateway answers "refused" when allowed; a blocked packet would time out.
 check "inside -> Docker network works" ok docker run --rm --network container:ea-vpn "$BUSYBOX" sh -c "wget -T 5 -O /dev/null http://10.99.0.1:1/ 2>&1 | grep -q refused"
 
@@ -66,10 +67,10 @@ check "still blocked after the attempt" fail egress http://1.1.1.1
 echo "== Invalid settings: Gluetun exits, kill switch stays closed"
 docker exec ea-vpn sh -c 'printf "VPN_SERVICE_PROVIDER=custom\nVPN_TYPE=wireguard\nWIREGUARD_PRIVATE_KEY=not-a-key\nWIREGUARD_ADDRESSES=10.2.0.2/32\nWIREGUARD_PUBLIC_KEY=x\nVPN_ENDPOINT_IP=192.0.2.1\nVPN_ENDPOINT_PORT=51820\n" > /gluetun/easyarr/vpn.env'
 check "wrapper reports crashed" ok wait_for 30 sh -c "docker exec ea-vpn cat /gluetun/easyarr/status.json | grep -q '\"state\":\"crashed\"'"
-check "Gluetun's error is in gluetun.log" ok wait_for 10 docker exec ea-vpn grep -qi 'private key' /gluetun/easyarr/gluetun.log
+check "Gluetun's error is in gluetun.log" ok wait_for 10 docker exec ea-vpn grep -qi 'key is not valid' /gluetun/easyarr/gluetun.log
 check "inside -> http://1.1.1.1 blocked" fail egress http://1.1.1.1
 check "still healthy (kill switch in place)" ok sh -c "[ \"\$(docker inspect -f '{{.State.Health.Status}}' ea-vpn)\" = healthy ]"
-check "Docker network -> service port inside still works" ok docker run --rm --network "$NET" "$BUSYBOX" wget -q -T 5 -O /dev/null http://ea-vpn:8989/
+check "Docker network -> service port inside still works" ok docker run --rm --network "$NET" "$BUSYBOX" wget -q -T 5 -O /dev/null http://ea-vpn:8989/passwd
 
 echo "== Removing vpn.env goes back to unconfigured"
 docker exec ea-vpn rm /gluetun/easyarr/vpn.env
