@@ -1,0 +1,38 @@
+#!/bin/sh
+# iptables guard (D-040). Installed as /usr/local/sbin/{iptables,ip6tables}{,-nft,-legacy}, which
+# come first in PATH, so Gluetun runs this instead of the real binary.
+#
+# Gluetun has one code path that opens the firewall: if enabling its rules fails half-way it flushes
+# them and sets every policy to ACCEPT before exiting. This guard turns an ACCEPT policy on OUTPUT
+# or FORWARD into DROP, so the kill switch can never be opened from inside the container. Everything
+# else is passed through unchanged.
+name=${0##*/}
+real=''
+for d in ${EASYARR_GUARD_SEARCH:-/usr/sbin /sbin /usr/bin /bin}; do
+  if [ -x "$d/$name" ]; then
+    real="$d/$name"
+    break
+  fi
+done
+if [ -z "$real" ]; then
+  echo "iptables-guard: $name not found" >&2
+  exit 127
+fi
+
+state=0 # 0 = normal, 1 = after -P/--policy, 2 = after -P OUTPUT|FORWARD
+for arg do
+  shift
+  if [ "$state" = 2 ] && [ "$arg" = ACCEPT ]; then
+    echo "iptables-guard: refusing an ACCEPT policy, keeping DROP (EasyArr kill switch)" >&2
+    set -- "$@" DROP
+    state=0
+    continue
+  fi
+  case "$state:$arg" in
+    0:-P | 0:--policy) state=1 ;;
+    1:OUTPUT | 1:FORWARD) state=2 ;;
+    *) state=0 ;;
+  esac
+  set -- "$@" "$arg"
+done
+exec "$real" "$@"

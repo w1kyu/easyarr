@@ -29,6 +29,18 @@ jobs:
       - run: pnpm test
       - run: pnpm build
 
+  vpn-wrapper:
+    name: VPN wrapper (shellcheck + unit tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: shellcheck
+        run: shellcheck -x -s sh vpn/rootfs/easyarr/*.sh vpn/rootfs/easyarr/iptables-guard vpn/test/lib.test.sh && shellcheck vpn/test/smoke.sh dev/*.sh
+      - name: Unit tests (dash)
+        run: dash vpn/test/lib.test.sh
+      - name: Unit tests (busybox ash, as in the image)
+        run: docker run --rm -v "$PWD:/w:ro" -w /w busybox:1.38.0@sha256:a46257e06c82ad85242d0d38077d0a52d9896389ca60a1a59d3463db586e5fa4 sh vpn/test/lib.test.sh
+
   e2e:
     name: Wizard e2e (Playwright)
     runs-on: ubuntu-latest
