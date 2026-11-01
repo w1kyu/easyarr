@@ -258,6 +258,7 @@ export class WiringEngine {
         const base = { type: 'step' as const, step: step.id, service: step.service };
         emit({ ...base, state: 'waiting' });
         let current: ServiceId = step.service;
+        let ctx: StepContext | undefined;
         try {
           const needs = typeof step.needs === 'function' ? step.needs(plan) : step.needs;
           for (const need of needs) {
@@ -266,15 +267,7 @@ export class WiringEngine {
           }
           current = step.service;
           emit({ ...base, state: 'running' });
-          const ctx = new StepContext(
-            step,
-            mode,
-            plan,
-            this.opts.store,
-            snapshot,
-            now,
-            this.opts.log,
-          );
+          ctx = new StepContext(step, mode, plan, this.opts.store, snapshot, now, this.opts.log);
           await step.run(ctx);
           total += ctx.changes;
           emit({ ...base, state: 'done', changes: ctx.changes, notes: ctx.notes });
@@ -285,8 +278,11 @@ export class WiringEngine {
         } catch (err) {
           ok = false;
           const error = toStepError(err, current);
-          this.opts.log?.warn({ step: step.id, error }, 'wiring step failed');
-          emit({ ...base, state: 'failed', error });
+          // What the step did before failing still counts (and its notes still matter).
+          const changes = ctx?.changes ?? 0;
+          total += changes;
+          this.opts.log?.warn({ step: step.id, error, changes }, 'wiring step failed');
+          emit({ ...base, state: 'failed', error, changes, notes: ctx?.notes ?? [] });
         }
       }
       await this.opts.store.finish({ at: now().toISOString(), mode, ok, changes: total });

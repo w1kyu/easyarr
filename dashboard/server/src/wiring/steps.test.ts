@@ -36,6 +36,8 @@ class FakeServarr {
     downloadclient: { id: 1, enableCompletedDownloadHandling: false, autoRedownloadFailed: true },
   };
   posts: string[] = [];
+  /** Implementation whose download-client POST fails validation (like a missing category). */
+  reject: string | null = null;
   constructor(
     readonly app: string,
     readonly key: string,
@@ -94,6 +96,9 @@ class FakeServarr {
       const b = body as Json;
       if (res === 'tag')
         return [201, col.items.find((t) => t['label'] === b['label']) ?? col.add(b)];
+      if (res === 'downloadclient' && b['implementation'] === this.reject) {
+        return [400, [{ propertyName: 'TvCategory', errorMessage: 'Category does not exist' }]];
+      }
       if (
         res === 'indexerproxy' &&
         Array.isArray(b['tags']) &&
@@ -684,5 +689,22 @@ describe('wiring steps', () => {
     ]);
     expect(w.arr.sonarr.coll('rootfolder').items).toHaveLength(1);
     expect(w.cu.setup).toBe(true);
+  });
+
+  it('a step that fails half-way still reports its notes and changes', async () => {
+    const { world: w, run } = setup();
+    w.arr.sonarr.reject = 'Sabnzbd'; // Sonarr refuses its SABnzbd connection (like a missing category)
+    await run();
+    const qbt = w.arr.sonarr
+      .coll('downloadclient')
+      .items.find((c) => c['implementation'] === 'QBittorrent');
+    w.arr.sonarr.coll('downloadclient').remove(qbt?.['id'] as number);
+    const r = await run();
+    const failed = r.failed as { step: string; notes?: { code: string }[]; error?: unknown }[];
+    expect(failed.map((f) => f.step)).toEqual(['sonarr.connect']);
+    expect(failed[0]).toMatchObject({
+      error: { details: ['TvCategory: Category does not exist'] },
+    });
+    expect(failed[0]?.notes).toEqual([expect.objectContaining({ code: 'deleted_by_user' })]);
   });
 });
