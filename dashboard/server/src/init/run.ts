@@ -8,7 +8,9 @@ import { chownIfRoot, readFileIfExists, writeFileAtomic } from '../fs-util.js';
 import { registerSecrets } from '../logger.js';
 import { secretsStore, stateStore } from '../state/index.js';
 import { IniFile } from './ini.js';
+import { seedBazarrConfig } from './bazarr-config.js';
 import { parseServarrConfig, serializeServarrConfig } from './servarr-config.js';
+import { unpackerrConfig } from './unpackerr-config.js';
 
 /** The shared media tree (SPEC §6). Parents are listed before children. */
 export const DATA_TREE = [
@@ -143,6 +145,12 @@ export async function runInit(cfg: InitConfig, log: Logger): Promise<InitReport>
     own_('AuthSubnetWhitelistEnabled', 'true');
     own_('AuthSubnetWhitelist', `${cfg.networkIp}/16`);
     own_('HostHeaderValidation', 'false');
+    // Sonarr/Radarr/Lidarr/Cleanuparr reach qBittorrent on localhost (shared VPN namespace) without
+    // a password; the inbound allowlist (D-046) keeps everyone else out.
+    own_('LocalHostAuth', 'false');
+    // With reverse-proxy support on, X-Forwarded-For would replace the dashboard's address in the
+    // subnet-whitelist check (research: downloaders.md §1.4).
+    own_('ReverseProxySupportEnabled', 'false');
     // Defaults, only on first creation: qBittorrent rewrites and migrates its file on start, so
     // re-adding defaults it dropped would flip-flop on every start (idempotency).
     if (raw === undefined) {
@@ -176,6 +184,9 @@ export async function runInit(cfg: InitConfig, log: Logger): Promise<InitReport>
     changed = ini.set('misc', 'nzb_key', nzbKey, sep) || changed;
     // Owned: port + accept requests addressed to the vpn container name (D-031).
     changed = ini.set('misc', 'port', '8080', sep) || changed;
+    // Owned: the dashboard proxies the UI under /apps/sabnzbd without stripping it (D-045). Seeded
+    // here: changing url_base through SABnzbd's API makes it restart itself.
+    changed = ini.set('misc', 'url_base', '/apps/sabnzbd', sep) || changed;
     // SABnzbd writes lists configobj-style ("a, b" or "a," for one item): only touch it when a
     // host is actually missing, never just to reformat (idempotency).
     const whitelist = (ini.get('misc', 'host_whitelist') ?? '')
@@ -198,6 +209,52 @@ export async function runInit(cfg: InitConfig, log: Logger): Promise<InitReport>
       changes.push(`${raw === undefined ? 'created' : 'updated'} sabnzbd/sabnzbd.ini`);
     }
   }
+
+  // 5b. Bazarr (/config/config/config.yaml). Bazarr rewrites the whole file with every default on
+  //     start, so only parsed values of owned keys are compared (never the text).
+  {
+    const file = path.join(cfg.appDataDir, 'bazarr', 'config', 'config.yaml');
+    const raw = await readFileIfExists(file);
+    const result = seedBazarrConfig(raw, {
+      apiKey: apiKeys['bazarr'],
+      sonarrKey: apiKeys['sonarr'] as string,
+      radarrKey: apiKeys['radarr'] as string,
+    });
+    apiKeys['bazarr'] = result.apiKey;
+    if (result.content !== null) {
+      await ensureDir(path.join(cfg.appDataDir, 'bazarr'), 0o755, own, [], cfg.appDataDir);
+      await ensureDir(path.dirname(file), 0o755, own, [], cfg.appDataDir);
+      await writeService(file, result.content, own);
+      changes.push(`${raw === undefined ? 'created' : 'updated'} bazarr/config/config.yaml`);
+    }
+  }
+
+  // 5c. Unpackerr (/config/unpackerr.conf): EasyArr's file entirely. Read once at start; its web UI
+  //     is off, because with it on Unpackerr rewrites the file to store a generated password.
+  {
+    const file = path.join(cfg.appDataDir, 'unpackerr', 'unpackerr.conf');
+    const desired = unpackerrConfig({
+      sonarr: apiKeys['sonarr'] as string,
+      radarr: apiKeys['radarr'] as string,
+      lidarr: apiKeys['lidarr'] as string,
+    });
+    const raw = await readFileIfExists(file);
+    if (raw !== desired) {
+      await ensureDir(path.join(cfg.appDataDir, 'unpackerr'), 0o755, own, [], cfg.appDataDir);
+      await writeService(file, desired, own);
+      changes.push(`${raw === undefined ? 'created' : 'updated'} unpackerr/unpackerr.conf`);
+    }
+  }
+
+  // 5d. Recyclarr: the dashboard writes recyclarr.yml and asks for syncs through .easyarr/ (D-048).
+  await ensureDir(path.join(cfg.appDataDir, 'recyclarr'), 0o755, own, changes, cfg.appDataDir);
+  await ensureDir(
+    path.join(cfg.appDataDir, 'recyclarr', '.easyarr'),
+    0o755,
+    own,
+    changes,
+    cfg.appDataDir,
+  );
 
   // 6. VPN folder (D-041): EasyArr's files for the wrapper (vpn.env, status, custom configs) and the
   //    API key the dashboard uses for Gluetun's control server. Gluetun reads the auth file when it

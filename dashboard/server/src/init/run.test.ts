@@ -2,6 +2,7 @@ import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import pino from 'pino';
+import { parse, stringify } from 'yaml';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { InitConfig } from '../config.js';
 import { DATA_TREE, runInit } from './run.js';
@@ -174,7 +175,9 @@ describe('init', () => {
         'AuthSubnetWhitelist=10.21.0.0/16',
         'AuthSubnetWhitelistEnabled=true',
         'HostHeaderValidation=false',
+        'LocalHostAuth=false',
         'Port=8090',
+        'ReverseProxySupportEnabled=false',
         '',
       ].join('\n'),
     );
@@ -188,5 +191,54 @@ describe('init', () => {
     await fs.chmod(movie, 0o600);
     await runInit(cfg, log);
     expect((await fs.stat(movie)).mode & 0o777).toBe(0o600);
+  });
+
+  it('seeds Bazarr (url base, keys) once and keeps values Bazarr wrote', async () => {
+    await runInit(cfg, log);
+    const file = path.join(cfg.appDataDir, 'bazarr/config/config.yaml');
+    const doc = parse(await fs.readFile(file, 'utf8')) as Record<string, Record<string, unknown>>;
+    expect(doc['general']).toMatchObject({
+      base_url: '/apps/bazarr',
+      port: 6767,
+      use_sonarr: false,
+    });
+    const secrets = JSON.parse(
+      await fs.readFile(path.join(cfg.appDataDir, 'easyarr/secrets.json'), 'utf8'),
+    );
+    expect(doc['auth']?.['apikey']).toBe(secrets.apiKeys.bazarr);
+    expect(doc['sonarr']?.['apikey']).toBe(secrets.apiKeys.sonarr);
+    // Bazarr rewrites the file with all its defaults + the user switches Sonarr on: init leaves it.
+    doc['general'] = { ...doc['general'], use_sonarr: true, minimum_score: 90 };
+    await fs.writeFile(file, stringify(doc));
+    expect((await runInit(cfg, log)).changes).toEqual([]);
+    // An owned value that drifted is put back.
+    doc['general'] = { ...doc['general'], base_url: '' };
+    await fs.writeFile(file, stringify(doc));
+    expect((await runInit(cfg, log)).changes).toEqual(['updated bazarr/config/config.yaml']);
+    const again = parse(await fs.readFile(file, 'utf8')) as Record<string, Record<string, unknown>>;
+    expect(again['general']).toMatchObject({ base_url: '/apps/bazarr', use_sonarr: true });
+  });
+
+  it("writes Unpackerr's config with the app keys and the web UI off", async () => {
+    await runInit(cfg, log);
+    const conf = await fs.readFile(path.join(cfg.appDataDir, 'unpackerr/unpackerr.conf'), 'utf8');
+    const secrets = JSON.parse(
+      await fs.readFile(path.join(cfg.appDataDir, 'easyarr/secrets.json'), 'utf8'),
+    );
+    expect(conf).toContain('listen_addr = ""');
+    expect(conf).toContain('url = "http://localhost:8989/apps/sonarr"');
+    expect(conf).toContain(`api_key = "${secrets.apiKeys.lidarr}"`);
+  });
+
+  it('seeds the SABnzbd url base and qBittorrent localhost access', async () => {
+    await runInit(cfg, log);
+    const sab = await fs.readFile(path.join(cfg.appDataDir, 'sabnzbd/sabnzbd.ini'), 'utf8');
+    expect(sab).toContain('url_base = /apps/sabnzbd');
+    const qbt = await fs.readFile(
+      path.join(cfg.appDataDir, 'qbittorrent/qBittorrent/qBittorrent.conf'),
+      'utf8',
+    );
+    expect(qbt).toContain('LocalHostAuth=false');
+    expect(qbt).toContain('ReverseProxySupportEnabled=false');
   });
 });
