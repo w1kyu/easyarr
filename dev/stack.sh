@@ -88,7 +88,7 @@ init_is_idempotent() {
     return 1
   }
 }
-dashboard_serves_app() { curl -fsS -m 10 http://localhost:39000/ | grep -q 'id="root"'; }
+dashboard_serves_app() { url_has http://localhost:39000/ 'id="root"'; }
 
 # Retries a command for up to N seconds.
 wait_for() {
@@ -253,7 +253,12 @@ arr_get() {
     "$port" "$app" "$path"
 }
 
-arr_has() { arr_get "$1" "$2" "$3" | grep -q -- "$4"; }
+# Capture first: with pipefail, `curl | grep -q` fails when grep exits early and curl gets SIGPIPE.
+arr_has() {
+  local out
+  out="$(arr_get "$1" "$2" "$3")"
+  grep -q -- "$4" <<<"$out"
+}
 sonarr_has_both_clients() {
   local list
   list="$(arr_get sonarr 8989 /api/v3/downloadclient)"
@@ -267,7 +272,11 @@ qbittorrent_has_categories() {
   cats="$(docker exec "$(c qbittorrent)" curl -fsS -m 10 http://localhost:8090/api/v2/torrents/categories)"
   grep -q '"tv"' <<<"$cats" && grep -q '"movies"' <<<"$cats" && grep -q '"music"' <<<"$cats"
 }
-url_has() { curl -fsS -m 10 "$1" | grep -q -- "$2"; }
+url_has() {
+  local out
+  out="$(curl -fsS -m 10 "$1")"
+  grep -q -- "$2" <<<"$out"
+}
 
 # DELETE inside a VPN-side container with that app's API key.
 arr_delete() {
