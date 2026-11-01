@@ -4,6 +4,8 @@
 #   dev/stack.sh up         install package files like umbrelOS does, then start the stack
 #   dev/stack.sh wait [s]   wait until every service with a healthcheck is healthy (vpn excluded)
 #   dev/stack.sh leaktest   kill-switch + reachability checks (SPEC §5.2)
+#   dev/stack.sh wiretest   finish the wizard through the API, run the wiring engine against the
+#                           real services, check the result and that a second run changes nothing
 #   dev/stack.sh ps|logs    docker compose ps / logs
 #   dev/stack.sh down       stop and remove containers (keeps dev/data)
 #   dev/stack.sh reset      down + delete dev/data (uses Docker to remove root-owned files)
@@ -149,7 +151,7 @@ leaktest() {
   echo "== The dashboard reaches the services via $(c vpn)"
   local dash=(docker exec "$(c dashboard)")
   check "dashboard has wget (guards the next checks)" ok "${dash[@]}" sh -c 'command -v wget'
-  for port_path in 8090/ 9696/ping 8191/ 8989/ping 7878/ping 8686/ping 6767/ 11011/apps/cleanuparr/health; do
+  for port_path in 8090/ 9696/ping 8191/ 8989/ping 7878/ping 8686/ping 6767/apps/bazarr/api/system/ping 11011/apps/cleanuparr/health; do
     check "dashboard -> http://$(c vpn):${port_path}" ok "${dash[@]}" wget -q -O /dev/null -T 10 "http://$(c vpn):${port_path}"
   done
   # SABnzbd answers 403 to unknown Host headers until its host_whitelist is seeded (phase 05),
@@ -194,6 +196,117 @@ leaktest() {
   echo "LEAK TEST PASSED"
 }
 
+# One wiring run over the API; prints one line per step, leaves the SSE stream in $1.
+wiring_run() {
+  curl -sS -N -m 1500 -X POST -H 'content-type: application/json' -d '{}' \
+    http://localhost:39000/api/wiring/run >"$1"
+  python3 - "$1" <<'PY'
+import json, sys
+for line in open(sys.argv[1]):
+    if not line.startswith("data: "):
+        continue
+    e = json.loads(line[6:])
+    if e.get("type") == "step" and e["state"] in ("done", "failed"):
+        extra = e.get("error", {}).get("message", "") if e["state"] == "failed" else f"changes={e.get('changes')} notes={len(e.get('notes', []))}"
+        print(f"   {e['state']:6} {e['step']:28} {extra}")
+    elif e.get("type") in ("end", "error"):
+        print(f"   {e}")
+PY
+}
+
+# Steps that may fail in CI: Recyclarr downloads the TRaSH guides, and CI has no real VPN.
+OFFLINE_STEPS='recyclarr.sync'
+
+wiring_failed_steps() {
+  python3 - "$1" "$OFFLINE_STEPS" <<'PY'
+import json, sys
+allowed = set(sys.argv[2].split())
+for line in open(sys.argv[1]):
+    if line.startswith("data: "):
+        e = json.loads(line[6:])
+        if e.get("type") == "step" and e["state"] == "failed" and e["step"] not in allowed:
+            print(e["step"])
+PY
+}
+
+wiring_changes() {
+  python3 - "$1" "$OFFLINE_STEPS" <<'PY'
+import json, sys
+allowed = set(sys.argv[2].split())
+n = 0
+for line in open(sys.argv[1]):
+    if line.startswith("data: "):
+        e = json.loads(line[6:])
+        if e.get("type") == "step" and e["state"] == "done" and e["step"] not in allowed:
+            n += e.get("changes", 0)
+print(n)
+PY
+}
+
+# GET inside a VPN-side container with that app's API key from its config.xml.
+arr_get() {
+  local app=$1 port=$2 path=$3
+  # shellcheck disable=SC2016 # expanded inside the container
+  docker exec "$(c "$app")" sh -c \
+    'k=$(sed -n "s:.*<ApiKey>\(.*\)</ApiKey>.*:\1:p" /config/config.xml); curl -fsS -m 15 -H "X-Api-Key: $k" "http://localhost:$0/apps/$1$2"' \
+    "$port" "$app" "$path"
+}
+
+arr_has() { arr_get "$1" "$2" "$3" | grep -q -- "$4"; }
+sonarr_has_both_clients() {
+  local list
+  list="$(arr_get sonarr 8989 /api/v3/downloadclient)"
+  grep -q QBittorrent <<<"$list" && grep -q Sabnzbd <<<"$list"
+}
+prowlarr_has_three_apps() {
+  [[ "$(arr_get prowlarr 9696 /api/v1/applications | grep -oE '"implementation": *"(Sonarr|Radarr|Lidarr)"' | sort -u | wc -l)" -eq 3 ]]
+}
+qbittorrent_has_categories() {
+  local cats
+  cats="$(docker exec "$(c qbittorrent)" curl -fsS -m 10 http://localhost:8090/api/v2/torrents/categories)"
+  grep -q '"tv"' <<<"$cats" && grep -q '"movies"' <<<"$cats" && grep -q '"music"' <<<"$cats"
+}
+url_has() { curl -fsS -m 10 "$1" | grep -q -- "$2"; }
+
+wiretest() {
+  local api=http://localhost:39000/api first second
+  first="$(mktemp)"
+  second="$(mktemp)"
+  json_post() { curl -fsS -m 20 -H 'content-type: application/json' -d "$2" "$api/$1" >/dev/null; }
+
+  echo "== Wizard answers through the API"
+  check "account" ok json_post wizard/account '{"username":"easyarr","password":"Tidy-Kettle-Orbit-42"}'
+  check "download method: both" ok json_post wizard/download '{"method":"both"}'
+
+  echo "== First wiring run (real services)"
+  wiring_run "$first"
+  local failed
+  failed="$(wiring_failed_steps "$first")"
+  check "every step worked (except offline: $OFFLINE_STEPS)" ok test -z "$failed"
+  [[ -z "$failed" ]] || echo "      failed: $failed"
+
+  echo "== The services really are connected"
+  check "sonarr has qBittorrent + SABnzbd" ok sonarr_has_both_clients
+  check "radarr root folder /data/media/movies" ok arr_has radarr 7878 /api/v3/rootfolder '/data/media/movies'
+  check "lidarr root folder /data/media/music" ok arr_has lidarr 8686 /api/v1/rootfolder '/data/media/music'
+  check "prowlarr knows sonarr, radarr, lidarr" ok prowlarr_has_three_apps
+  check "qBittorrent has the tv/movies/music categories" ok qbittorrent_has_categories
+  check "Jellyfin's first-run wizard is done" ok url_has http://localhost:39096/System/Info/Public '"StartupWizardCompleted":true'
+  check "the request page is set up" ok url_has http://localhost:39055/api/v1/settings/public '"initialized":true'
+
+  echo "== Second run changes nothing"
+  wiring_run "$second"
+  check "no failed steps" ok test -z "$(wiring_failed_steps "$second")"
+  check "zero changes" ok test "$(wiring_changes "$second")" -eq 0
+
+  rm -f "$first" "$second"
+  if [[ $fail -ne 0 ]]; then
+    echo "WIRING TEST FAILED"
+    return 1
+  fi
+  echo "WIRING TEST PASSED"
+}
+
 case "${1:-}" in
   up)
     install_package
@@ -201,6 +314,7 @@ case "${1:-}" in
     ;;
   wait) wait_healthy "${2:-600}" ;;
   leaktest) leaktest ;;
+  wiretest) wiretest ;;
   ps) compose ps -a ;;
   logs)
     shift

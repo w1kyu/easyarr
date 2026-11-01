@@ -76,6 +76,8 @@ jobs:
           pnpm install --frozen-lockfile
           pnpm exec playwright install --with-deps chromium
           pnpm test:e2e
+      - name: Wiring engine against the real services
+        run: dev/stack.sh wiretest
       - name: Show state and logs
         if: always()
         run: |
