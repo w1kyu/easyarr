@@ -49,9 +49,10 @@ export class SabnzbdApi {
   async categories(): Promise<z.infer<typeof categorySchema>[]> {
     const r = await this.call(
       { mode: 'get_config', section: 'categories' },
-      z.object({ config: z.object({ categories: z.array(categorySchema) }) }),
+      // No [categories] section in the INI yet (fresh install) → {"config":{}}.
+      z.object({ config: z.object({ categories: z.array(categorySchema).optional() }) }),
     );
-    return r.config.categories;
+    return r.config.categories ?? [];
   }
 
   /** Creates or updates a category; `dir` is relative to complete_dir. */

@@ -207,7 +207,8 @@ for line in open(sys.argv[1]):
         continue
     e = json.loads(line[6:])
     if e.get("type") == "step" and e["state"] in ("done", "failed"):
-        extra = e.get("error", {}).get("message", "") if e["state"] == "failed" else f"changes={e.get('changes')} notes={len(e.get('notes', []))}"
+        err = e.get("error", {})
+        extra = " — ".join([err.get("message", ""), *err.get("details", [])]) if e["state"] == "failed" else f"changes={e.get('changes')} notes={len(e.get('notes', []))}"
         print(f"   {e['state']:6} {e['step']:28} {extra}")
     elif e.get("type") in ("end", "error"):
         print(f"   {e}")
@@ -268,6 +269,21 @@ qbittorrent_has_categories() {
 }
 url_has() { curl -fsS -m 10 "$1" | grep -q -- "$2"; }
 
+# DELETE inside a VPN-side container with that app's API key.
+arr_delete() {
+  local app=$1 port=$2 path=$3
+  # shellcheck disable=SC2016 # expanded inside the container
+  docker exec "$(c "$app")" sh -c \
+    'k=$(sed -n "s:.*<ApiKey>\(.*\)</ApiKey>.*:\1:p" /config/config.xml); curl -fsS -m 15 -X DELETE -H "X-Api-Key: $k" "http://localhost:$0/apps/$1$2"' \
+    "$port" "$app" "$path"
+}
+sonarr_qbittorrent_id() {
+  arr_get sonarr 8989 /api/v3/downloadclient |
+    python3 -c 'import json,sys; print(next((c["id"] for c in json.load(sys.stdin) if c["implementation"] == "QBittorrent"), ""))'
+}
+sonarr_has_qbittorrent() { [[ -n "$(sonarr_qbittorrent_id)" ]]; }
+stream_has_note() { grep -q "\"code\":\"$2\"" "$1"; }
+
 wiretest() {
   local api=http://localhost:39000/api first second
   first="$(mktemp)"
@@ -299,7 +315,21 @@ wiretest() {
   check "no failed steps" ok test -z "$(wiring_failed_steps "$second")"
   check "zero changes" ok test "$(wiring_changes "$second")" -eq 0
 
-  rm -f "$first" "$second"
+  echo "== What you delete stays deleted; \"Repair\" puts it back (SPEC §10.2)"
+  local third fourth id
+  third="$(mktemp)"
+  fourth="$(mktemp)"
+  id="$(sonarr_qbittorrent_id)"
+  check "delete Sonarr's qBittorrent connection" ok arr_delete sonarr 8989 "/api/v3/downloadclient/${id}"
+  wiring_run "$third"
+  check "a normal run leaves it deleted" fail sonarr_has_qbittorrent
+  check "... and says so" ok stream_has_note "$third" deleted_by_user
+  curl -sS -N -m 1500 -X POST -H 'content-type: application/json' -d '{}' \
+    http://localhost:39000/api/wiring/repair >"$fourth"
+  check "repair puts it back" ok sonarr_has_qbittorrent
+  check "... and says so" ok stream_has_note "$fourth" recreated
+
+  rm -f "$first" "$second" "$third" "$fourth"
   if [[ $fail -ne 0 ]]; then
     echo "WIRING TEST FAILED"
     return 1

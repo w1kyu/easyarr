@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import { createBrowserRouter, type RouteObject } from 'react-router';
 import { Loading } from '@/components/ui/loading';
 import { DocsPage } from '~/features/docs/docs-page';
+import { WiringDevPage } from '~/features/wiring/wiring-dev-page';
 import { SetupIndex, WizardPage } from '~/features/wizard/wizard-page';
 import { Start } from './home';
 import { Layout } from './layout';
@@ -17,6 +18,8 @@ const children: RouteObject[] = [
   { path: 'setup/:stepId', element: <WizardPage /> },
   { path: 'help/*', element: <DocsPage /> },
   { path: 'unavailable/:service', element: <Unavailable /> },
+  // Temporary (phase 05): connect the apps by hand until the wizard's Finish step does it.
+  { path: 'dev/wiring', element: <WiringDevPage /> },
   ...(DevUi
     ? [
         {

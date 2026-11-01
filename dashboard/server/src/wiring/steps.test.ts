@@ -131,7 +131,8 @@ class World {
     prowlarr: new FakeServarr('prowlarr', this.keys['prowlarr'] as string),
   };
   qbt = { prefs: {} as Json, categories: {} as Record<string, Json> };
-  sab = { categories: [{ name: '*', dir: '' }] as Json[] };
+  // A fresh SABnzbd (INI written by init) has no [categories] section: get_config → {config:{}}.
+  sab = { categories: [] as Json[] };
   bz = { profiles: [] as Json[], settings: {} as Record<string, string> };
   jf = {
     wizardDone: false,
@@ -222,7 +223,12 @@ class World {
       return [200, { status: false, error: 'API Key Incorrect' }];
     const mode = q.get('mode');
     if (mode === 'version') return [200, { version: '5.1.3' }];
-    if (mode === 'get_config') return [200, { config: { categories: this.sab.categories } }];
+    if (mode === 'get_config') {
+      return [
+        200,
+        { config: this.sab.categories.length ? { categories: this.sab.categories } : {} },
+      ];
+    }
     if (mode === 'set_config') {
       this.sab.categories = [
         ...this.sab.categories.filter((c) => c['name'] !== q.get('name')),
@@ -486,7 +492,7 @@ describe('wiring steps', () => {
     expect(Object.keys(w.qbt.categories).sort()).toEqual(['movies', 'music', 'tv']);
     expect(w.qbt.categories['tv']?.['savePath']).toBe('/data/downloads/torrents/tv');
     expect(w.qbt.prefs).toMatchObject({ max_ratio_act: 0, auto_tmm_enabled: true });
-    expect(w.sab.categories.map((c) => c['name']).sort()).toEqual(['*', 'movies', 'music', 'tv']);
+    expect(w.sab.categories.map((c) => c['name']).sort()).toEqual(['movies', 'music', 'tv']);
 
     for (const [app, folder] of [
       ['sonarr', 'tv'],
@@ -651,7 +657,7 @@ describe('wiring steps', () => {
       gpu: false,
     });
     expect(r.failed).toEqual([]);
-    expect(w.sab.categories).toHaveLength(1);
+    expect(w.sab.categories).toHaveLength(0);
     expect(w.arr.sonarr.coll('downloadclient').items).toHaveLength(0);
     expect(w.arr.radarr.coll('downloadclient').items.map((c) => c['implementation'])).toEqual([
       'QBittorrent',
