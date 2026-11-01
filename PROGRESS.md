@@ -4,12 +4,12 @@
 > Newest session log entries go on top.
 
 ## Current phase
-**Phase 05 — 🟨 in progress (wiring engine + service proxy).**
+**Phase 05 — ✅ done (owner test pending).** v0.0.7: the wiring engine connects every app; proven
+against the real containers in CI on amd64 + arm64 (`dev/stack.sh wiretest`). Started by hand at
+`/dev/wiring` until phase 06's Finish step.
 Phase 04 owner test: VPN connected on the owner's Umbrel (Proton VPN, WireGuard, Germany, port
 forwarding active) — confirmed 2026-10-31. The phase 02/03 look-and-feel checklists are still open.
-Released during phase 05 so far: v0.0.5 (VPN rule clean-up fix, D-044), v0.0.6 (service proxy +
-inbound allowlist, D-045/D-046).
-Next prompt after this phase: `prompts/06-wizard-rest.md`.
+Next prompt: `prompts/06-wizard-rest.md`.
 
 ## Phase status
 | Phase | Title | Status | Notes |
@@ -19,7 +19,7 @@ Next prompt after this phase: `prompts/06-wizard-rest.md`.
 | 02 | Dashboard skeleton + design system + CI | ✅ done (owner test pending) | v0.0.2; image ghcr.io/w1kyu/easyarr amd64/arm64; stack test green on d72a564 |
 | 03 | Wizard basics (steps 1–4) | ✅ done (owner test pending) | v0.0.3; wizard e2e green locally, in CI and against the stack (amd64 + arm64) |
 | 04 | VPN (wrapper, kill switch, wizard step) | ✅ done (owner: VPN works) | v0.0.4; VPN image ghcr.io/w1kyu/easyarr-vpn amd64/arm64; leak tests green in CI (image smoke test + stack) |
-| 05 | Wiring engine + service proxy | 🟨 in progress | proxy + allowlist shipped (v0.0.6); engine + steps in progress |
+| 05 | Wiring engine + service proxy | ✅ done (owner test pending) | v0.0.5–v0.0.7; wiretest green against real services (amd64 + arm64) |
 | 06 | Wizard steps 6–9 | ⬜ todo | |
 | 07 | Dashboard + settings | ⬜ todo | |
 | 08 | Backup & restore | ⬜ todo | |
@@ -69,8 +69,8 @@ Copy from SPEC as they get resolved. Highest priority first:
 - [x] Jellyfin `/dev/dri` handling with/without GPU (→ `permissions: [GPU]`)
 - [x] Gluetun control server endpoints + auth requirements; port-forwarding provider list
 - [x] Gluetun DNS: can VPN-side apps resolve Docker container names (e.g. Jellyfin) once the tunnel is up? → No, by design (D-043); use localhost / the dashboard.
-- [ ] Sub-path support per service (Servarr, Bazarr, SABnzbd incl. `host_whitelist`, qBittorrent, Cleanuparr `BASE_PATH`)
-- [ ] Jellyfin startup API + backup/restore API; Seerr setup API
+- [x] Sub-path support per service (Servarr, Bazarr, SABnzbd incl. `host_whitelist`, qBittorrent, Cleanuparr `BASE_PATH`) — `docs/dev/research/`, D-045, D-049
+- [ ] Jellyfin startup API + backup/restore API; Seerr setup API (startup + Seerr setup done: `docs/dev/research/jellyfin-seerr.md`; backup/restore still open)
 - [ ] Servarr backup/restore API endpoints
 - [x] Port range 39000/39096/39055 free in official + popular community stores
 - [x] Cleanuparr image name, port, config format (config is created via its UI/API; format TBD in phase 05)
@@ -106,6 +106,32 @@ Copy from SPEC as they get resolved. Highest priority first:
 - umbrelOS 2.0 `environment:` manifest settings could expose a few safe knobs (e.g. TZ) in Umbrel's app settings.
 
 ## Session log
+### 2026-11-01 — Phase 05, part 2: every service wired, proven against the real containers (Hermes)
+- Research for all services moved into the repo: `docs/dev/research/*.md` (commit-pinned citations).
+- Clients: Servarr (Sonarr/Radarr/Lidarr/Prowlarr), qBittorrent, SABnzbd, Cleanuparr (+ Jellyfin,
+  Seerr, Bazarr, Recyclarr from part 1). Steps (`wiring/steps.ts`): download folders → Lidarr
+  quality profile → Sonarr/Radarr/Lidarr root folders + download clients + hardlinks + completed
+  download handling → Prowlarr apps + FlareSolverr → Recyclarr profiles → Bazarr → Jellyfin (wizard
+  with the owner's account, API key, libraries, GPU) → request page (admin via Jellyfin, libraries,
+  Sonarr/Radarr) → Cleanuparr (setup, apps, qBittorrent). Each step waits only for the services the
+  plan needs (D-047). `/api/wiring` registered; temporary page `/dev/wiring`.
+- init now seeds Bazarr, Unpackerr, SABnzbd `url_base`, qBittorrent localhost access; compose: Recyclarr
+  runner (sync only on request, D-048), Cleanuparr `BASE_PATH`, Recyclarr folder in the dashboard
+  (D-049). Proxy drops X-Forwarded-For.
+- Tests: 18 wiring unit tests against faked services; `dev/stack.sh wiretest` in CI against the real
+  containers: everything connected, second run = 0 changes, deleted connection stays deleted, repair
+  puts it back. Found + fixed by the real run: a fresh SABnzbd has no categories section.
+  In CI only Recyclarr fails (no internet without a real VPN) — expected; on a real Umbrel it syncs.
+- Released **v0.0.7** (easyarr sha-13a178b).
+- Owner test (v0.0.7):
+  - [ ] Update EasyArr to 0.0.7; open `http://umbrel.local:39000/dev/wiring` (or EasyArr → add
+        `/dev/wiring` to the address) → "Connect everything" → every line ends in "Done"
+  - [ ] Press it again → "Everything was already connected"
+  - [ ] Open Sonarr/Radarr/Prowlarr/qBittorrent from that page — downloaders, folders and apps are linked
+  - [ ] Log into Jellyfin (port 39096) with your EasyArr account; Movies/Shows/Music exist
+  - [ ] The request page (port 39055) lets you sign in with the same account
+- Next: `prompts/06-wizard-rest.md`.
+
 ### 2026-10-31 (evening) — Phase 05, part 1: proxy, allowlist, engine core (Hermes agent on the owner's Umbrel)
 - Owner confirmed the VPN works. Its logs showed Gluetun failing to clean up its own firewall rules on
   every reconnect (`cannot remove outdated VPN connection rule … "!10.21.0.16"`): our guard rule's
