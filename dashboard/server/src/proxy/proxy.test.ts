@@ -98,7 +98,7 @@ describe('service proxy /apps/*', () => {
     expect(res.headers['x-frame-options']).toBe('SAMEORIGIN');
   });
 
-  it('forwards same-origin POSTs with the body, without Origin/Referer', async () => {
+  it('forwards same-origin POSTs with the body; Host is the service, no Origin/Referer/X-Forwarded-For', async () => {
     const res = await app.inject({
       method: 'POST',
       url: '/apps/qbittorrent/api/v2/torrents/pause',
@@ -107,6 +107,7 @@ describe('service proxy /apps/*', () => {
         origin: 'http://umbrel.local:39000',
         referer: 'http://umbrel.local:39000/apps/qbittorrent/',
         'content-type': 'application/x-www-form-urlencoded',
+        'x-forwarded-for': '100.101.102.103',
       },
       payload: 'hashes=all',
     });
@@ -115,6 +116,8 @@ describe('service proxy /apps/*', () => {
     expect(echo.body).toBe('hashes=all');
     expect(echo.headers['origin']).toBeUndefined();
     expect(echo.headers['referer']).toBeUndefined();
+    expect(echo.headers['x-forwarded-for']).toBeUndefined();
+    expect(echo.headers['host']).toBe(new URL(upstreamUrl).host);
   });
 
   it('refuses cross-site state-changing requests (Origin or Referer from another site)', async () => {

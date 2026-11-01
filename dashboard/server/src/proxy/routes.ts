@@ -81,6 +81,10 @@ export async function proxyRoutes(app: FastifyInstance, opts: ProxyOptions): Pro
           const rest = { ...headers };
           delete rest.origin;
           delete rest.referer;
+          // The browser's address means nothing to the services and can hurt: SABnzbd refuses
+          // requests whose X-Forwarded-For isn't a private address (e.g. via Tailscale).
+          delete rest['x-forwarded-for'];
+          delete rest['x-real-ip'];
           return rest;
         },
         onError: (reply, { error }) => {
