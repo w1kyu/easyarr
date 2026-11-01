@@ -7,8 +7,8 @@ once, in Prowlarr.
 EasyArr doesn't choose, rank or recommend sites. Which sites you use — and what you download —
 is up to you. Only download content you have the right to download and share.
 
-> **Needs the VPN.** Prowlarr checks every site when you add it, through the VPN. If you skipped
-> the VPN, set it up first (setup step 5) or add your sites later.
+**Needs the VPN:** Prowlarr checks every site when you add it, through the VPN. If you skipped the
+VPN, set it up first (setup step 5) or add your sites later.
 
 ## Step by step
 

@@ -277,6 +277,9 @@ GET/POST /api/wizard/:step            # load/save step answers
 POST /api/vpn/config                  # write vpn.env + trigger reload
 GET  /api/vpn/status                  # state, public IP/country, port forwarding
 POST /api/vpn/test                    # run connection test
+POST /api/usenet/test-server          # wizard step 6 "Test" (through SABnzbd, D-050)
+POST /api/usenet/test-indexer         # wizard step 6 "Test" (through Prowlarr)
+GET  /api/prowlarr/indexers           # wizard step 7 check (D-051)
 POST /api/wiring/run                  # run wiring (SSE stream of progress)
 POST /api/wiring/repair               # re-create resources the ledger says are missing
 GET/POST /api/settings/...            # same forms as wizard steps
@@ -318,7 +321,7 @@ into docs, Back/Next, progress indicator. Answers saved per step (refresh-safe).
 | 6 | **Usenet** (if chosen) | Explains provider vs indexer. Guided forms: provider (host, port, SSL, username, password, connections) with presets for common providers **[VERIFY presets]**; indexer(s) (URL, API key). "Test" buttons. |
 | 7 | **Indexers** (if torrents) | Tutorial for adding indexers in Prowlarr (opens `/apps/prowlarr/` in new tab with step-by-step side guide). EasyArr does not pre-select or recommend specific trackers. |
 | 8 | **What do you want?** | Libraries: Movies / TV / Music (toggles). Preferred language. Quality preset: **Best quality / Balanced (default) / Save space** → mapped to Recyclarr templates (Sonarr/Radarr) and EasyArr's own Lidarr profile. |
-| 9 | **Finish** | Runs wiring with a live checklist (SSE): "✅ Sonarr connected to Prowlarr", … Failures show plain explanation + "Retry" + "Get help with AI". Ends on the dashboard with a short "what now" tour (request something in Jellyseerr, watch in Jellyfin). |
+| 9 | **Finish** | Runs wiring with a live checklist (SSE): "✅ Sonarr connected to Prowlarr", … Failures show plain explanation + "Retry" + "Get help with AI" (+ "Finish anyway", D-053). Ends on the dashboard with a short "what now" tour (request something in Jellyseerr, watch in Jellyfin). Saving an earlier step re-opens Finish. |
 
 ---
 

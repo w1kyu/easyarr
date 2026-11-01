@@ -10,11 +10,11 @@ import {
 } from '@easyarr/shared';
 import { useMutation } from '@tanstack/react-query';
 import {
-  BookOpenText,
   CircleCheck,
   CircleX,
   ExternalLink,
   Library,
+  PlugZap,
   Plus,
   Server,
   Trash2,
@@ -23,7 +23,6 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Field } from '~/components/field';
 import { SelectField } from '~/components/select-field';
-import { WhatsThis } from '~/features/docs/whats-this';
 import { api, ApiError } from '~/lib/api';
 import { ErrorAlert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -177,11 +176,6 @@ export function UsenetStep({ formId, view, onSaved }: StepFormProps) {
           icon={Library}
           title={t('usenet.explain.indexerTitle')}
           body={t('usenet.explain.indexer')}
-        />
-        <WhatsThis
-          slug="usenet-101"
-          label={t('usenet.explain.more')}
-          className="self-start md:col-span-2"
         />
       </div>
 
@@ -429,15 +423,18 @@ function ServerCard({
           hint={hasSaved ? t('usenet.savedHint') : undefined}
         />
       </div>
-      <Field
-        label={t('usenet.servers.connections')}
-        value={s.connections}
-        inputMode="numeric"
-        className="sm:max-w-48"
-        onChange={(e) => onChange({ connections: e.target.value })}
-        error={err('connections')}
-        hint={t('usenet.servers.connectionsHint')}
-      />
+      <div className="grid grid-cols-1 gap-x-3 gap-y-1.5 sm:grid-cols-[8rem_1fr] sm:items-end">
+        <Field
+          label={t('usenet.servers.connections')}
+          value={s.connections}
+          inputMode="numeric"
+          onChange={(e) => onChange({ connections: e.target.value })}
+          error={err('connections')}
+        />
+        <p className="px-[5px] pb-1 text-12 leading-relaxed text-white/50 sm:pb-3.5">
+          {t('usenet.servers.connectionsHint')}
+        </p>
+      </div>
       <TestRow
         label={t('usenet.test.server')}
         pending={test.isPending}
@@ -552,7 +549,7 @@ function TestRow({
   return (
     <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
       <Button type="button" size="sm" disabled={pending} onClick={onTest} className="shrink-0">
-        <BookOpenText className="size-3.5" aria-hidden />
+        <PlugZap className="size-3.5" aria-hidden />
         {pending ? t('usenet.test.testing') : label}
       </Button>
       {!pending && (result || failed) && (
