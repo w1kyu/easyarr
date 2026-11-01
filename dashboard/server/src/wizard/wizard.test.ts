@@ -1,4 +1,6 @@
 import { promises as fs } from 'node:fs';
+import http from 'node:http';
+import type { AddressInfo } from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import type { SystemInfo } from '@easyarr/shared';
@@ -6,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { buildApp } from '../app.js';
 import { verifyPassword } from '../auth/password.js';
 import { createLogger } from '../logger.js';
+import { secretsStore, stateStore } from '../state/index.js';
 
 const GIB = 1024 ** 3;
 let dir: string;
@@ -24,9 +27,16 @@ afterEach(async () => {
   await fs.rm(dir, { recursive: true, force: true });
 });
 
-const make = () =>
+const make = (serviceUrls?: Record<string, string>) =>
   buildApp({
-    config: { version: 't', webDir: dir, licensesDir: dir, stateDir: dir, dataDir: dir },
+    config: {
+      version: 't',
+      webDir: dir,
+      licensesDir: dir,
+      stateDir: dir,
+      dataDir: dir,
+      ...(serviceUrls ? { serviceUrls } : {}),
+    },
     collectSystemInfo: async () => info,
   });
 
@@ -69,10 +79,13 @@ describe('wizard API', () => {
         { id: 'account', completed: false },
         { id: 'download', completed: false },
         { id: 'vpn', completed: false },
+        { id: 'library', completed: false },
+        { id: 'finish', completed: false },
       ],
       next: 'welcome',
       answers: {},
       account: null,
+      usenetSecrets: { servers: [], indexers: [] },
     });
   });
 
@@ -205,7 +218,14 @@ describe('wizard API', () => {
     ]);
     expect((await post(app, 'vpn', { mode: 'skipped' })).statusCode).toBe(200);
     view = (await app.inject({ method: 'GET', url: '/api/wizard' })).json();
-    expect(view.next).toBeNull();
+    // "Both": the Usenet step (6) and the indexer step (7) follow.
+    expect(view.next).toBe('usenet');
+    expect(view.steps.map((s: { id: string }) => s.id).slice(5)).toEqual([
+      'usenet',
+      'indexers',
+      'library',
+      'finish',
+    ]);
     expect(view.answers.download).toEqual({ method: 'both' });
     expect((await post(app, 'download', { method: 'fax' })).statusCode).toBe(400);
   });
@@ -225,5 +245,154 @@ describe('wizard API', () => {
       'system',
       'welcome',
     ]);
+  });
+
+  const SERVER = {
+    id: 'news',
+    preset: null,
+    host: 'news.example.com',
+    port: 563,
+    ssl: true,
+    username: 'me',
+    connections: 20,
+  };
+  const INDEXER = {
+    id: 'geek',
+    preset: 'nzbgeek',
+    name: 'NZBgeek',
+    url: 'https://api.nzbgeek.info',
+  };
+  const PW = 'sab-secret-pw-1';
+  const KEY = 'indexer-secret-key-1';
+
+  it('step 6: secrets go to secrets.json, never to state or the API; empty keeps the saved one', async () => {
+    const app = await make();
+    await finishThrough(app, 'download');
+    expect((await post(app, 'vpn', { mode: 'skipped' })).statusCode).toBe(200);
+
+    const missing = await post(app, 'usenet', { servers: [SERVER], indexers: [INDEXER] });
+    expect(missing.statusCode).toBe(400);
+    expect(missing.json().issues).toEqual([
+      { path: 'servers.0.password', message: 'wizard.error.usenetPasswordRequired' },
+      { path: 'indexers.0.apiKey', message: 'wizard.error.indexerApiKeyRequired' },
+    ]);
+    const bad = await post(app, 'usenet', {
+      servers: [{ ...SERVER, host: 'https://news', port: 0, password: PW }],
+      indexers: [{ ...INDEXER, url: 'nzbgeek', apiKey: KEY }],
+    });
+    expect(bad.json().issues.map((i: { message: string }) => i.message)).toEqual([
+      'wizard.error.usenetHostInvalid',
+      'wizard.error.usenetPortInvalid',
+      'wizard.error.indexerUrlInvalid',
+    ]);
+
+    const ok = await post(app, 'usenet', {
+      servers: [{ ...SERVER, password: PW }],
+      indexers: [{ ...INDEXER, apiKey: KEY }],
+    });
+    expect(ok.statusCode).toBe(200);
+    expect(ok.json().next).toBe('indexers');
+    expect(ok.json().usenetSecrets).toEqual({ servers: ['news'], indexers: ['geek'] });
+    expect((await readJson('secrets.json')).usenet).toEqual({
+      servers: { news: PW },
+      indexers: { geek: KEY },
+    });
+    for (const url of ['/api/wizard', '/api/wizard/usenet']) {
+      const body = (await app.inject({ method: 'GET', url })).body;
+      expect(body).toContain('news.example.com');
+      expect(body).not.toContain(PW);
+      expect(body).not.toContain(KEY);
+    }
+    expect(JSON.stringify(await readJson('state.json'))).not.toContain(PW);
+
+    // Saving again without secrets keeps them; a removed indexer loses its key.
+    const second = await post(app, 'usenet', {
+      servers: [SERVER],
+      indexers: [{ ...INDEXER, id: 'other', url: 'https://nzb.example', apiKey: 'k2' }],
+    });
+    expect(second.statusCode).toBe(200);
+    expect((await readJson('secrets.json')).usenet).toEqual({
+      servers: { news: PW },
+      indexers: { other: 'k2' },
+    });
+  });
+
+  it('step 7: "I added one" is checked against Prowlarr; "later" is always allowed', async () => {
+    let indexers: unknown[] = [];
+    const fake = http.createServer((req, res) => {
+      const ok = req.headers['x-api-key'] === 'p'.repeat(32);
+      res.writeHead(ok ? 200 : 401, { 'content-type': 'application/json' });
+      res.end(req.url === '/apps/prowlarr/api/v1/indexer' && ok ? JSON.stringify(indexers) : '{}');
+    });
+    await new Promise<void>((r) => fake.listen(0, '127.0.0.1', r));
+    const { port } = fake.address() as AddressInfo;
+    try {
+      const secrets = secretsStore(dir);
+      await secrets.save({
+        ...(await secrets.load()).value,
+        apiKeys: { prowlarr: 'p'.repeat(32) },
+      });
+      const app = await make({ prowlarr: `http://127.0.0.1:${port}` });
+      await finishThrough(app, 'account');
+      await post(app, 'download', { method: 'torrents' });
+      await post(app, 'vpn', { mode: 'skipped' });
+
+      const none = await post(app, 'indexers', { mode: 'added' });
+      expect(none.json().issues).toEqual([{ path: 'mode', message: 'wizard.error.noIndexers' }]);
+      const check = await app.inject({ method: 'GET', url: '/api/prowlarr/indexers' });
+      expect(check.json()).toEqual({ reachable: true, count: 0, torrent: 0 });
+
+      indexers = [{ id: 1, protocol: 'torrent' }];
+      expect((await post(app, 'indexers', { mode: 'added' })).statusCode).toBe(200);
+      expect((await post(app, 'indexers', { mode: 'later' })).statusCode).toBe(200);
+    } finally {
+      fake.close();
+    }
+    // Prowlarr not answering is its own message (same state dir: earlier steps are done).
+    const app = await make({ prowlarr: 'http://127.0.0.1:9' });
+    const down = await post(app, 'indexers', { mode: 'added' });
+    expect(down.json().issues).toEqual([
+      { path: 'mode', message: 'wizard.error.prowlarrUnreachable' },
+    ]);
+  });
+
+  it('step 8 needs at least one library; step 9 needs a wiring run, and changes re-open it', async () => {
+    const app = await make();
+    await finishThrough(app, 'account');
+    await post(app, 'download', { method: 'torrents' });
+    await post(app, 'vpn', { mode: 'skipped' });
+    await post(app, 'indexers', { mode: 'later' });
+
+    const none = await post(app, 'library', {
+      libraries: { movies: false, tv: false, music: false },
+      language: 'de',
+      quality: 'balanced',
+    });
+    expect(none.json().issues).toEqual([
+      { path: 'libraries', message: 'wizard.error.libraryRequired' },
+    ]);
+    const lib = {
+      libraries: { movies: true, tv: false, music: true },
+      language: 'de',
+      quality: 'best',
+    };
+    expect((await post(app, 'library', lib)).json().next).toBe('finish');
+
+    const early = await post(app, 'finish', { result: 'ok' });
+    expect(early.json().issues).toEqual([
+      { path: 'result', message: 'wizard.error.wiringNotDone' },
+    ]);
+
+    const store = stateStore(dir);
+    const { value } = await store.load();
+    const run = { at: new Date().toISOString(), mode: 'run' as const, ok: false, changes: 3 };
+    await store.save({ ...value, wiring: { ...value.wiring, lastRun: run } });
+    expect((await post(app, 'finish', { result: 'ok' })).statusCode).toBe(400);
+    const done = await post(app, 'finish', { result: 'problems' });
+    expect(done.json().next).toBeNull();
+
+    // Changing an earlier answer means the wiring must run again → Finish is open again.
+    const changed = await post(app, 'library', { ...lib, quality: 'small' });
+    expect(changed.json().next).toBe('finish');
   });
 });

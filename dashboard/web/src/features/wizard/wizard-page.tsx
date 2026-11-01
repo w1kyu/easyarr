@@ -17,7 +17,7 @@ import { SAVE_MUTATION_KEY, useWizard } from './wizard-api';
 
 const FORM_ID = 'wizard-step-form';
 
-/** Where to go after a step: the next visible step, or home when steps 1–4 are done. */
+/** Where to go after a step: the next visible step, or home after Finish. */
 function pathAfter(view: WizardView, current: string): string {
   const ids = view.steps.map((s) => s.id);
   const next = ids[ids.indexOf(current as (typeof ids)[number]) + 1];

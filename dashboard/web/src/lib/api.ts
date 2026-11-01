@@ -1,4 +1,7 @@
 import type {
+  UsenetIndexerTestInput,
+  UsenetServerTestInput,
+  UsenetTestResult,
   SystemCheckResult,
   VpnConfigInput,
   VpnConfigView,
@@ -143,4 +146,10 @@ export const api = {
   vpnTest: () => post<VpnTestView>('/api/vpn/test', {}),
   vpnReconnect: () => post<{ ok: true }>('/api/vpn/reconnect', {}),
   wiring: () => request<WiringStatus>('/api/wiring'),
+  testUsenetServer: (body: Partial<UsenetServerTestInput>) =>
+    post<UsenetTestResult>('/api/usenet/test-server', body),
+  testUsenetIndexer: (body: Partial<UsenetIndexerTestInput>) =>
+    post<UsenetTestResult>('/api/usenet/test-indexer', body),
+  prowlarrIndexers: () =>
+    request<{ reachable: boolean; count: number; torrent: number }>('/api/prowlarr/indexers'),
 };

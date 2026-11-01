@@ -7,8 +7,40 @@ import {
   evaluateSystem,
   SERVICES,
   WIZARD_STEP_IDS,
+  LIBRARY_IDS,
+  QUALITY_PRESETS,
   type SystemInfo,
+  type UsenetTestResult,
 } from '@easyarr/shared';
+
+const USENET_TEST_REASONS: UsenetTestResult['reason'][] = [
+  'ok',
+  'auth',
+  'unreachable',
+  'timeout',
+  'certificate',
+  'noVpn',
+  'serviceDown',
+  'missingSecret',
+  'failed',
+];
+/** Every wiring step id (dashboard/server/src/wiring/steps.ts) — the checklist shows each one. */
+const WIRING_STEP_IDS = [
+  'qbittorrent.setup',
+  'sabnzbd.setup',
+  'lidarr.profile',
+  'sonarr.connect',
+  'radarr.connect',
+  'lidarr.connect',
+  'prowlarr.apps',
+  'prowlarr.indexers',
+  'prowlarr.flaresolverr',
+  'recyclarr.sync',
+  'bazarr.setup',
+  'jellyfin.setup',
+  'jellyseerr.setup',
+  'cleanuparr.setup',
+];
 import { describe, expect, it } from 'vitest';
 import { STEP_UI } from '~/features/wizard/steps';
 import en from '~/locales/en.json';
@@ -33,7 +65,7 @@ const sources = {
   ),
 };
 const PREFIXES =
-  'wizard|system|account|download|password|docs|home|field|footer|status|stepper|vpn';
+  'wizard|system|account|download|password|docs|home|field|footer|status|stepper|vpn|usenet|indexers|library|finish|wiring';
 const literal = new RegExp(`['"\`]((?:${PREFIXES})\\.[A-Za-z0-9_.]+)['"\`]`, 'g');
 
 describe('en.json', () => {
@@ -98,6 +130,21 @@ describe('en.json', () => {
     for (const c of VPN_PROBLEM_CODES)
       dynamic.push(`vpn.problem.${c}.title`, `vpn.problem.${c}.fix`);
     for (const k of ['country', 'region', 'city']) dynamic.push(`vpn.location.${k}`);
+    for (const r of USENET_TEST_REASONS) dynamic.push(`usenet.test.result.${r}`);
+    for (const l of LIBRARY_IDS)
+      dynamic.push(`library.libraries.${l}.title`, `library.libraries.${l}.body`);
+    for (const q of QUALITY_PRESETS)
+      for (const k of ['title', 'body', 'size']) dynamic.push(`library.quality.${q}.${k}`);
+    for (const m of DOWNLOAD_METHODS) dynamic.push(`finish.summary.downloaders.${m}`);
+    for (const k of ['request', 'download', 'watch'])
+      dynamic.push(`finish.tour.${k}.title`, `finish.tour.${k}.body`);
+    for (const k of ['request', 'watch']) dynamic.push(`finish.tour.${k}.open`);
+    for (const s of ['pending', 'waiting', 'running', 'done', 'failed', 'skipped'])
+      dynamic.push(`wiring.state.${s}`);
+    for (const id of WIRING_STEP_IDS) dynamic.push(`wiring.step.${id}`);
+    for (const c of ['deleted_by_user', 'recreated', 'adopted']) dynamic.push(`wiring.note.${c}`);
+    for (const c of ['generic', 'network', 'wizard_incomplete', 'wiring_running', 'internal'])
+      dynamic.push(`wiring.error.${c}`);
     expect(missing(dynamic)).toEqual([]);
   });
 });

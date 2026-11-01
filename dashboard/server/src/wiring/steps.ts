@@ -15,9 +15,12 @@ import { QBITTORRENT_DEFAULTS, QbittorrentApi } from './services/qbittorrent.js'
 import { qualityProfileName, recyclarrConfig, type RecyclarrFiles } from './services/recyclarr.js';
 import { SabnzbdApi } from './services/sabnzbd.js';
 import { MEDIA_SERVER_NOT_CONFIGURED, SeerrClient } from './services/seerr.js';
+import { usenetIndexerPreset, usenetProviderPreset } from '@easyarr/shared';
 import {
   fieldValue,
+  indexerTemplateSchema,
   lidarrQualityProfile,
+  newznabIndexerBody,
   prowlarrApplicationBody,
   qbittorrentClientBody,
   sabnzbdClientBody,
@@ -38,6 +41,8 @@ export interface StepDeps {
   recyclarr: Pick<RecyclarrFiles, 'writeConfig' | 'sync'>;
   /** GPU for Jellyfin: vendor + render device, or null. */
   gpu(): Promise<{ vendor: GpuVendor; device: string } | null>;
+  /** Wizard step 6 secrets: a Usenet server's password / an indexer's API key, by entry id. */
+  usenetSecret(kind: 'servers' | 'indexers', id: string): Promise<string | undefined>;
   fetch?: typeof fetch;
   /** Waiting for Recyclarr's sync (tests make it instant). */
   recyclarrTimeoutMs?: number;
@@ -161,6 +166,30 @@ export function buildSteps(deps: StepDeps): {
           create: async () => {
             await s.setCategory(l.category, l.category);
             return l.category;
+          },
+        });
+      }
+      // News servers from wizard step 6. SABnzbd names a server after its host by default; a
+      // server the user added by hand for the same host is adopted, not duplicated.
+      for (const server of ctx.plan.usenetServers) {
+        const label = usenetProviderPreset(server.preset)?.name ?? server.host;
+        await ctx.resource({
+          key: `sabnzbd.server.${server.id}`,
+          kind: 'server',
+          name: label,
+          exists: async (id) => (await s.servers()).some((x) => x.name === id),
+          find: async () =>
+            (await s.servers()).find(
+              (x) => (x.host ?? '').toLowerCase() === server.host.toLowerCase(),
+            )?.name ?? null,
+          create: async () => {
+            const password = await deps.usenetSecret('servers', server.id);
+            if (!password)
+              throw new ServiceError('sabnzbd', 'rejected', `no password saved for ${label}`, 400, [
+                'usenet_secret_missing',
+              ]);
+            await s.setServer(server.host, { ...server, password, displayname: label });
+            return server.host;
           },
         });
       }
@@ -347,6 +376,60 @@ export function buildSteps(deps: StepDeps): {
     },
   };
 
+  /** Usenet indexers from wizard step 6 (Prowlarr then hands them to Sonarr/Radarr/Lidarr). */
+  const prowlarrUsenetIndexers: WiringStep = {
+    id: 'prowlarr.indexers',
+    service: 'prowlarr',
+    needs: (p) => ['prowlarr', ...libsFor(p).map((l) => l.app)],
+    enabled: (p) => p.usenet && p.usenetIndexers.length > 0,
+    async run(ctx) {
+      const p = await servarr('prowlarr');
+      const sameUrl = (a: unknown, b: string) =>
+        String(a ?? '')
+          .replace(/\/+$/, '')
+          .toLowerCase() === b.replace(/\/+$/, '').toLowerCase();
+      for (const x of ctx.plan.usenetIndexers) {
+        const name = `EasyArr – ${x.name}`;
+        await ctx.resource({
+          key: `prowlarr.indexer.${x.id}`,
+          kind: 'indexer',
+          name,
+          exists: (id) => p.providerExists('indexer', id),
+          find: async () => {
+            const found = (await p.providers('indexer')).find(
+              (i) => i.implementation === 'Newznab' && sameUrl(fieldValue(i, 'baseUrl'), x.url),
+            );
+            return found ? String(found.id) : null;
+          },
+          create: async () => {
+            const apiKey = await deps.usenetSecret('indexers', x.id);
+            if (!apiKey)
+              throw new ServiceError(
+                'prowlarr',
+                'rejected',
+                `no API key saved for ${x.name}`,
+                400,
+                ['usenet_secret_missing'],
+              );
+            const templates = await p.get('/indexer/schema', z.array(indexerTemplateSchema));
+            const profiles = await p.get('/appprofile', z.array(z.looseObject({ id: z.number() })));
+            // Saving makes Prowlarr test the indexer through the VPN; a wrong key or no VPN fails
+            // here with Prowlarr's own message (shown in the checklist).
+            return p.createProvider(
+              'indexer',
+              newznabIndexerBody(
+                templates,
+                usenetIndexerPreset(x.preset)?.name ?? null,
+                { name, url: x.url, apiPath: x.apiPath, apiKey },
+                profiles[0]?.id ?? 1,
+              ),
+            );
+          },
+        });
+      }
+    },
+  };
+
   const prowlarrFlaresolverr: WiringStep = {
     id: 'prowlarr.flaresolverr',
     service: 'prowlarr',
@@ -448,9 +531,15 @@ export function buildSteps(deps: StepDeps): {
       // The default profile must exist before Sonarr/Radarr are switched on (first sync assigns it).
       await ctx.once('bazarr.languageProfile', async () => {
         if ((await b.languageProfiles()).length > 0) return false; // never replace the user's
+        const name =
+          new Intl.DisplayNames(['en'], { type: 'language' }).of(ctx.plan.language) ??
+          ctx.plan.language;
         await b.saveSettings([
-          ['languages-enabled', 'en'],
-          ['languages-profiles', JSON.stringify([singleLanguageProfile(1, 'English', 'en')])],
+          ['languages-enabled', ctx.plan.language],
+          [
+            'languages-profiles',
+            JSON.stringify([singleLanguageProfile(1, name, ctx.plan.language)]),
+          ],
         ]);
         return true;
       });
@@ -526,7 +615,10 @@ export function buildSteps(deps: StepDeps): {
           exists: async (id) => (await j.libraries(apiKey)).some((f) => f.ItemId === id),
           find: async () => (await j.libraryByPath(apiKey, path))?.ItemId ?? null,
           create: async () => {
-            await j.addLibrary(apiKey, l.name, l.jellyfin, path);
+            await j.addLibrary(apiKey, l.name, l.jellyfin, path, {
+              language: ctx.plan.language,
+              country: ctx.plan.country,
+            });
             const made = await j.libraryByPath(apiKey, path);
             if (!made)
               throw new ServiceError(
@@ -753,6 +845,7 @@ export function buildSteps(deps: StepDeps): {
     arrMedia('radarr', 'movies', 'movies'),
     arrMedia('lidarr', 'music', 'music'),
     prowlarrApps,
+    prowlarrUsenetIndexers,
     prowlarrFlaresolverr,
     recyclarrSync,
     bazarrSetup,

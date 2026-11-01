@@ -47,6 +47,10 @@ const plan: WiringPlan = {
   usenet: false,
   libraries: { movies: true, tv: true, music: false },
   quality: 'balanced',
+  language: 'en',
+  country: 'US',
+  usenetServers: [],
+  usenetIndexers: [],
   gpu: false,
 };
 

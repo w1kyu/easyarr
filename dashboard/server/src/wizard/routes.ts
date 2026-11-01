@@ -8,12 +8,13 @@ export interface WizardRoutesOptions {
   stateDir: string;
   collectSystemInfo: () => Promise<SystemInfo>;
   lock: Mutex;
+  prowlarrIndexers?: () => Promise<{ reachable: boolean; count: number }>;
 }
 
 /** GET /api/system-check, GET /api/wizard, GET/POST /api/wizard/:step (SPEC §7.3). */
 export async function wizardRoutes(app: FastifyInstance, opts: WizardRoutesOptions) {
   const systemCheck = async () => evaluateSystem(await opts.collectSystemInfo());
-  const wizard = new WizardService(opts.stateDir, systemCheck, opts.lock);
+  const wizard = new WizardService(opts.stateDir, systemCheck, opts.lock, opts.prowlarrIndexers);
   useApiErrorHandler(app);
 
   app.get('/api/system-check', async () => systemCheck());
@@ -28,6 +29,7 @@ export async function wizardRoutes(app: FastifyInstance, opts: WizardRoutesOptio
       completed: view.steps.find((s) => s.id === step)?.completed ?? false,
       answers: view.answers[step] ?? null,
       account: step === 'account' ? view.account : undefined,
+      usenetSecrets: step === 'usenet' ? view.usenetSecrets : undefined,
     };
   });
 

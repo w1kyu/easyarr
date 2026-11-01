@@ -96,7 +96,7 @@ export function defaultState(now = new Date()): State {
 }
 
 /** secrets.json — API keys and other credentials. chmod 600, never logged (SPEC §7.2). */
-export const SECRETS_SCHEMA_VERSION = 3;
+export const SECRETS_SCHEMA_VERSION = 4;
 
 export const secretsSchema = z.object({
   schemaVersion: z.literal(SECRETS_SCHEMA_VERSION),
@@ -105,9 +105,22 @@ export const secretsSchema = z.object({
   account: z.object({ password: z.string() }).nullable(),
   /** Secret VPN field values (v3): keys, usernames, passwords, certificates, config files. */
   vpn: z.object({ fields: z.record(z.string(), z.string()) }).nullable(),
+  /** Usenet passwords and indexer API keys (v4), keyed by the wizard entry's id. */
+  usenet: z
+    .object({
+      servers: z.record(z.string(), z.string()),
+      indexers: z.record(z.string(), z.string()),
+    })
+    .nullable(),
 });
 export type Secrets = z.infer<typeof secretsSchema>;
 
 export function defaultSecrets(): Secrets {
-  return { schemaVersion: SECRETS_SCHEMA_VERSION, apiKeys: {}, account: null, vpn: null };
+  return {
+    schemaVersion: SECRETS_SCHEMA_VERSION,
+    apiKeys: {},
+    account: null,
+    vpn: null,
+    usenet: null,
+  };
 }

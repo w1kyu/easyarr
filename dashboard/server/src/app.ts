@@ -20,6 +20,8 @@ import { createWiring } from './wiring/index.js';
 import type { WiringEngine } from './wiring/engine.js';
 import { wiringRoutes } from './wiring/routes.js';
 import { wizardRoutes } from './wizard/routes.js';
+import { usenetRoutes } from './usenet/routes.js';
+import { UsenetService } from './usenet/service.js';
 
 export type AppConfig = Pick<
   ServeConfig,
@@ -160,11 +162,18 @@ export async function buildApp({
 
   app.get('/api/health', async () => ({ status: 'ok', name: APP_NAME, version: config.version }));
 
+  const usenet = new UsenetService({
+    stateDir: config.stateDir,
+    serviceUrls: config.serviceUrls ?? {},
+    vpnConnected: async () => (await svc.vpn.status()).connection === 'connected',
+  });
   await app.register(wizardRoutes, {
     stateDir: config.stateDir,
     collectSystemInfo: systemInfo,
     lock: svc.lock,
+    prowlarrIndexers: () => usenet.prowlarrIndexers(),
   });
+  await app.register(usenetRoutes, { usenet });
   await app.register(wiringRoutes, {
     engine: svc.wiring ?? wiringFor(config, svc.lock, systemInfo, logger),
     stateDir: config.stateDir,

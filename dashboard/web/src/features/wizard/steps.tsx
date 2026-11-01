@@ -6,6 +6,10 @@ import { DownloadStep } from './steps/download';
 import { SystemStep } from './steps/system';
 import { VpnNextLabel, VpnStep } from './steps/vpn';
 import { WelcomeStep } from './steps/welcome';
+import { FinishNextLabel, FinishStep } from './steps/finish';
+import { IndexersNextLabel, IndexersStep } from './steps/indexers';
+import { LibraryStep } from './steps/library';
+import { UsenetStep } from './steps/usenet';
 
 export interface StepUi {
   /** i18n keys. */
@@ -60,5 +64,31 @@ export const STEP_UI: Record<WizardStepId, StepUi> = {
     Form: VpnStep,
     NextLabel: VpnNextLabel,
     wide: true,
+  },
+  usenet: {
+    title: 'wizard.usenet.title',
+    intro: 'wizard.usenet.intro',
+    doc: 'usenet-101',
+    Form: UsenetStep,
+  },
+  indexers: {
+    title: 'wizard.indexers.title',
+    intro: 'wizard.indexers.intro',
+    doc: 'indexers',
+    Form: IndexersStep,
+    NextLabel: IndexersNextLabel,
+    wide: true,
+  },
+  library: {
+    title: 'wizard.library.title',
+    intro: 'wizard.library.intro',
+    doc: 'quality-presets',
+    Form: LibraryStep,
+  },
+  finish: {
+    title: 'wizard.finish.title',
+    intro: 'wizard.finish.intro',
+    Form: FinishStep,
+    NextLabel: FinishNextLabel,
   },
 };

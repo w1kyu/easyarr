@@ -74,6 +74,7 @@ export function createWiring(opts: WiringOptions): WiringEngine {
       return null;
     },
     recyclarr: new RecyclarrFiles(opts.recyclarrDir),
+    usenetSecret: async (kind, id) => (await secrets.load()).value.usenet?.[kind][id],
   };
   const { steps, health } = buildSteps(deps);
   return new WiringEngine({

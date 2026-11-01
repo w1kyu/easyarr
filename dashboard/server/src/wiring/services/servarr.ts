@@ -340,3 +340,60 @@ export function lidarrQualityProfile(
     items: schema.items.map(mark),
   };
 }
+
+/** A Prowlarr indexer template from GET /api/v1/indexer/schema (one per preset). */
+export const indexerTemplateSchema = z.looseObject({
+  name: z.string().nullish(),
+  implementation: z.string(),
+  configContract: z.string(),
+  fields: z.array(z.looseObject({ name: z.string(), value: z.unknown().optional() })),
+});
+export type IndexerTemplate = z.infer<typeof indexerTemplateSchema>;
+
+export interface NewznabIndexer {
+  name: string;
+  url: string;
+  apiPath: string;
+  apiKey: string;
+}
+
+/**
+ * A Prowlarr Newznab indexer from its schema: the preset's own template when Prowlarr has one with
+ * that name (it brings the right categories), else "Generic Newznab" (Prowlarr reads the
+ * capabilities from the indexer on first add). docs/dev/research/servarr.md §8.
+ */
+export function newznabIndexerBody(
+  templates: IndexerTemplate[],
+  presetName: string | null,
+  indexer: NewznabIndexer,
+  appProfileId: number,
+): Record<string, unknown> {
+  const newznab = templates.filter((t) => t.implementation === 'Newznab');
+  const template =
+    (presetName ? newznab.find((t) => t.name === presetName) : undefined) ??
+    newznab.find((t) => t.name === 'Generic Newznab') ??
+    newznab[0];
+  if (!template) {
+    throw new ServiceError('prowlarr', 'invalid_response', 'Prowlarr has no Newznab indexer type');
+  }
+  const set: Record<string, unknown> = {
+    baseUrl: indexer.url.replace(/\/+$/, ''),
+    apiPath: indexer.apiPath,
+    apiKey: indexer.apiKey,
+  };
+  const fields = template.fields.map((f) => (f.name in set ? { ...f, value: set[f.name] } : f));
+  for (const [name, value] of Object.entries(set)) {
+    if (!fields.some((f) => f.name === name)) fields.push({ name, value });
+  }
+  return {
+    ...template,
+    name: indexer.name,
+    enable: true,
+    // Prowlarr refuses Usenet indexers without redirect (IndexerController.Validate).
+    redirect: true,
+    appProfileId,
+    priority: 25,
+    tags: [],
+    fields,
+  };
+}

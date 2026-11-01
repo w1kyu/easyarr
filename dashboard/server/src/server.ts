@@ -12,6 +12,10 @@ export async function startServer(config: ServeConfig): Promise<void> {
   registerSecrets(Object.values(secrets.value.apiKeys));
   if (secrets.value.account) registerSecrets([secrets.value.account.password]);
   if (secrets.value.vpn) registerSecrets(Object.values(secrets.value.vpn.fields));
+  if (secrets.value.usenet) {
+    registerSecrets(Object.values(secrets.value.usenet.servers));
+    registerSecrets(Object.values(secrets.value.usenet.indexers));
+  }
 
   const services = createServices(config, log);
   const app = await buildApp({ config, logger: log, services });

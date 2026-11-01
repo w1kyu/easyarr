@@ -1,0 +1,44 @@
+# Quality presets
+
+In the setup's "What do you want?" step you pick one of three presets. It decides which versions
+EasyArr looks for and how much disk space your library takes. You can switch later; files you
+already have stay as they are.
+
+| Preset | Movies and shows | Music | Roughly per movie | per hour of TV | per album |
+| --- | --- | --- | --- | --- | --- |
+| **Best quality** | 4K (2160p) from streaming services when it exists, otherwise 1080p | Lossless (FLAC) | 15–30 GB | 4–12 GB | 300–600 MB |
+| **Balanced** (default) | 1080p from Blu-ray or streaming services | High-quality MP3/AAC, upgraded to lossless when available | 6–15 GB | 1.5–4 GB | 100–600 MB |
+| **Save space** | 1080p, preferring smaller files | High-quality MP3/AAC | 3–8 GB | 1–2 GB | 80–150 MB |
+
+Sizes are rough averages — a three-hour film is bigger than a short one, and animation is
+usually smaller.
+
+## Which one should I pick?
+
+- **Balanced** suits most people: sharp on a big TV, and a 4 TB disk holds a few hundred movies.
+- **Best quality** if you have a 4K TV and plenty of storage. Not every movie or show exists
+  in 4K — then EasyArr takes 1080p, so nothing stays missing.
+- **Save space** for phones, tablets, laptops or a small disk.
+
+Your Umbrel's home screen and Settings show how much space is free.
+
+## What EasyArr sets up
+
+- **Shows and movies:** EasyArr uses [Recyclarr](https://recyclarr.dev) to create a quality
+  profile in Sonarr and Radarr from the [TRaSH guides](https://trash-guides.info) — a community
+  guide to good releases. The profile is called **"EasyArr (Best quality)"**, **"EasyArr
+  (Balanced)"** or **"EasyArr (Save space)"**.
+  - Best quality: TRaSH profiles *WEB-2160p* (shows) and *WEBDL 2160p* (movies), both with a
+    1080p fallback.
+  - Balanced: *WEB-1080p* (shows) and *HD Bluray + WEB* (movies).
+  - Save space: *WEB-1080p* (shows) and *WEB 1080p* (movies), with sizes leaning to the small end.
+- **Music:** EasyArr creates its own Lidarr profile with the same name.
+
+Movies and shows are downloaded in their original language. Your language choice is used for
+subtitles (Bazarr) and titles and descriptions in Jellyfin.
+
+## Want to fine-tune?
+
+EasyArr owns the "EasyArr (…)" profiles and resets them when it updates them. To customise, open
+Sonarr or Radarr → **Settings → Profiles**, clone the EasyArr profile, edit the copy and use that
+one instead.

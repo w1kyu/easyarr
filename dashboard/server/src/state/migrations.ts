@@ -46,4 +46,6 @@ export const secretsMigrations: readonly Migration[] = [
   { from: 1, migrate: (doc) => ({ ...doc, account: null }) },
   // v3 (phase 04): VPN secrets.
   { from: 2, migrate: (doc) => ({ ...doc, vpn: null }) },
+  // v4 (phase 06): Usenet passwords + indexer API keys.
+  { from: 3, migrate: (doc) => ({ ...doc, usenet: null }) },
 ];

@@ -1,5 +1,5 @@
 import type { SystemInfo } from '@easyarr/shared';
-import { parseWizardAnswers } from '@easyarr/shared';
+import { DEFAULT_LIBRARY_ANSWERS, languageCountry, parseWizardAnswers } from '@easyarr/shared';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { ApiError, useApiErrorHandler } from '../http-errors.js';
@@ -13,18 +13,24 @@ import {
 } from './engine.js';
 
 /**
- * What to wire, from the wizard answers. Steps 6–8 (Usenet servers, libraries, quality) arrive in
- * phase 06; until then every library is on and the quality preset is "balanced" (phase 05 prompt).
+ * What to wire, from the wizard answers. Needs the account (step 3) and the download method
+ * (step 4); without step 8's answers every library is on, English, "Balanced".
  */
 export function planFromState(state: State, system: Pick<SystemInfo, 'gpu'>): WiringPlan {
   const answers = parseWizardAnswers(state.wizard.answers);
   const method = answers.download?.method;
   if (!state.account || !method) throw new ApiError(409, 'wizard_incomplete');
+  const library = answers.library ?? DEFAULT_LIBRARY_ANSWERS;
+  const usenet = method === 'usenet' || method === 'both';
   return {
     torrents: method === 'torrents' || method === 'both',
-    usenet: method === 'usenet' || method === 'both',
-    libraries: { movies: true, tv: true, music: true },
-    quality: 'balanced',
+    usenet,
+    libraries: { ...library.libraries },
+    quality: library.quality,
+    language: library.language,
+    country: languageCountry(library.language),
+    usenetServers: usenet ? (answers.usenet?.servers ?? []) : [],
+    usenetIndexers: usenet ? (answers.usenet?.indexers ?? []) : [],
     gpu: system.gpu.kind !== 'none',
   };
 }

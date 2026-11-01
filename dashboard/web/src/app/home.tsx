@@ -1,5 +1,5 @@
 import { SERVICES, type ServiceInfo } from '@easyarr/shared';
-import { CircleCheckBig } from 'lucide-react';
+import { CircleCheckBig, TriangleAlert } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Link, Navigate } from 'react-router';
 import { GlassPanel } from '~/components/glass-panel';
@@ -20,14 +20,26 @@ export function Start() {
   if (wizard.isPending) return <Loading />;
   // If the API is unreachable, still show the home screen (it links to Jellyfin etc.).
   if (wizard.data?.next) return <Navigate to={`/setup/${wizard.data.next}`} replace />;
-  return <Home />;
+  return <Home problems={wizard.data?.answers.finish?.result === 'problems'} />;
 }
 
-export function Home() {
+export function Home({ problems = false }: { problems?: boolean }) {
   const { t } = useTranslation();
   const published = SERVICES.filter((s) => s.publishedPort !== undefined);
   return (
     <div className="flex flex-col gap-6">
+      {problems && (
+        <GlassPanel
+          className="flex flex-col gap-3 sm:flex-row sm:items-center"
+          data-testid="home-problems"
+        >
+          <TriangleAlert className="size-5 shrink-0 text-amber-300" aria-hidden />
+          <p className="flex-1 text-14 text-white/80">{t('home.problems')}</p>
+          <Link to="/setup/finish" className={cn(buttonVariants({ size: 'md' }))}>
+            {t('home.problemsRetry')}
+          </Link>
+        </GlassPanel>
+      )}
       <GlassPanel className="flex flex-col gap-4 md:flex-row md:items-center md:gap-6">
         <div className="grid size-14 shrink-0 place-items-center rounded-full bg-white/10 ring-1 ring-white/15">
           <CircleCheckBig className="size-6 text-white/80" aria-hidden />

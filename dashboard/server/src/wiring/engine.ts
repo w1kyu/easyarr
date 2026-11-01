@@ -1,4 +1,4 @@
-import type { ServiceId } from '@easyarr/shared';
+import type { ServiceId, UsenetIndexer, UsenetServer } from '@easyarr/shared';
 import type { Logger } from 'pino';
 import type { LedgerEntry, WiringRunSummary } from '../state/index.js';
 import { ServiceError, waitUntilReady, type ServiceErrorCode } from './http.js';
@@ -9,6 +9,12 @@ export interface WiringPlan {
   usenet: boolean;
   libraries: { movies: boolean; tv: boolean; music: boolean };
   quality: 'best' | 'balanced' | 'small';
+  /** ISO 639-1 (subtitles in Bazarr, titles in Jellyfin) and Jellyfin's metadata country. */
+  language: string;
+  country: string;
+  /** Wizard step 6 (secrets come from StepDeps.usenetSecret). */
+  usenetServers: UsenetServer[];
+  usenetIndexers: UsenetIndexer[];
   /** The GPU check found a usable device (SPEC §18). */
   gpu: boolean;
 }

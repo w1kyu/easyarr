@@ -7,7 +7,9 @@ import {
   visibleWizardSteps,
   WIZARD_STEP_IDS,
   WIZARD_STEPS,
+  libraryAnswersSchema,
 } from './wizard.js';
+import { usenetInputSchema, USENET_INDEXER_PRESETS, USENET_PROVIDER_PRESETS } from './usenet.js';
 
 const issues = (input: unknown) => {
   const r = accountInputSchema.safeParse(input);
@@ -15,16 +17,29 @@ const issues = (input: unknown) => {
 };
 
 describe('wizard registry', () => {
-  it('lists steps 1–5 in order, each with a schema', () => {
+  it('lists steps 1–9 in order, each with a schema', () => {
     expect(WIZARD_STEPS.map((s) => s.id)).toEqual([...WIZARD_STEP_IDS]);
-    expect(WIZARD_STEP_IDS).toEqual(['welcome', 'system', 'account', 'download', 'vpn']);
+    expect(WIZARD_STEP_IDS).toEqual([
+      'welcome',
+      'system',
+      'account',
+      'download',
+      'vpn',
+      'usenet',
+      'indexers',
+      'library',
+      'finish',
+    ]);
   });
 
   it('resumes at the first unfinished visible step', () => {
+    const first5 = ['welcome', 'system', 'account', 'download', 'vpn'];
     expect(nextWizardStep({}, [])).toBe('welcome');
     expect(nextWizardStep({}, ['welcome', 'system'])).toBe('account');
     expect(nextWizardStep({}, ['welcome', 'system', 'account', 'download'])).toBe('vpn');
-    expect(nextWizardStep({}, ['welcome', 'system', 'account', 'download', 'vpn'])).toBeNull();
+    expect(nextWizardStep({}, first5)).toBe('library');
+    expect(nextWizardStep({ download: { method: 'both' } }, first5)).toBe('usenet');
+    expect(nextWizardStep({}, [...first5, 'library', 'finish'])).toBeNull();
     // Order of completion doesn't matter, gaps are found.
     expect(nextWizardStep({}, ['account', 'welcome'])).toBe('system');
   });
@@ -48,8 +63,29 @@ describe('wizard registry', () => {
     ).toEqual({ welcome: { started: true }, account: { username: 'kevin' } });
   });
 
-  it('all steps 1–5 are always visible', () => {
-    expect(visibleWizardSteps({ download: { method: 'usenet' } })).toHaveLength(5);
+  it('step 6 only for Usenet, step 7 only for torrents', () => {
+    const ids = (method?: 'torrents' | 'usenet' | 'both') =>
+      visibleWizardSteps(method ? { download: { method } } : {}).slice(5);
+    expect(ids()).toEqual(['library', 'finish']);
+    expect(ids('torrents')).toEqual(['indexers', 'library', 'finish']);
+    expect(ids('usenet')).toEqual(['usenet', 'library', 'finish']);
+    expect(ids('both')).toEqual(['usenet', 'indexers', 'library', 'finish']);
+  });
+
+  it('step 8 needs a library; unknown languages are refused', () => {
+    const lib = {
+      libraries: { movies: true, tv: false, music: false },
+      language: 'de',
+      quality: 'small',
+    };
+    expect(libraryAnswersSchema.safeParse(lib).success).toBe(true);
+    expect(libraryAnswersSchema.safeParse({ ...lib, language: 'xx' }).success).toBe(false);
+    expect(
+      libraryAnswersSchema.safeParse({
+        ...lib,
+        libraries: { movies: false, tv: false, music: false },
+      }).error?.issues[0]?.message,
+    ).toBe('wizard.error.libraryRequired');
   });
 });
 
@@ -83,5 +119,62 @@ describe('account input', () => {
     expect(issues({ username: 'kevin', password: 'kevin-rocks-99' })).toEqual([
       'password:wizard.error.passwordWeak',
     ]);
+  });
+});
+
+describe('usenet input', () => {
+  const server = {
+    id: 's-1',
+    preset: null,
+    host: 'news.example.com',
+    port: 563,
+    ssl: true,
+    username: 'me',
+    connections: 20,
+  };
+  const indexer = { id: 'i-1', preset: null, name: 'Mine', url: 'https://nzb.example' };
+  const msgs = (input: unknown) => {
+    const r = usenetInputSchema.safeParse(input);
+    return r.success ? [] : r.error.issues.map((i) => `${i.path.join('.')}:${i.message}`);
+  };
+
+  it('accepts a provider + indexer; the API path defaults to /api', () => {
+    const r = usenetInputSchema.parse({ servers: [server], indexers: [indexer] });
+    expect(r.indexers[0]?.apiPath).toBe('/api');
+  });
+
+  it('explains wrong hosts, ports, connections and addresses', () => {
+    expect(
+      msgs({
+        servers: [{ ...server, host: 'https://news.example.com/', port: 70000, connections: 0 }],
+        indexers: [{ ...indexer, url: 'ftp://x' }],
+      }),
+    ).toEqual([
+      'servers.0.host:wizard.error.usenetHostInvalid',
+      'servers.0.port:wizard.error.usenetPortInvalid',
+      'servers.0.connections:wizard.error.usenetConnectionsInvalid',
+      'indexers.0.url:wizard.error.indexerUrlInvalid',
+    ]);
+    expect(msgs({ servers: [], indexers: [] })).toEqual([
+      'servers:wizard.error.usenetServerRequired',
+      'indexers:wizard.error.usenetIndexerRequired',
+    ]);
+  });
+
+  it('presets have unique ids, valid hosts and https indexer addresses', () => {
+    for (const list of [USENET_PROVIDER_PRESETS, USENET_INDEXER_PRESETS]) {
+      expect(new Set(list.map((p) => p.id)).size).toBe(list.length);
+    }
+    for (const p of USENET_PROVIDER_PRESETS) {
+      expect(
+        msgs({
+          servers: [{ ...server, host: p.host, port: p.port, connections: p.connections }],
+          indexers: [indexer],
+        }),
+        p.id,
+      ).toEqual([]);
+      expect(p.source).toMatch(/^https:\/\//);
+    }
+    for (const p of USENET_INDEXER_PRESETS) expect(p.url).toMatch(/^https:\/\/[^/]+$/);
   });
 });

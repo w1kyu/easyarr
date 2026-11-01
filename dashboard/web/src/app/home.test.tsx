@@ -14,7 +14,7 @@ describe('Home', () => {
         </MemoryRouter>
       </QueryClientProvider>,
     );
-    expect(screen.getByText('First part of the setup is done')).toBeTruthy();
+    expect(screen.getByText('EasyArr is ready')).toBeTruthy();
     expect(screen.getByText('Review your answers').closest('a')?.getAttribute('href')).toBe(
       '/setup/welcome',
     );

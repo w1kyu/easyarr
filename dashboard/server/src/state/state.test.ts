@@ -77,7 +77,13 @@ describe('real migrations', () => {
       wiring: { ledger: [], applied: [], lastRun: null },
     });
     const secrets = await secretsStore(dir).load();
-    expect(secrets.value).toEqual({ ...v1Secrets, schemaVersion: 3, account: null, vpn: null });
+    expect(secrets.value).toEqual({
+      ...v1Secrets,
+      schemaVersion: 4,
+      account: null,
+      vpn: null,
+      usenet: null,
+    });
     // Persisted: a second load doesn't migrate again.
     expect((await stateStore(dir).load()).migrated).toBe(false);
     expect((await secretsStore(dir).load()).migrated).toBe(false);

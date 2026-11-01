@@ -165,6 +165,8 @@ export class JellyfinClient {
     name: string,
     type: JellyfinCollection,
     path: string,
+    /** Titles, descriptions, artwork language and the country for age ratings. */
+    metadata: { language: string; country: string } = { language: 'en', country: 'US' },
   ): Promise<void> {
     await this.http.json('/Library/VirtualFolders', undefined, {
       method: 'POST',
@@ -175,8 +177,8 @@ export class JellyfinClient {
           Enabled: true,
           // New imports from Sonarr/Radarr/Lidarr show up without waiting for the nightly scan.
           EnableRealtimeMonitor: true,
-          PreferredMetadataLanguage: 'en',
-          MetadataCountryCode: 'US',
+          PreferredMetadataLanguage: metadata.language,
+          MetadataCountryCode: metadata.country,
         },
       },
     });
