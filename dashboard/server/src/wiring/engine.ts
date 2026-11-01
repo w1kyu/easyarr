@@ -69,7 +69,7 @@ export interface WiringStep {
   id: string;
   service: ServiceId;
   /** Services that must answer before this step runs. */
-  needs: ServiceId[];
+  needs: ServiceId[] | ((plan: WiringPlan) => ServiceId[]);
   enabled(plan: WiringPlan): boolean;
   run(ctx: StepContext): Promise<void>;
 }
@@ -259,7 +259,8 @@ export class WiringEngine {
         emit({ ...base, state: 'waiting' });
         let current: ServiceId = step.service;
         try {
-          for (const need of step.needs) {
+          const needs = typeof step.needs === 'function' ? step.needs(plan) : step.needs;
+          for (const need of needs) {
             current = need;
             await waitFor(need);
           }

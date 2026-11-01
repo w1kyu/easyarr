@@ -24,6 +24,8 @@ export interface ServeConfig {
   qbittorrentUrl: string;
   /** Services that tell us our own public IP (outside the VPN) for the "home IP hidden" check. */
   homeIpUrls: string[];
+  /** Recyclarr's /config: the dashboard writes recyclarr.yml there and asks for syncs (D-048). */
+  recyclarrDir: string;
   /** Upstream overrides for the service proxy and wiring (dev/e2e), e.g. sonarr=http://127.0.0.1:8989. */
   serviceUrls: Partial<Record<ServiceId, string>>;
   /**
@@ -102,6 +104,7 @@ export function loadServeConfig(env: Env = process.env): ServeConfig {
     homeIpUrls: env['EASYARR_HOME_IP_URLS']
       ? list(env['EASYARR_HOME_IP_URLS'])
       : ['https://api.ipify.org?format=json', 'https://ipv4.icanhazip.com'],
+    recyclarrDir: path.resolve(env['EASYARR_RECYCLARR_DIR'] ?? '/recyclarr'),
     serviceUrls: parseServiceUrls(env['EASYARR_SERVICE_URLS']),
     trustedClients: [
       '127.0.0.1',

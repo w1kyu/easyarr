@@ -149,7 +149,7 @@ leaktest() {
   echo "== The dashboard reaches the services via $(c vpn)"
   local dash=(docker exec "$(c dashboard)")
   check "dashboard has wget (guards the next checks)" ok "${dash[@]}" sh -c 'command -v wget'
-  for port_path in 8090/ 9696/ping 8191/ 8989/ping 7878/ping 8686/ping 6767/ 11011/health; do
+  for port_path in 8090/ 9696/ping 8191/ 8989/ping 7878/ping 8686/ping 6767/ 11011/apps/cleanuparr/health; do
     check "dashboard -> http://$(c vpn):${port_path}" ok "${dash[@]}" wget -q -O /dev/null -T 10 "http://$(c vpn):${port_path}"
   done
   # SABnzbd answers 403 to unknown Host headers until its host_whitelist is seeded (phase 05),

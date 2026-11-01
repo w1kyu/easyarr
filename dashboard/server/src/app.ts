@@ -16,6 +16,9 @@ import { proxyRoutes } from './proxy/routes.js';
 import { PortSync, QbittorrentClient } from './vpn/port-sync.js';
 import { vpnRoutes } from './vpn/routes.js';
 import { VpnService } from './vpn/service.js';
+import { createWiring } from './wiring/index.js';
+import type { WiringEngine } from './wiring/engine.js';
+import { wiringRoutes } from './wiring/routes.js';
 import { wizardRoutes } from './wizard/routes.js';
 
 export type AppConfig = Pick<
@@ -25,7 +28,13 @@ export type AppConfig = Pick<
   Partial<
     Pick<
       ServeConfig,
-      'vpnDir' | 'gluetunUrl' | 'qbittorrentUrl' | 'homeIpUrls' | 'trustedClients' | 'serviceUrls'
+      | 'vpnDir'
+      | 'gluetunUrl'
+      | 'qbittorrentUrl'
+      | 'homeIpUrls'
+      | 'trustedClients'
+      | 'serviceUrls'
+      | 'recyclarrDir'
     >
   >;
 
@@ -33,10 +42,33 @@ export interface Services {
   lock: Mutex;
   vpn: VpnService;
   portSync: PortSync;
+  /** Built from the config when left out (tests that only exercise other routes). */
+  wiring?: WiringEngine;
+}
+
+function wiringFor(
+  config: AppConfig,
+  lock: Mutex,
+  collect: () => Promise<SystemInfo>,
+  logger?: Logger,
+): WiringEngine {
+  return createWiring({
+    stateDir: config.stateDir,
+    recyclarrDir: config.recyclarrDir ?? path.join(config.stateDir, 'recyclarr'),
+    lock,
+    serviceUrls: config.serviceUrls ?? {},
+    collectSystemInfo: collect,
+    ...(logger ? { log: logger } : {}),
+  });
 }
 
 /** Long-lived services, built once per process (server.ts starts the port-sync timer). */
-export function createServices(config: AppConfig, logger?: Logger, lock = new Mutex()): Services {
+export function createServices(
+  config: AppConfig,
+  logger?: Logger,
+  lock = new Mutex(),
+  collect: () => Promise<SystemInfo> = () => collectSystemInfo({ dataDir: config.dataDir }),
+): Services {
   const gluetun = new GluetunClient({
     baseUrl: config.gluetunUrl ?? 'http://127.0.0.1:8000',
     apiKey: async () => (await secretsStore(config.stateDir).load()).value.apiKeys['gluetun'],
@@ -54,7 +86,7 @@ export function createServices(config: AppConfig, logger?: Logger, lock = new Mu
     new QbittorrentClient(config.qbittorrentUrl ?? 'http://127.0.0.1:8090'),
     logger,
   );
-  return { lock, vpn, portSync };
+  return { lock, vpn, portSync, wiring: wiringFor(config, lock, collect, logger) };
 }
 
 export interface BuildAppOptions {
@@ -79,7 +111,8 @@ export async function buildApp({
     logController: new LogController({ disableRequestLogging: true }),
     trustProxy: true,
   });
-  const svc = services ?? createServices(config, logger);
+  const systemInfo = collect ?? (() => collectSystemInfo({ dataDir: config.dataDir }));
+  const svc = services ?? createServices(config, logger, undefined, systemInfo);
   const trusted = new Set(config.trustedClients ?? ['127.0.0.1', '::1']);
 
   await app.register(helmet, {
@@ -129,8 +162,13 @@ export async function buildApp({
 
   await app.register(wizardRoutes, {
     stateDir: config.stateDir,
-    collectSystemInfo: collect ?? (() => collectSystemInfo({ dataDir: config.dataDir })),
+    collectSystemInfo: systemInfo,
     lock: svc.lock,
+  });
+  await app.register(wiringRoutes, {
+    engine: svc.wiring ?? wiringFor(config, svc.lock, systemInfo, logger),
+    stateDir: config.stateDir,
+    collectSystemInfo: systemInfo,
   });
   await app.register(vpnRoutes, { vpn: svc.vpn, portSync: svc.portSync });
   await app.register(proxyRoutes, { serviceUrls: config.serviceUrls ?? {} });
