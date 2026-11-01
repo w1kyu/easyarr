@@ -1,7 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
 
-// One user walking through wizard steps 1–4 (prompts/03): every test continues where the previous
-// one stopped, against a fresh install (new state dir locally, fresh dev stack in CI).
+// One user walking through the whole wizard (torrents): every test continues where the previous
+// one stopped, against a fresh install (new state dir + fakes locally, fresh dev stack in CI).
+// Locally the services are fakes; on the stack the Finish step wires the real services (CI has no
+// VPN, so the TRaSH guide download fails there — the test checks how that failure is shown).
 test.describe.configure({ mode: 'serial' });
 
 const USER = 'e2e-owner';
@@ -17,7 +19,7 @@ test('opening EasyArr on a fresh install starts the wizard at Welcome', async ({
   await page.goto('/');
   await expect(page).toHaveURL(/\/setup\/welcome$/);
   await expect(page.getByRole('heading', { name: 'Welcome to EasyArr' })).toBeVisible();
-  await expect(page.getByText('Step 1 of 5')).toBeVisible();
+  await expect(page.getByText('Step 1 of 7')).toBeVisible();
   await expect(page.getByText('Please use it responsibly')).toBeVisible();
   await expect(page.getByRole('button', { name: /Restore from backup/ })).toBeDisabled();
 });
@@ -90,7 +92,7 @@ test('the API never returns the password', async ({ request }) => {
 
 test('step 4: choose a download method', async ({ page }) => {
   await page.goto('/setup/download');
-  await expect(page.getByText('Step 4 of 5')).toBeVisible();
+  await expect(page.getByText('Step 4 of 7')).toBeVisible();
   await next(page);
   await expect(page.getByText('Please choose one of the options.')).toBeVisible();
   await page.getByRole('button', { name: 'Usenet explained' }).click();
@@ -103,7 +105,7 @@ test('step 4: choose a download method', async ({ page }) => {
 
 test('step 5: "Skip for now" explains honestly that downloads stay off', async ({ page }) => {
   await page.goto('/setup/vpn');
-  await expect(page.getByText('Step 5 of 5')).toBeVisible();
+  await expect(page.getByText('Step 5 of 8')).toBeVisible();
   // On the stack the leak test has already saved a VPN, so step 5 opens that provider first.
   const list = page.getByRole('heading', { name: 'Best for torrents' });
   const other = page.getByRole('button', { name: 'Other provider' });
@@ -135,7 +137,10 @@ test('step 5: a wrong password gets a plain reason; fixing it connects and hides
   await expect(result).toContainText('Username or password was refused');
   await expect(page.getByRole('button', { name: 'Skip for now' })).toBeVisible();
 
-  // Change the settings: no reinstall, the VPN reconnects with the new password.
+  // Change the settings: no reinstall, the VPN reconnects with the new password. (A person takes
+  // more than a second to retype; the wrapper's status.json has 1-second timestamps, and a status
+  // from the same second as the new save can't be told apart from the old settings' crash.)
+  await page.waitForTimeout(2_000);
   await page.getByLabel('VPN password').fill(VPN_PASSWORD);
   await page.getByRole('button', { name: 'Connect' }).click();
   await expect(result).toHaveAttribute('data-ok', 'true', { timeout: 30_000 });
@@ -147,19 +152,73 @@ test('step 5: a wrong password gets a plain reason; fixing it connects and hides
   expect(await config.text()).not.toContain(VPN_PASSWORD);
 
   await next(page);
-  await expect(page).toHaveURL(/\/$/);
-  await expect(page.getByText('First part of the setup is done')).toBeVisible();
+  await expect(page).toHaveURL(/\/setup\/indexers$/);
 });
 
-test('step 5 (stack): skipping keeps the kill switch closed and finishes the wizard', async ({
-  page,
-}) => {
+test('step 5 (stack): skipping keeps the kill switch closed and goes on', async ({ page }) => {
   test.skip(!external, 'local runs connect the fake VPN instead');
   await page.goto('/setup/vpn');
   await page.getByRole('button', { name: 'Skip for now' }).click();
   await page.getByRole('dialog').getByRole('button', { name: /Skip/ }).click();
-  await expect(page).toHaveURL(/\/$/);
-  await expect(page.getByText('First part of the setup is done')).toBeVisible();
+  await expect(page).toHaveURL(/\/setup\/indexers$/);
+});
+
+test('step 7: no search sites yet → "Do this later" explains what that means', async ({ page }) => {
+  await page.goto('/setup/indexers');
+  await expect(page.getByText('Step 6 of 8')).toBeVisible();
+  await expect(page.getByTestId('indexers-guide')).toContainText('Add Indexer');
+  await expect(page.getByTestId('indexers-status')).toBeVisible();
+  await page.getByRole('button', { name: /Do this later/ }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByText(/can't find anything to download/)).toBeVisible();
+  await dialog.getByRole('button', { name: /Continue/ }).click();
+  await expect(page).toHaveURL(/\/setup\/library$/);
+});
+
+test('step 8: defaults are all libraries, English, Balanced', async ({ page }) => {
+  await page.goto('/setup/library');
+  for (const name of ['Movies', 'TV shows', 'Music']) {
+    await expect(page.getByRole('switch', { name })).toHaveAttribute('aria-checked', 'true');
+  }
+  await expect(page.getByRole('radio', { name: /Balanced/ })).toHaveAttribute(
+    'aria-checked',
+    'true',
+  );
+  await next(page);
+  await expect(page).toHaveURL(/\/setup\/finish$/);
+});
+
+test('step 9: Finish connects the apps with a live checklist', async ({ page }) => {
+  // The real stack waits for every service and for the TRaSH guide download to fail (no VPN).
+  test.setTimeout(15 * 60_000);
+  await page.goto('/setup/finish');
+  await page.getByRole('button', { name: /^Connect everything/ }).click();
+  await expect(page.getByTestId('wiring-checklist')).toBeVisible();
+  const tour = page.getByTestId('finish-tour');
+  const failed = page.getByTestId('finish-failed');
+  await expect(tour.or(failed)).toBeVisible({ timeout: 14 * 60_000 });
+  if (external) {
+    // CI has no working VPN: only the quality profiles (TRaSH guides, over the internet) fail,
+    // and the checklist says why in plain words.
+    await expect(failed).toBeVisible();
+    await expect(page.getByTestId('wiring-step-recyclarr.sync')).toHaveAttribute(
+      'data-state',
+      'failed',
+    );
+    await expect(page.getByText(/TRaSH guides/)).toBeVisible();
+    for (const step of ['sonarr.connect', 'radarr.connect', 'prowlarr.apps', 'jellyfin.setup']) {
+      await expect(page.getByTestId(`wiring-step-${step}`)).toHaveAttribute('data-state', 'done');
+    }
+    await page.getByRole('button', { name: 'Finish anyway' }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Finish anyway' }).click();
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByTestId('home-problems')).toBeVisible();
+  } else {
+    await expect(tour).toContainText('Add at least one search site');
+    await page.getByRole('button', { name: /Go to my dashboard/ }).click();
+    await expect(page).toHaveURL(/\/$/);
+  }
+  await expect(page.getByText('EasyArr is ready')).toBeVisible();
 });
 
 test('going back shows saved answers; a saved password is kept', async ({ page }) => {

@@ -300,7 +300,14 @@ wiretest() {
   json_post() { curl -fsS -m 20 -H 'content-type: application/json' -d "$2" "$api/$1" >/dev/null; }
 
   echo "== Wizard answers through the API"
-  check "account" ok json_post wizard/account '{"username":"easyarr","password":"Tidy-Kettle-Orbit-42"}'
+  # The wizard e2e may have created the account (and set up Jellyfin with it) already: keep it.
+  local wizard
+  wizard="$(curl -fsS -m 20 "$api/wizard")"
+  if grep -q '"account":null' <<<"$wizard"; then
+    check "account" ok json_post wizard/account '{"username":"easyarr","password":"Tidy-Kettle-Orbit-42"}'
+  else
+    echo "  (account from the wizard e2e kept)"
+  fi
   check "download method: both" ok json_post wizard/download '{"method":"both"}'
 
   echo "== First wiring run (real services)"
