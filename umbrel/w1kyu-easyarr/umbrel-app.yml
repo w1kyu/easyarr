@@ -5,7 +5,7 @@ storage:
 category: media
 name: EasyArr
 icon: https://raw.githubusercontent.com/w1kyu/easyarr/main/assets/icon.svg
-version: '0.0.6'
+version: '0.0.7'
 tagline: Your own Netflix-style media setup, wired up for you
 description: >-
   ⚠️ PREVIEW — not ready for everyday use yet. This early build installs all services, but the
@@ -29,10 +29,11 @@ description: >-
 
   Jellyfin opens on port 39096 and the request page on port 39055 of your Umbrel.
 releaseNotes: >-
-  Safer by default: only EasyArr itself (and its request page) can reach the download and search apps
-  now — other apps on your Umbrel can't. The app pages (Sonarr, Radarr, qBittorrent, …) can be opened
-  through EasyArr at /apps/<name>/, behind your Umbrel login. Connecting the apps to each other comes
-  in the next updates.
+  EasyArr can now connect the apps to each other for you: download folders in qBittorrent and SABnzbd,
+  Sonarr, Radarr and Lidarr linked to the downloaders, Prowlarr sharing its search sites, Jellyfin set
+  up with your account and libraries, and the request page linked to Jellyfin, Sonarr and Radarr. For
+  now you start it by hand at /dev/wiring inside EasyArr; the setup wizard will do it for you in a
+  coming update. Things you change or delete in the apps are left alone.
 
 developer: w1kyu
 website: https://github.com/w1kyu/easyarr
