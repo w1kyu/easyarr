@@ -4,10 +4,12 @@
 > Newest session log entries go on top.
 
 ## Current phase
-**Phase 04 — ✅ done by the agent, waiting for the owner's test (v0.0.4).**
-The phase 02 + 03 checklists are still open too — one fresh install (or update) of 0.0.4 covers
-all three.
-Next prompt: `prompts/05-wiring.md` (after the owner's checklists below pass).
+**Phase 05 — 🟨 in progress (wiring engine + service proxy).**
+Phase 04 owner test: VPN connected on the owner's Umbrel (Proton VPN, WireGuard, Germany, port
+forwarding active) — confirmed 2026-10-31. The phase 02/03 look-and-feel checklists are still open.
+Released during phase 05 so far: v0.0.5 (VPN rule clean-up fix, D-044), v0.0.6 (service proxy +
+inbound allowlist, D-045/D-046).
+Next prompt after this phase: `prompts/06-wizard-rest.md`.
 
 ## Phase status
 | Phase | Title | Status | Notes |
@@ -16,8 +18,8 @@ Next prompt: `prompts/05-wiring.md` (after the owner's checklists below pass).
 | 01 | Umbrel app + compose stack | ✅ done | v0.0.1 installed + restarted on owner's Umbrel (x86); CI green amd64/arm64 |
 | 02 | Dashboard skeleton + design system + CI | ✅ done (owner test pending) | v0.0.2; image ghcr.io/w1kyu/easyarr amd64/arm64; stack test green on d72a564 |
 | 03 | Wizard basics (steps 1–4) | ✅ done (owner test pending) | v0.0.3; wizard e2e green locally, in CI and against the stack (amd64 + arm64) |
-| 04 | VPN (wrapper, kill switch, wizard step) | ✅ done (owner test pending) | v0.0.4; VPN image ghcr.io/w1kyu/easyarr-vpn amd64/arm64; leak tests green in CI (image smoke test + stack) |
-| 05 | Wiring engine + service proxy | ⬜ todo | |
+| 04 | VPN (wrapper, kill switch, wizard step) | ✅ done (owner: VPN works) | v0.0.4; VPN image ghcr.io/w1kyu/easyarr-vpn amd64/arm64; leak tests green in CI (image smoke test + stack) |
+| 05 | Wiring engine + service proxy | 🟨 in progress | proxy + allowlist shipped (v0.0.6); engine + steps in progress |
 | 06 | Wizard steps 6–9 | ⬜ todo | |
 | 07 | Dashboard + settings | ⬜ todo | |
 | 08 | Backup & restore | ⬜ todo | |
@@ -104,6 +106,28 @@ Copy from SPEC as they get resolved. Highest priority first:
 - umbrelOS 2.0 `environment:` manifest settings could expose a few safe knobs (e.g. TZ) in Umbrel's app settings.
 
 ## Session log
+### 2026-10-31 (evening) — Phase 05, part 1: proxy, allowlist, engine core (Hermes agent on the owner's Umbrel)
+- Owner confirmed the VPN works. Its logs showed Gluetun failing to clean up its own firewall rules on
+  every reconnect (`cannot remove outdated VPN connection rule … "!10.21.0.16"`): our guard rule's
+  negated address broke Gluetun's rule parser. Guard moved to the mangle table; image smoke test now
+  makes Gluetun reconnect between real servers and checks the clean-up (D-044). **v0.0.5** released.
+- Service proxy `/apps/<service>/` (HTTP + WebSocket; prefix kept, stripped for qBittorrent), own
+  cross-site check, Origin/Referer/X-Forwarded-For dropped, loopback + Umbrel gateway only, "not
+  answering" page (D-045).
+- Found while designing the proxy: with authentication off inside the apps, every other Umbrel app
+  on the shared Docker network could control Sonarr/qBittorrent/FlareSolverr. Fixed: the VPN
+  wrapper only accepts connections from the dashboard and the request page (list written by the
+  dashboard, D-046). Stack test proves other apps are refused. **v0.0.6** released (CI green
+  amd64 + arm64, store synced).
+- Research for every service API, from upstream source at the pinned versions:
+  `docs/dev/research/{servarr,downloaders,jellyfin-seerr,bazarr-recyclarr}.md`.
+- Wiring engine core: ledger in state.json (schema v4), idempotent resources (create / adopt /
+  respect deletions / repair), one-time settings, SSE routes; clients for Jellyfin, Seerr, Bazarr,
+  Recyclarr, Servarr. Not wired into the app yet.
+- Next (same phase): qBittorrent/SABnzbd/Cleanuparr clients, the steps, init seeding (Bazarr,
+  Unpackerr, qBittorrent LocalHostAuth, SABnzbd url_base), compose (Recyclarr runner, Cleanuparr
+  BASE_PATH), dev trigger button, CI integration test with real containers.
+
 ### 2026-10-31 — Phase 04: VPN wrapper, kill switch, provider catalog, wizard step 5 (Hermes agent on the owner's Umbrel)
 - Start: owner allowed phase 04 "if everything checks out" — installed 0.0.3 checked via Umbrel MCP
   (status, logs, API health, services reachable) → OK.
@@ -138,8 +162,8 @@ Copy from SPEC as they get resolved. Highest priority first:
   19c8ad4; fresh clone green (152 unit tests); store synced (v0.0.4, store 5a36ec1).
 - Decisions D-040…D-043.
 - Owner checklist (phase 04 — update to / install 0.0.4):
-  - [ ] Wizard step 5: set up your VPN following only the in-app guide
-  - [ ] The test shows the VPN's IP + country and "Your home IP is hidden"
+  - [x] Wizard step 5: set up your VPN following only the in-app guide (owner, 2026-10-31)
+  - [x] The test shows the VPN's IP + country and "Your home IP is hidden" (owner, 2026-10-31)
   - [ ] Change a setting (e.g. another country) and press Connect again → reconnects, no reinstall
   - [ ] Leak check (Umbrel → Settings → Advanced → Terminal):
         `sudo docker exec w1kyu-easyarr_qbittorrent_1 curl -s -m 10 https://ipinfo.io/ip`
