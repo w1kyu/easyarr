@@ -5,12 +5,11 @@ storage:
 category: media
 name: EasyArr
 icon: https://raw.githubusercontent.com/w1kyu/easyarr/main/assets/icon.svg
-version: '0.0.7'
+version: '0.0.8'
 tagline: Your own Netflix-style media setup, wired up for you
 description: >-
-  ⚠️ PREVIEW — not ready for everyday use yet. This early build installs all services, but the
-  setup wizard is still being built (first 5 steps so far) and the apps aren't connected to each
-  other yet.
+  ⚠️ PREVIEW — not ready for everyday use yet. The setup wizard is complete and connects all the
+  apps, but the dashboard, settings and backups are still being built.
 
 
   EasyArr sets up a complete media automation stack on your Umbrel and connects everything for
@@ -29,11 +28,11 @@ description: >-
 
   Jellyfin opens on port 39096 and the request page on port 39055 of your Umbrel.
 releaseNotes: >-
-  EasyArr can now connect the apps to each other for you: download folders in qBittorrent and SABnzbd,
-  Sonarr, Radarr and Lidarr linked to the downloaders, Prowlarr sharing its search sites, Jellyfin set
-  up with your account and libraries, and the request page linked to Jellyfin, Sonarr and Radarr. For
-  now you start it by hand at /dev/wiring inside EasyArr; the setup wizard will do it for you in a
-  coming update. Things you change or delete in the apps are left alone.
+  The setup wizard is now complete. New steps: your Usenet provider and indexer (with presets and
+  Test buttons), adding torrent search sites in Prowlarr, choosing movies/shows/music, your
+  language and a quality preset. The last step connects every app for you with a live checklist
+  and explains anything that didn't work. Already set up? Open EasyArr — it continues with the
+  new steps.
 
 developer: w1kyu
 website: https://github.com/w1kyu/easyarr
