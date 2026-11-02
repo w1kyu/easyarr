@@ -335,7 +335,7 @@
   "usenet.servers.provider": "Provider",
   "usenet.servers.other": "Other provider",
   "usenet.servers.otherHint": "Your provider's website lists the server address under \"setup\" or \"newsreader settings\".",
-  "usenet.servers.presetHint": "Server details for {{name}} filled in — check them in your account if something doesn't work.",
+  "usenet.servers.presetHint": "Server details for {{name}} filled in. Connections is set for its smallest plan — a bigger plan may allow more (see your account).",
   "usenet.servers.newTitle": "Provider {{n}}",
   "usenet.servers.host": "Server address",
   "usenet.servers.port": "Port",
