@@ -4,12 +4,12 @@
 > Newest session log entries go on top.
 
 ## Current phase
-**Phase 05 — ✅ done (owner test pending).** v0.0.7: the wiring engine connects every app; proven
-against the real containers in CI on amd64 + arm64 (`dev/stack.sh wiretest`). Started by hand at
-`/dev/wiring` until phase 06's Finish step.
-Phase 04 owner test: VPN connected on the owner's Umbrel (Proton VPN, WireGuard, Germany, port
-forwarding active) — confirmed 2026-10-31. The phase 02/03 look-and-feel checklists are still open.
-Next prompt: `prompts/06-wizard-rest.md`.
+**Phase 06 — ✅ built (owner test pending).** v0.0.8: the wizard is complete (steps 6–9); Finish
+runs the wiring with a live checklist. Proven with e2e for torrents-only, Usenet-only and both
+(fake services) and against the real stack in CI (amd64 + arm64).
+"Done when" still needs the owner's real first run: wizard → request → download via VPN → Jellyfin.
+Phase 05 owner test (v0.0.7 /dev/wiring) is superseded by the Finish step — test that instead.
+Next prompt: `prompts/07-dashboard.md` (after the owner's phase 06 test).
 
 ## Phase status
 | Phase | Title | Status | Notes |
@@ -20,7 +20,7 @@ Next prompt: `prompts/06-wizard-rest.md`.
 | 03 | Wizard basics (steps 1–4) | ✅ done (owner test pending) | v0.0.3; wizard e2e green locally, in CI and against the stack (amd64 + arm64) |
 | 04 | VPN (wrapper, kill switch, wizard step) | ✅ done (owner: VPN works) | v0.0.4; VPN image ghcr.io/w1kyu/easyarr-vpn amd64/arm64; leak tests green in CI (image smoke test + stack) |
 | 05 | Wiring engine + service proxy | ✅ done (owner test pending) | v0.0.5–v0.0.7; wiretest green against real services (amd64 + arm64) |
-| 06 | Wizard steps 6–9 | ⬜ todo | |
+| 06 | Wizard steps 6–9 | ✅ done (owner test pending) | v0.0.8; e2e torrents/usenet/both + stack wizard e2e through Finish |
 | 07 | Dashboard + settings | ⬜ todo | |
 | 08 | Backup & restore | ⬜ todo | |
 | 09 | Diagnostics + AI help | ⬜ todo | |
@@ -62,6 +62,10 @@ Results of SPEC **[VERIFY]** items. Format: `- YYYY-MM-DD — <fact> — <source
 - 2026-10-31 — Gluetun resets iptables policies to ACCEPT while (re)configuring → EasyArr's iptables guard rewrites `-P OUTPUT/FORWARD ACCEPT` to DROP (D-040). — https://github.com/qdm12/gluetun/blob/v3.41.3/internal/firewall/enable.go
 - 2026-10-31 — Mullvad removed OpenVPN on 2026-01-15 (WireGuard only) and port forwarding in 2023. — https://mullvad.net/en/blog/removing-openvpn-15th-january-2026
 - 2026-10-31 — Provider setup steps for the 9 VPN guides were checked against the providers' help centres (sources listed in each guide's research; see docs/vpn/*.md "Last checked").
+- 2026-11-01 — Usenet provider presets (host, SSL port 563, connections of the smallest current plan) for Easynews, Eweka, Giganews, NewsDemon, Newsgroup Ninja, Newshosting, Pure Usenet, theCubeNet, Tweaknews, UsenetServer, ViperNews — each from the provider's own help pages (URLs in `dashboard/shared/src/usenet-presets.ts`), SSL ports tried live. Left out (no official SSL port / connection limit): Frugal Usenet, Usenet.Farm, Supernews (still alive). Note: port 443 is *not* SSL on Newsgroup Ninja, theCubeNet, NewsDemon, Frugal; Easynews SSL-443 only on secure.news.easynews.com. — provider KB pages (D-050)
+- 2026-11-01 — Prowlarr 2.7.0 built-in Newznab presets (names + URLs) used as EasyArr's indexer list; Usenet indexers need `redirect: true` (IndexerController.Validate); `POST /api/v1/indexer/test` tests capabilities. — https://github.com/Prowlarr/Prowlarr/blob/0dc20d8495bad9951c3fafe53f32b6e1c70fcf3b/src/NzbDrone.Core/Indexers/Definitions/Newznab/Newznab.cs#L88-L108
+- 2026-11-01 — SABnzbd 5.1.3 `mode=config&name=test_server` returns `{value:{result,message}}` with plain reasons ("Server requires username and password.", "Timed out", "Unknown SSL protocol…"); parameters may be POSTed. — https://github.com/sabnzbd/sabnzbd/blob/a647f73426cb70ad60ae7964b96c2d5e939b4727/sabnzbd/api.py#L1365
+- 2026-11-01 — Prowlarr UI labels for the indexers guide: "Add Indexer" / "Add New Indexer", filters Protocol / Privacy (Public, Private, Semi-Private) / Language; Cloudflare error text "Unable to access {host}, blocked by CloudFlare Protection." — Prowlarr@0dc20d8 `src/NzbDrone.Core/Localization/Core/en.json`, `Http/CloudFlare/CloudFlareProtectionException.cs`
 ## Open [VERIFY] items
 Copy from SPEC as they get resolved. Highest priority first:
 - [x] Umbrel compose: `depends_on` conditions, restart policies allowed, `APP_SEED`, container naming for `APP_HOST`
@@ -84,12 +88,16 @@ Copy from SPEC as they get resolved. Highest priority first:
 - AirVPN only hands out reserved ports ≥ 2048; EasyArr accepts 1024–65535 (the guide says so).
 - Help links with `#section` open the top of the page (anchors aren't scrolled to yet; phase 10).
 - Settings → VPN doesn't exist yet (phase 07); changing the VPN = reopening wizard step 5 (`/setup/vpn`).
-- SABnzbd refuses requests through other hostnames until `host_whitelist` is seeded (phase 05).
-- Recyclarr and Unpackerr run with empty configs (they idle and log warnings) until wiring exists (phase 05).
+- Changing any wizard answer later = reopen that step (home → "Review your answers"), then run Finish
+  again. Settings arrive in phase 07; "Repair connections" (the old /dev/wiring button) too.
+- Language choice only affects subtitles (Bazarr) and Jellyfin metadata, not which audio language
+  gets downloaded (D-052). Bazarr's profile and Jellyfin libraries are set once — changing the
+  language later doesn't rewrite them yet (phase 07).
+- Usenet servers/indexers removed from the wizard later are not removed from SABnzbd/Prowlarr.
+- "Get help with AI" on the Finish step is a disabled placeholder (phase 09).
 - Bazarr, Recyclarr, Unpackerr and Cleanuparr configs plus sub-path settings (SABnzbd `url_base`, qBittorrent
   reverse proxy) are not seeded yet (phase 05, D-031).
 - Service tiles on the home screen show static status pills (no live status until phase 07).
-- The wizard ends after step 5 for now; the home screen says so and offers "Review your answers".
 - The account isn't applied to Jellyfin/Jellyseerr yet (phase 05); changing it later = going back
   through the wizard until Settings exist (phase 07).
 
@@ -106,6 +114,31 @@ Copy from SPEC as they get resolved. Highest priority first:
 - umbrelOS 2.0 `environment:` manifest settings could expose a few safe knobs (e.g. TZ) in Umbrel's app settings.
 
 ## Session log
+### 2026-11-01 (afternoon) — Phase 06: wizard steps 6–9, full first-run e2e (Hermes)
+- Step 6 Usenet: provider vs indexer explainer; 1–5 providers (11 verified presets) and 1–10
+  indexers (Prowlarr's preset list); Test buttons via SABnzbd `test_server` / Prowlarr
+  `indexer/test` with plain reasons (incl. "your VPN isn't connected"); passwords/API keys in
+  secrets.json v4 by entry id, never returned (D-050). `docs/usenet-101.md` finished.
+- Step 7 Indexers: guide (`docs/indexers.md`) beside "Open Prowlarr" + live count; server checks
+  Prowlarr really has one, or "Do this later" with an honest dialog (D-051).
+- Step 8 What do you want?: libraries, language (Bazarr + Jellyfin metadata), quality preset with
+  size hints; `docs/quality-presets.md` (D-052).
+- Step 9 Finish: wiring with the live checklist, plain explanations per failure, Retry, AI-help
+  placeholder, "Finish anyway", what-now tour; saving an earlier step re-opens Finish (D-053).
+  `/dev/wiring` removed. Wiring now adds Usenet servers to SABnzbd and indexers to Prowlarr.
+- Tests: 218 unit tests; Playwright 29 tests — wizard spec + full first run for torrents-only,
+  Usenet-only, both, each against a fresh dashboard with the shared service fakes (D-054); on the
+  stack the wizard e2e goes through Finish with the real services (only the offline TRaSH sync fails).
+- Released **v0.0.8** (easyarr sha-7c63806).
+- Owner test (v0.0.8) — ideally reinstall EasyArr (fresh app data) and go through it like a beginner:
+  - [ ] Whole wizard; at step 9 every line ends in "Done" (with your real VPN)
+  - [ ] Torrents: add a site in Prowlarr from step 7; EasyArr notices it by itself
+  - [ ] Usenet (if you have accounts): pick your provider, Test → "It works"; same for the indexer
+  - [ ] Request a legal test item (e.g. a public-domain film) on the request page (port 39055)
+        → it downloads through the VPN → appears in Jellyfin (port 39096)
+  - [ ] Note every confusing sentence and tell the agent
+- Next: owner test, then `prompts/07-dashboard.md`.
+
 ### 2026-11-01 — Phase 05, part 2: every service wired, proven against the real containers (Hermes)
 - Research for all services moved into the repo: `docs/dev/research/*.md` (commit-pinned citations).
 - Clients: Servarr (Sonarr/Radarr/Lidarr/Prowlarr), qBittorrent, SABnzbd, Cleanuparr (+ Jellyfin,
