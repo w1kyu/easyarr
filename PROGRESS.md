@@ -4,11 +4,12 @@
 > Newest session log entries go on top.
 
 ## Current phase
-**Phase 06 — ✅ built (owner test pending).** v0.0.8: the wizard is complete (steps 6–9); Finish
-runs the wiring with a live checklist. Proven with e2e for torrents-only, Usenet-only and both
-(fake services) and against the real stack in CI (amd64 + arm64).
-"Done when" still needs the owner's real first run: wizard → request → download via VPN → Jellyfin.
-Phase 05 owner test (v0.0.7 /dev/wiring) is superseded by the Finish step — test that instead.
+**Phase 06 — 🟨 owner test in progress.** v0.0.8 on the owner's Umbrel: wizard, VPN routing
+(all VPN-side services exit via the VPN IP), Prowlarr site and request work. The first request
+stayed "Missing" because TRaSH blocks LQ releases (YTS) → v0.0.9 makes LQ a last resort (D-055)
+and re-runs the wiring on app start (D-056). Remaining owner check: the download lands in
+Jellyfin. Open: FlareSolverr tag not ready in Prowlarr's add-site form on the owner's install
+(cause unknown — waiting for the diagnostic output).
 Next prompt: `prompts/07-dashboard.md` (after the owner's phase 06 test).
 
 ## Phase status
@@ -20,7 +21,7 @@ Next prompt: `prompts/07-dashboard.md` (after the owner's phase 06 test).
 | 03 | Wizard basics (steps 1–4) | ✅ done (owner test pending) | v0.0.3; wizard e2e green locally, in CI and against the stack (amd64 + arm64) |
 | 04 | VPN (wrapper, kill switch, wizard step) | ✅ done (owner: VPN works) | v0.0.4; VPN image ghcr.io/w1kyu/easyarr-vpn amd64/arm64; leak tests green in CI (image smoke test + stack) |
 | 05 | Wiring engine + service proxy | ✅ done (owner test pending) | v0.0.5–v0.0.7; wiretest green against real services (amd64 + arm64) |
-| 06 | Wizard steps 6–9 | ✅ done (owner test pending) | v0.0.8; e2e torrents/usenet/both + stack wizard e2e through Finish |
+| 06 | Wizard steps 6–9 | 🟨 owner test in progress | v0.0.8 → v0.0.9 (LQ last resort, wiring on start); e2e torrents/usenet/both + stack wizard e2e through Finish |
 | 07 | Dashboard + settings | ⬜ todo | |
 | 08 | Backup & restore | ⬜ todo | |
 | 09 | Diagnostics + AI help | ⬜ todo | |
@@ -66,6 +67,10 @@ Results of SPEC **[VERIFY]** items. Format: `- YYYY-MM-DD — <fact> — <source
 - 2026-11-01 — Prowlarr 2.7.0 built-in Newznab presets (names + URLs) used as EasyArr's indexer list; Usenet indexers need `redirect: true` (IndexerController.Validate); `POST /api/v1/indexer/test` tests capabilities. — https://github.com/Prowlarr/Prowlarr/blob/0dc20d8495bad9951c3fafe53f32b6e1c70fcf3b/src/NzbDrone.Core/Indexers/Definitions/Newznab/Newznab.cs#L88-L108
 - 2026-11-01 — SABnzbd 5.1.3 `mode=config&name=test_server` returns `{value:{result,message}}` with plain reasons ("Server requires username and password.", "Timed out", "Unknown SSL protocol…"); parameters may be POSTed. — https://github.com/sabnzbd/sabnzbd/blob/a647f73426cb70ad60ae7964b96c2d5e939b4727/sabnzbd/api.py#L1365
 - 2026-11-01 — Prowlarr UI labels for the indexers guide: "Add Indexer" / "Add New Indexer", filters Protocol / Privacy (Public, Private, Semi-Private) / Language; Cloudflare error text "Unable to access {host}, blocked by CloudFlare Protection." — Prowlarr@0dc20d8 `src/NzbDrone.Core/Localization/Core/en.json`, `Http/CloudFlare/CloudFlareProtectionException.cs`
+- 2026-11-05 — Radarr 6.4.4 / Sonarr 4.0.20 rank releases by quality first, then custom-format score (`DownloadDecisionComparer`: CompareQuality → CompareCustomFormatScore → protocol → indexer priority → peers/age → size). — https://github.com/Radarr/Radarr/blob/a96bf7c3ecb23cb76993770727285dc17a613fbc/src/NzbDrone.Core/DecisionEngine/DownloadDecisionComparer.cs#L31-L43
+- 2026-11-05 — TRaSH LQ formats (Radarr `90a6f9a2…`, `e204b80c…`; Sonarr `9c11cd3f…`, `e2315f99…`) score −10000 and reach EasyArr's profiles through the default "[Unwanted] Unwanted Formats" group; YTS is in LQ. Other negative guide scores: −51 (v0), −10000, −35000. — https://github.com/TRaSH-Guides/Guides/tree/d24f13ceea5e82ccc20d08b7814fca93840e4046/docs/json/radarr/cf-groups/unwanted-formats.json
+- 2026-11-05 — Recyclarr 8.8.1: an explicit `custom_formats[].assign_scores_to[].score` beats the guide score; `qualities` replaces the guide's list (highest first, Recyclarr reverses for the API), unlisted qualities get disabled, emptied groups are dropped; `upgrade.until_quality` may name a group. Proven against the real images (CI job "Recyclarr profiles"). — https://github.com/recyclarr/recyclarr/blob/874cb274f8b419dff6fb211fc326e4f2dd63c4fb/docs/architecture/sync-plan-phase.md , `src/Recyclarr.Cli/Pipelines/QualityProfile/QualityItemOrganizer.cs`
+
 ## Open [VERIFY] items
 Copy from SPEC as they get resolved. Highest priority first:
 - [x] Umbrel compose: `depends_on` conditions, restart policies allowed, `APP_SEED`, container naming for `APP_HOST`
@@ -114,6 +119,30 @@ Copy from SPEC as they get resolved. Highest priority first:
 - umbrelOS 2.0 `environment:` manifest settings could expose a few safe knobs (e.g. TZ) in Umbrel's app settings.
 
 ## Session log
+### 2026-11-05 — Phase 06 owner test feedback → v0.0.9 (Claude Code on the Mac)
+- Owner checked VPN routing with a throwaway curl container in each service's network namespace:
+  every VPN-side service exits with the VPN IP; dashboard, Jellyfin and Seerr use the home IP, as
+  intended. No leak.
+- Owner feedback: (1) adding FlareSolverr felt like it needed the Indexers settings page; it should
+  only need the `flaresolverr` tag in the add-site form (that's the design, so something went
+  wrong on the install; cause not found yet, diagnostic script sent). (2) The movie request stayed
+  "Missing (Monitored)": all 4 releases were LQ (−10000 < minimum 0).
+- v0.0.9: LQ as a last resort (D-055), with Balanced movies' Bluray/WEB 1080p in one group so an LQ
+  "Bluray" can't beat a good WEB-DL; the wiring re-runs silently on app start once the setup is
+  finished (D-056), which brings the new profiles to existing installs.
+- New CI job `dev/recyclarr-test.sh`: real Recyclarr 8.8.1 + Radarr 6.4.4 + Sonarr 4.0.20 from the
+  compose pins, all presets, v0.0.8 → v0.0.9 conversion, second sync changes nothing, YTS = LQ.
+- Tests: 229 unit tests.
+- Owner test (v0.0.9) — update EasyArr in the Umbrel app store, then wait ~5 minutes:
+  - [ ] Radarr → Settings → Profiles → "EasyArr (Balanced)": a "Bluray/WEB 1080p" group; Custom
+        Formats "LQ" and "LQ (Release Title)" at −10, minimum score −20
+  - [ ] Radarr → the stuck movie → Interactive Search: the LQ rows no longer have the red icon;
+        press Search (automatic) → it downloads → appears in Jellyfin (port 39096)
+  - [ ] FlareSolverr: send the diagnostic script's last three sections (Prowlarr indexers,
+        proxies, tags)
+- Released: store synced (umbrel-app-store@67f6d8f, v0.0.9 from easyarr@c48cd3a); CI + stack test green (amd64 + arm64).
+- Next: owner test, FlareSolverr fix, then `prompts/07-dashboard.md`.
+
 ### 2026-11-01 (afternoon) — Phase 06: wizard steps 6–9, full first-run e2e (Hermes)
 - Step 6 Usenet: provider vs indexer explainer; 1–5 providers (11 verified presets) and 1–10
   indexers (Prowlarr's preset list); Test buttons via SABnzbd `test_server` / Prowlarr

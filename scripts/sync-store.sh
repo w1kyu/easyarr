@@ -9,7 +9,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP_ID="w1kyu-easyarr"
-STORE_DIR="${1:-${ROOT}/../projects/umbrel-app-store}"
+STORE_DIR="${1:-${ROOT}/../umbrel-app-store}"
 SRC="${ROOT}/umbrel/${APP_ID}"
 
 if [[ ! -f "${STORE_DIR}/umbrel-app-store.yml" ]]; then
