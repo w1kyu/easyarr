@@ -8,6 +8,8 @@
 # Balanced movie profile has one 1080p group, a second sync changes nothing, and a v0.0.8 install
 # (profiles made with the old config) is converted by the new one.
 set -euo pipefail
+# jq filters are single-quoted on purpose (SC2016).
+# shellcheck disable=SC2016
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 COMPOSE="${ROOT}/umbrel/w1kyu-easyarr/docker-compose.yml"
@@ -71,7 +73,9 @@ radarr() { curl -fsS -m 20 -H "X-Api-Key: ${RK}" "http://127.0.0.1:17878/api/v3/
 sonarr() { curl -fsS -m 20 -H "X-Api-Key: ${SK}" "http://127.0.0.1:18989/api/v3/$1"; }
 
 sync() { # sync <preset> [--v0.0.8]
-  node "${GEN}" "$1" http://rt-radarr:7878 "${RK}" http://rt-sonarr:8989 "${SK}" ${2:-} \
+  local flag=()
+  [ -n "${2:-}" ] && flag=("$2")
+  node "${GEN}" "$1" http://rt-radarr:7878 "${RK}" http://rt-sonarr:8989 "${SK}" "${flag[@]}" \
     >"${WORK}/recyclarr/recyclarr.yml"
   if ! docker run --rm --network "${NET}" --user "$(id -u):$(id -g)" \
     -v "${WORK}/recyclarr:/config" --entrypoint recyclarr "${RECYCLARR_IMG}" \
