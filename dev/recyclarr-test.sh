@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jq filters are single-quoted on purpose; the directive before the first command covers the file.
+# shellcheck disable=SC2016
 # EasyArr's Recyclarr config against the real Recyclarr, Radarr and Sonarr images from the Umbrel
 # compose (outside the VPN, so Recyclarr can fetch the TRaSH guides — the stack test can't).
 #
@@ -8,8 +10,6 @@
 # Balanced movie profile has one 1080p group, a second sync changes nothing, and a v0.0.8 install
 # (profiles made with the old config) is converted by the new one.
 set -euo pipefail
-# jq filters are single-quoted on purpose (SC2016).
-# shellcheck disable=SC2016
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 COMPOSE="${ROOT}/umbrel/w1kyu-easyarr/docker-compose.yml"
