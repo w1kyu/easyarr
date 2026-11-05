@@ -5,7 +5,7 @@ storage:
 category: media
 name: EasyArr
 icon: https://raw.githubusercontent.com/w1kyu/easyarr/main/assets/icon.svg
-version: '0.0.8'
+version: '0.0.9'
 tagline: Your own Netflix-style media setup, wired up for you
 description: >-
   ⚠️ PREVIEW — not ready for everyday use yet. The setup wizard is complete and connects all the
@@ -28,11 +28,10 @@ description: >-
 
   Jellyfin opens on port 39096 and the request page on port 39055 of your Umbrel.
 releaseNotes: >-
-  The setup wizard is now complete. New steps: your Usenet provider and indexer (with presets and
-  Test buttons), adding torrent search sites in Prowlarr, choosing movies/shows/music, your
-  language and a quality preset. The last step connects every app for you with a live checklist
-  and explains anything that didn't work. Already set up? Open EasyArr — it continues with the
-  new steps.
+  Requests no longer get stuck on "Missing" when a site only has low-quality releases (for example
+  YTS): those are now used as a last resort and replaced automatically when a better version
+  appears. Better releases always win at the same resolution. After the update EasyArr re-applies
+  its settings by itself within a few minutes of starting.
 
 developer: w1kyu
 website: https://github.com/w1kyu/easyarr
