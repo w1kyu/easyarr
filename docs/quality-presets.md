@@ -32,6 +32,14 @@ Your Umbrel's home screen and Settings show how much space is free.
     1080p fallback.
   - Balanced: *WEB-1080p* (shows) and *HD Bluray + WEB* (movies).
   - Save space: *WEB-1080p* (shows) and *WEB 1080p* (movies), with sizes leaning to the small end.
+- **Two changes to the TRaSH profiles:**
+  - Releases from groups the guide calls low quality (for example YTS) aren't blocked. They're a
+    last resort: EasyArr takes one only when nothing better exists at the same resolution, and
+    replaces it automatically when a better version shows up. On public torrent sites they're often
+    the only releases there are, and without them your request would just stay "Missing".
+  - Balanced movies: 1080p from Blu-ray and from streaming services count as the same quality, so
+    the release's score decides. Otherwise a low-quality "Blu-ray" would beat a good streaming
+    release.
 - **Music:** EasyArr creates its own Lidarr profile with the same name.
 
 Movies and shows are downloaded in their original language. Your language choice is used for

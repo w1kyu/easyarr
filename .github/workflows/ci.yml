@@ -67,3 +67,17 @@ jobs:
             e2e/playwright-report
             e2e/test-results
           retention-days: 7
+
+  recyclarr:
+    name: Recyclarr profiles (real Recyclarr, Radarr, Sonarr)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: dev/recyclarr-test.sh

@@ -12,24 +12,64 @@ export type QualityPreset = WiringPlan['quality'];
  * TRaSH guide profiles per preset (research 2026-10-31, TRaSH-Guides@d24f13c). WEB-centric, no
  * Remux, always with a 1080p fallback so nothing stays "missing" just because no 4K release exists.
  */
+interface ProfileQuality {
+  name: string;
+  /** A group: these qualities rank equally, so the custom-format score decides between them. */
+  qualities?: string[];
+}
+
+interface PresetProfile {
+  trashId: string;
+  /** Replaces the guide's quality list (highest first); the rest end up disabled. */
+  qualities?: ProfileQuality[];
+  /** Cutoff when `qualities` renames the guide's cutoff quality. */
+  untilQuality?: string;
+}
+
+/**
+ * LQ = release groups the guide calls low quality (YTS & co.) — on public torrent sites often the
+ * only releases there are. The guide blocks them (-10000 against a minimum of 0); EasyArr keeps them
+ * as a last resort instead (D-055): -10 each (a release can match both) and a minimum of -20, so an
+ * LQ release is only taken when nothing else at that quality exists and later upgrades to a normal
+ * one. No other guide score lies between -20 and 0 (the closest are -51 and -10000), so nothing else
+ * gets through. Trash IDs at TRaSH-Guides@d24f13c `docs/json/{radarr,sonarr}/cf/lq*.json`.
+ */
+export const LQ_SCORE = -10;
+export const MIN_FORMAT_SCORE = -20;
+const LQ_TRASH_IDS = {
+  radarr: ['90a6f9a284dff5103f6346090e6280c8', 'e204b80c87be9497a8a6eaff48f72905'],
+  sonarr: ['9c11cd3f07101cdba90a2d81cf0e56b4', 'e2315f990da2e2cbfc9fa5b7a6fcfe48'],
+} as const;
+
 const PRESETS: Record<
   QualityPreset,
-  { label: string; sonarr: string; radarr: string; preferredRatio?: number }
+  { label: string; sonarr: PresetProfile; radarr: PresetProfile; preferredRatio?: number }
 > = {
   best: {
     label: 'Best quality',
-    sonarr: 'c4cadd6b35b95f62c3d47a408e53e2f7', // WEB-2160p (Combined)
-    radarr: '05fbf054ac8ad0303335026cc2632f1a', // WEBDL 2160p (Combined)
+    sonarr: { trashId: 'c4cadd6b35b95f62c3d47a408e53e2f7' }, // WEB-2160p (Combined)
+    radarr: { trashId: '05fbf054ac8ad0303335026cc2632f1a' }, // WEBDL 2160p (Combined)
   },
   balanced: {
     label: 'Balanced',
-    sonarr: '72dae194fc92bf828f32cde7744e51a1', // WEB-1080p
-    radarr: 'd1d67249d3890e49bc12e275d989a7e9', // HD Bluray + WEB
+    sonarr: { trashId: '72dae194fc92bf828f32cde7744e51a1' }, // WEB-1080p
+    // HD Bluray + WEB. The guide ranks Bluray-1080p above the WEB 1080p group, and Radarr compares
+    // quality before score — so an LQ "Bluray" (typical for YTS) would beat a good WEB-DL and never
+    // be replaced by it. One 1080p group lets the score decide (the guide's tier scores already
+    // put good Bluray groups above WEB ones). Bluray-720p stays the lower fallback.
+    radarr: {
+      trashId: 'd1d67249d3890e49bc12e275d989a7e9',
+      qualities: [
+        { name: 'Bluray/WEB 1080p', qualities: ['Bluray-1080p', 'WEBDL-1080p', 'WEBRip-1080p'] },
+        { name: 'Bluray-720p' },
+      ],
+      untilQuality: 'Bluray/WEB 1080p',
+    },
   },
   small: {
     label: 'Save space',
-    sonarr: '72dae194fc92bf828f32cde7744e51a1', // WEB-1080p
-    radarr: 'e8c5acb741363a0dbda67d3978f4912f', // WEB 1080p
+    sonarr: { trashId: '72dae194fc92bf828f32cde7744e51a1' }, // WEB-1080p
+    radarr: { trashId: 'e8c5acb741363a0dbda67d3978f4912f' }, // WEB 1080p
     preferredRatio: 0.25,
   },
 };
@@ -51,27 +91,43 @@ export function recyclarrConfig(
   targets: { sonarr?: RecyclarrTarget; radarr?: RecyclarrTarget },
 ): string {
   const p = PRESETS[preset];
-  const instance = (t: RecyclarrTarget, type: 'series' | 'movie', trashId: string) => ({
+  const name = qualityProfileName(preset);
+  const instance = (t: RecyclarrTarget, app: 'sonarr' | 'radarr', profile: PresetProfile) => ({
     base_url: t.baseUrl,
     api_key: t.apiKey,
     delete_old_custom_formats: false,
     quality_definition: {
-      type,
+      type: app === 'sonarr' ? 'series' : 'movie',
       ...(p.preferredRatio !== undefined ? { preferred_ratio: p.preferredRatio } : {}),
     },
     quality_profiles: [
       {
-        trash_id: trashId,
-        name: qualityProfileName(preset),
+        trash_id: profile.trashId,
+        name,
         reset_unmatched_scores: { enabled: true },
+        min_format_score: MIN_FORMAT_SCORE,
+        ...(profile.qualities
+          ? {
+              qualities: profile.qualities.map((q) =>
+                q.qualities ? { name: q.name, qualities: q.qualities } : { name: q.name },
+              ),
+            }
+          : {}),
+        ...(profile.untilQuality
+          ? { upgrade: { allowed: true, until_quality: profile.untilQuality } }
+          : {}),
       },
+    ],
+    // An explicit score beats the guide's (Recyclarr sync-plan-phase.md "Score Resolution").
+    custom_formats: [
+      { trash_ids: [...LQ_TRASH_IDS[app]], assign_scores_to: [{ name, score: LQ_SCORE }] },
     ],
   });
   const doc: Record<string, unknown> = {};
   if (targets.sonarr)
-    doc['sonarr'] = { 'easyarr-sonarr': instance(targets.sonarr, 'series', p.sonarr) };
+    doc['sonarr'] = { 'easyarr-sonarr': instance(targets.sonarr, 'sonarr', p.sonarr) };
   if (targets.radarr)
-    doc['radarr'] = { 'easyarr-radarr': instance(targets.radarr, 'movie', p.radarr) };
+    doc['radarr'] = { 'easyarr-radarr': instance(targets.radarr, 'radarr', p.radarr) };
   return [
     '# Written by EasyArr from your quality choice — changes here are replaced.',
     '# To customise a profile, clone "EasyArr (…)" in Sonarr/Radarr and edit the copy.',

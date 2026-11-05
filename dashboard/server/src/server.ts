@@ -3,6 +3,8 @@ import { buildApp, createServices } from './app.js';
 import { createLogger, registerSecrets } from './logger.js';
 import { secretsStore, stateStore } from './state/index.js';
 import { ClientAllowlist } from './vpn/allowlist.js';
+import { collectSystemInfo } from './system/check.js';
+import { startupWiring } from './wiring/startup.js';
 
 export async function startServer(config: ServeConfig): Promise<void> {
   const log = createLogger(config.logLevel);
@@ -24,10 +26,21 @@ export async function startServer(config: ServeConfig): Promise<void> {
   // Only this dashboard and the request page may connect to the VPN-side services (D-046).
   const allowlist = new ClientAllowlist({ vpnDir: config.vpnDir, log });
   allowlist.start();
+  // Run the wiring again in the background once the services are up (SPEC §10).
+  const startup = services.wiring
+    ? startupWiring({
+        engine: services.wiring,
+        stateDir: config.stateDir,
+        collectSystemInfo: () => collectSystemInfo({ dataDir: config.dataDir }),
+        log,
+      })
+    : undefined;
+  startup?.start();
   const close = async (signal: string) => {
     log.info({ signal }, 'shutting down');
     services.portSync.stop();
     allowlist.stop();
+    startup?.stop();
     await app.close();
     process.exit(0);
   };
