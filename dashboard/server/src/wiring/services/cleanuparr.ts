@@ -147,6 +147,63 @@ export class CleanuparrApi {
     ).clients;
   }
 
+  /** Queue Cleaner settings (§4.7). PUT replaces the whole record: always round-trip the GET body. */
+  queueCleaner() {
+    return this.http.json(
+      '/api/configuration/queue_cleaner',
+      z.looseObject({ enabled: z.boolean() }),
+      {
+        headers: this.key(),
+      },
+    );
+  }
+
+  async setQueueCleaner(body: Record<string, unknown>): Promise<void> {
+    await this.http.json('/api/configuration/queue_cleaner', undefined, {
+      method: 'PUT',
+      headers: this.key(),
+      body,
+    });
+  }
+
+  async stallRules() {
+    return this.http.json(
+      '/api/queue-rules/stall',
+      z.array(z.looseObject({ id, name: z.string() })),
+      { headers: this.key() },
+    );
+  }
+
+  async addStallRule(body: Record<string, unknown>): Promise<string> {
+    return (
+      await this.http.json('/api/queue-rules/stall', z.looseObject({ id }), {
+        method: 'POST',
+        headers: this.key(),
+        body,
+      })
+    ).id;
+  }
+
+  /** Seeker: replacement searches after a removal (on by default) and proactive searches. */
+  seeker() {
+    return this.http.json(
+      '/api/configuration/seeker',
+      z.looseObject({
+        proactiveSearchEnabled: z.boolean(),
+        instances: z.array(z.looseObject({ arrInstanceId: id })),
+      }),
+      { headers: this.key() },
+    );
+  }
+
+  async setSeeker(body: Record<string, unknown>): Promise<void> {
+    await this.http.json('/api/configuration/seeker', undefined, {
+      method: 'PUT',
+      headers: this.key(),
+      body,
+    });
+  }
+
   async addDownloadClient(body: Record<string, unknown>): Promise<string> {
     return (
       await this.http.json('/api/configuration/download_client', clientSchema, {

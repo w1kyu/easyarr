@@ -76,6 +76,7 @@ const PORT: Record<ServarrApp, number> = {
   prowlarr: 9696,
 };
 /** How apps in the VPN namespace reach each other. */
+const STALL_RULE = 'EasyArr – stalled downloads';
 const local = (app: ServarrApp) => `http://localhost:${PORT[app]}${URL_BASE[app]}`;
 
 /** Same naming as the Recyclarr-managed Sonarr/Radarr profiles: "EasyArr (Balanced)". */
@@ -833,7 +834,65 @@ export function buildSteps(deps: StepDeps): {
               downloadDirectoryTarget: null,
             }),
         });
+        // Queue Cleaner (off in a fresh Cleanuparr, D-057): every 5 min a torrent stuck on
+        // "downloading metadata", stalled without peers or errored earns a strike; at the limit
+        // Cleanuparr removes it through Sonarr/Radarr with a blocklist entry and its Seeker
+        // searches for another release. Only public torrents — private trackers have own rules.
+        await ctx.once('cleanuparr.queueCleaner', async () => {
+          const qc = await c.queueCleaner();
+          if (qc.enabled) return false;
+          const errored = (qc['errored'] ?? {}) as Record<string, unknown>;
+          await c.setQueueCleaner({
+            ...qc,
+            enabled: true,
+            cronExpression: '0 0/5 * * * ?',
+            useAdvancedScheduling: false,
+            // 3 strikes × 5 min ≈ 15 min without metadata.
+            downloadingMetadataMaxStrikes: 3,
+            errored: { ...errored, maxStrikes: 3, ignorePrivate: true },
+          });
+          return true;
+        });
+        await ctx.resource({
+          key: 'cleanuparr.stallrule',
+          kind: 'rule',
+          name: STALL_RULE,
+          exists: async (rid) => (await c.stallRules()).some((r) => r.id === rid),
+          find: async () => (await c.stallRules()).find((r) => r.name === STALL_RULE)?.id ?? null,
+          create: () =>
+            c.addStallRule({
+              name: STALL_RULE,
+              enabled: true,
+              // 6 strikes × 5 min ≈ 30 min with no progress; any progress resets the count.
+              maxStrikes: 6,
+              privacyType: 'Public',
+              minCompletionPercentage: 0,
+              maxCompletionPercentage: 100,
+              resetStrikesOnProgress: true,
+              deletePrivateTorrentsFromClient: false,
+              changeCategory: false,
+            }),
+        });
       }
+      // Proactive search: a request no indexer had a release for yet is searched again later
+      // instead of staying "missing" forever (Sonarr/Radarr only search once, when it's added).
+      await ctx.once('cleanuparr.seeker', async () => {
+        const sk = await c.seeker();
+        if (sk.proactiveSearchEnabled || sk.instances.length === 0) return false;
+        await c.setSeeker({
+          ...sk,
+          searchEnabled: true,
+          searchInterval: 5,
+          proactiveSearchEnabled: true,
+          instances: sk.instances.map((i) => ({
+            ...i,
+            enabled: true,
+            monitoredOnly: true,
+            minCycleTimeDays: 1,
+          })),
+        });
+        return true;
+      });
     },
   };
 

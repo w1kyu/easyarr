@@ -205,6 +205,27 @@ export class World {
     radarr: new Collection(),
     lidarr: new Collection(),
     clients: new Collection(),
+    // Fresh-install answers of Cleanuparr 2.10.12: Queue Cleaner off, no rules, Seeker reactive only.
+    queueCleaner: {
+      enabled: false,
+      cronExpression: '0 0/5 * * * ?',
+      useAdvancedScheduling: false,
+      failedImport: { maxStrikes: 0, patterns: [], patternMode: 'Include' },
+      ignoredDownloads: [],
+      processNoContentId: false,
+      downloadingMetadataMaxStrikes: 0,
+      errored: { maxStrikes: 0, ignorePrivate: false, deletePrivate: false, changeCategory: false },
+    } as Json,
+    stall: new Collection(),
+    seeker: {
+      searchEnabled: true,
+      searchInterval: 3,
+      proactiveSearchEnabled: false,
+      selectionStrategy: 'BalancedWeighted',
+      useRoundRobin: true,
+      postReleaseGraceHours: 6,
+    } as Json,
+    seekerInstances: {} as Record<string, Json>,
   };
   recyclarrSyncs = 0;
   calls: string[] = [];
@@ -470,14 +491,51 @@ export class World {
     }
     const arr = /^\/api\/configuration\/(sonarr|radarr|lidarr)(\/instances)?$/.exec(p);
     if (arr) {
-      const col = this.cu[arr[1] as 'sonarr'];
+      const type = arr[1] as 'sonarr';
+      const col = this.cu[type];
       if (m === 'GET')
         return [
           200,
-          { instances: col.items.map((i) => ({ ...i, id: `guid-${String(i['id'])}` })) },
+          { instances: col.items.map((i) => ({ ...i, id: `guid-${type}-${String(i['id'])}` })) },
         ];
       const made = col.add(b);
-      return [201, { ...made, id: `guid-${String(made['id'])}` }];
+      return [201, { ...made, id: `guid-${type}-${String(made['id'])}` }];
+    }
+    if (p === '/api/configuration/queue_cleaner') {
+      if (m === 'GET') return [200, this.cu.queueCleaner];
+      this.cu.queueCleaner = b;
+      return [200, {}];
+    }
+    if (p === '/api/queue-rules/stall') {
+      const guid = (i: Json) => ({ ...i, id: `rule-${String(i['id'])}` });
+      if (m === 'GET') return [200, this.cu.stall.items.map(guid)];
+      if (this.cu.stall.items.some((r) => r['name'] === b['name'])) return [400, ''];
+      return [201, guid(this.cu.stall.add(b))];
+    }
+    if (p === '/api/configuration/seeker') {
+      // Only Sonarr/Radarr instances take part in the Seeker.
+      const ids = (['sonarr', 'radarr'] as const).flatMap((t) =>
+        this.cu[t].items.map((i) => `guid-${t}-${String(i['id'])}`),
+      );
+      if (m === 'GET')
+        return [
+          200,
+          {
+            ...this.cu.seeker,
+            instances: ids.map((arrInstanceId) => ({
+              arrInstanceId,
+              enabled: false,
+              minCycleTimeDays: 7,
+              ...this.cu.seekerInstances[arrInstanceId],
+            })),
+          },
+        ];
+      const { instances, ...rest } = b as Json & { instances: Json[] };
+      if (rest['proactiveSearchEnabled'] === true && !instances.some((i) => i['enabled']))
+        return [400, ''];
+      this.cu.seeker = rest;
+      for (const i of instances) this.cu.seekerInstances[String(i['arrInstanceId'])] = i;
+      return [200, {}];
     }
     if (p === '/api/configuration/download_client') {
       if (m === 'GET')

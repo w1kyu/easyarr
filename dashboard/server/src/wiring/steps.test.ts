@@ -150,6 +150,33 @@ describe('wiring steps', () => {
     });
     expect(w.cu.lidarr.items[0]).toMatchObject({ url: 'http://localhost:8686/apps/lidarr' });
     expect(w.cu.clients.items).toHaveLength(1);
+    expect(w.cu.queueCleaner).toMatchObject({
+      enabled: true,
+      downloadingMetadataMaxStrikes: 3,
+      errored: { maxStrikes: 3 },
+      failedImport: { patternMode: 'Include' },
+    });
+    expect(w.cu.stall.items).toEqual([
+      expect.objectContaining({
+        maxStrikes: 6,
+        privacyType: 'Public',
+        resetStrikesOnProgress: true,
+      }),
+    ]);
+    expect(w.cu.seeker).toMatchObject({ searchEnabled: true, proactiveSearchEnabled: true });
+    expect(Object.values(w.cu.seekerInstances)).toHaveLength(2);
+    expect(Object.values(w.cu.seekerInstances).every((i) => i['enabled'] === true)).toBe(true);
+  });
+
+  it('keeps the Queue Cleaner and Seeker as the user left them', async () => {
+    const { world: w, run } = setup();
+    await run();
+    w.cu.queueCleaner = { ...w.cu.queueCleaner, enabled: false };
+    w.cu.seeker = { ...w.cu.seeker, proactiveSearchEnabled: false };
+    const r = await run();
+    expect(r).toMatchObject({ ok: true, failed: [] });
+    expect(w.cu.queueCleaner['enabled']).toBe(false);
+    expect(w.cu.seeker['proactiveSearchEnabled']).toBe(false);
   });
 
   it('a second run changes nothing and creates nothing', async () => {

@@ -272,6 +272,12 @@ qbittorrent_has_categories() {
   cats="$(docker exec "$(c qbittorrent)" curl -fsS -m 10 http://localhost:8090/api/v2/torrents/categories)"
   grep -q '"tv"' <<<"$cats" && grep -q '"movies"' <<<"$cats" && grep -q '"music"' <<<"$cats"
 }
+# Cleanuparr trusts loopback once the wiring set disableAuthForLocalAddresses → no key needed.
+cleanuparr_has() {
+  local out
+  out="$(docker exec "$(c cleanuparr)" curl -fsS -m 10 "http://localhost:11011/apps/cleanuparr/api$1")"
+  grep -qE -- "$2" <<<"$out"
+}
 url_has() {
   local out
   out="$(curl -fsS -m 10 "$1")"
@@ -325,6 +331,9 @@ wiretest() {
   check "qBittorrent has the tv/movies/music categories" ok qbittorrent_has_categories
   check "Jellyfin's first-run wizard is done" ok url_has http://localhost:39096/System/Info/Public '"StartupWizardCompleted":true'
   check "the request page is set up" ok url_has http://localhost:39055/api/v1/settings/public '"initialized":true'
+  check "Cleanuparr's Queue Cleaner is on (metadata strikes 3)" ok cleanuparr_has /configuration/queue_cleaner '"downloadingMetadataMaxStrikes": *3'
+  check "Cleanuparr has EasyArr's stall rule" ok cleanuparr_has /queue-rules/stall 'EasyArr'
+  check "Cleanuparr searches proactively" ok cleanuparr_has /configuration/seeker '"proactiveSearchEnabled": *true'
 
   echo "== Second run changes nothing"
   wiring_run "$second"
