@@ -189,7 +189,13 @@ test('dashboard: downloads, recently added, Simple/Advanced remembered', async (
   await expect(page.getByTestId('services')).toHaveCount(0);
   if (shots) await page.screenshot({ path: `${shots}/simple-${method}.png`, fullPage: true });
 
+  const saved = (mode: string) =>
+    page.waitForResponse(
+      (r) => r.url().endsWith('/api/ui') && r.request().postData()?.includes(mode) === true,
+    );
+  let put = saved('advanced');
   await page.getByRole('button', { name: 'Advanced' }).click();
+  await put;
   const services = page.getByTestId('services');
   await expect(services).toBeVisible();
   await expect(services.locator('[data-service="sonarr"]')).toContainText('Running');
@@ -205,7 +211,9 @@ test('dashboard: downloads, recently added, Simple/Advanced remembered', async (
   await page.reload();
   await expect(page.getByTestId('services')).toBeVisible();
   if (shots) await page.screenshot({ path: `${shots}/advanced-${method}.png`, fullPage: true });
+  put = saved('simple');
   await page.getByRole('button', { name: 'Simple' }).click();
+  await put;
   await page.reload();
   await expect(page.getByTestId('tile-watch')).toBeVisible();
   await expect(page.getByTestId('services')).toHaveCount(0);
