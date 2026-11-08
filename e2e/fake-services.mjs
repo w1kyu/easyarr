@@ -17,6 +17,7 @@ const SERVICES = [
   'jellyfin',
   'jellyseerr',
   'cleanuparr',
+  'flaresolverr',
 ];
 
 const readBody = (req) =>
@@ -32,6 +33,42 @@ const readBody = (req) =>
  */
 export async function startFakeServices({ stateDir, recyclarrDir }) {
   const world = new World();
+  // Something to show on the dashboard (phase 07): one torrent, one Usenet job, one new movie.
+  world.qbt.torrents = [
+    {
+      hash: 'e2e1',
+      name: 'Big.Buck.Bunny.2008.1080p.BluRay',
+      state: 'downloading',
+      progress: 0.42,
+      dlspeed: 3_200_000,
+      eta: 754,
+      category: 'movies',
+      size: 2_100_000_000,
+    },
+  ];
+  world.sab.queue = {
+    kbpersec: '0',
+    slots: [
+      {
+        nzo_id: 'SABnzbd_nzo_e2e',
+        filename: 'Sintel.S01E01.720p',
+        status: 'Queued',
+        percentage: '0',
+        mb: '850',
+        cat: 'tv',
+      },
+    ],
+  };
+  world.jf.items = [
+    {
+      Id: 'a'.repeat(32),
+      Name: 'Tears of Steel',
+      Type: 'Movie',
+      ProductionYear: 2012,
+      DateCreated: '2026-11-08T10:00:00Z',
+      ImageTags: { Primary: 'p' },
+    },
+  ];
   const servers = [];
   const urls = [];
   for (const id of SERVICES) {

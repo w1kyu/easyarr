@@ -1,8 +1,11 @@
 import type {
+  LogSource,
+  LogView,
+  StatusView,
+  SystemCheckResult,
   UsenetIndexerTestInput,
   UsenetServerTestInput,
   UsenetTestResult,
-  SystemCheckResult,
   VpnConfigInput,
   VpnConfigView,
   VpnStatusView,
@@ -152,4 +155,12 @@ export const api = {
     post<UsenetTestResult>('/api/usenet/test-indexer', body),
   prowlarrIndexers: () =>
     request<{ reachable: boolean; count: number; torrent: number }>('/api/prowlarr/indexers'),
+  status: () => request<StatusView>('/api/status'),
+  setMode: (mode: StatusView['mode']) =>
+    request<{ mode: StatusView['mode'] }>('/api/ui', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ mode }),
+    }),
+  log: (source: LogSource) => request<LogView>(`/api/logs/${source}`),
 };

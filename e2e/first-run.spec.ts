@@ -135,7 +135,7 @@ test('step 9: everything gets connected, then the "what now" tour and the dashbo
   await expect(page.getByRole('link', { name: /Open the request page/ })).toBeVisible();
   await page.getByRole('button', { name: /Go to my dashboard/ }).click();
   await expect(page).toHaveURL(/\/$/);
-  await expect(page.getByText('EasyArr is ready')).toBeVisible();
+  await expect(page.getByTestId('tile-watch')).toBeVisible();
 
   // What got wired matches the answers.
   const { ledger, lastRun } = (await (await page.request.get('/api/wiring')).json()) as {
@@ -170,5 +170,43 @@ test('a second Finish changes nothing (idempotent), the wizard stays complete', 
   };
   expect(status.lastRun).toMatchObject({ ok: true, changes: 0 });
   await page.getByRole('button', { name: /Go to my dashboard/ }).click();
-  await expect(page.getByText('EasyArr is ready')).toBeVisible();
+  await expect(page.getByTestId('tile-watch')).toBeVisible();
+});
+
+test('dashboard: downloads, recently added, Simple/Advanced remembered', async ({ page }, info) => {
+  const method = methodOf(info);
+  const shots = process.env['E2E_SHOTS'];
+  await page.goto('/');
+  await expect(page.getByTestId('tile-request')).toHaveAttribute('href', /:39055$/);
+  await expect(page.getByTestId('status-strip')).toContainText('Protected');
+  const downloads = page.getByTestId('downloads');
+  // The fakes have one torrent and one Usenet job; each shows only if that client is in use…
+  // …but both clients always answer, so both are listed (the dashboard shows what's there).
+  await expect(downloads).toContainText('Big.Buck.Bunny.2008.1080p.BluRay');
+  await expect(downloads).toContainText('Sintel.S01E01.720p');
+  await expect(page.getByTestId('recent')).toContainText('Tears of Steel');
+  await expect(page.getByTestId('warnings')).toHaveCount(0);
+  await expect(page.getByTestId('services')).toHaveCount(0);
+  if (shots) await page.screenshot({ path: `${shots}/simple-${method}.png`, fullPage: true });
+
+  await page.getByRole('button', { name: 'Advanced' }).click();
+  const services = page.getByTestId('services');
+  await expect(services).toBeVisible();
+  await expect(services.locator('[data-service="sonarr"]')).toContainText('Running');
+  await expect(services.locator('[data-service="sonarr"] a')).toHaveAttribute(
+    'href',
+    '/apps/sonarr/',
+  );
+  await expect(page.getByTestId('vpn-details')).toContainText('Public IP');
+  await page.getByLabel('Show the log of').selectOption('sonarr');
+  await expect(page.getByTestId('logs')).toContainText(/log is empty|isn't answering/);
+
+  // Remembered on the server: a reload (or another device) opens in Advanced.
+  await page.reload();
+  await expect(page.getByTestId('services')).toBeVisible();
+  if (shots) await page.screenshot({ path: `${shots}/advanced-${method}.png`, fullPage: true });
+  await page.getByRole('button', { name: 'Simple' }).click();
+  await page.reload();
+  await expect(page.getByTestId('tile-watch')).toBeVisible();
+  await expect(page.getByTestId('services')).toHaveCount(0);
 });

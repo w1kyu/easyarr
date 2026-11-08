@@ -8,6 +8,7 @@ import { StatusPill } from '~/components/status-pill';
 import { buttonVariants } from '@/components/ui/button';
 import { Loading } from '@/components/ui/loading';
 import { cn } from '@/lib/utils';
+import { Dashboard } from '~/features/dashboard/dashboard';
 import { useWizard } from '~/features/wizard/wizard-api';
 
 function portUrl(port: number): string {
@@ -20,7 +21,9 @@ export function Start() {
   if (wizard.isPending) return <Loading />;
   // If the API is unreachable, still show the home screen (it links to Jellyfin etc.).
   if (wizard.data?.next) return <Navigate to={`/setup/${wizard.data.next}`} replace />;
-  return <Home problems={wizard.data?.answers.finish?.result === 'problems'} />;
+  // The API answered: the real dashboard. Unreachable API: the static home (links to Jellyfin etc.).
+  if (wizard.data) return <Dashboard />;
+  return <Home />;
 }
 
 export function Home({ problems = false }: { problems?: boolean }) {
