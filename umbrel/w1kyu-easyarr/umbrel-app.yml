@@ -5,7 +5,7 @@ storage:
 category: media
 name: EasyArr
 icon: https://raw.githubusercontent.com/w1kyu/easyarr/main/assets/icon.svg
-version: '0.0.13'
+version: '0.0.14'
 tagline: Your own Netflix-style media setup, wired up for you
 description: >-
   ⚠️ PREVIEW — not ready for everyday use yet. The setup wizard is complete and connects all the
@@ -28,9 +28,10 @@ description: >-
 
   Jellyfin opens on port 39096 and the request page on port 39055 of your Umbrel.
 releaseNotes: >-
-  Fixes "Request page: Jellyfin, Sonarr and Radarr — Didn't work" after updating from an older
-  version: the "Open in Radarr/Sonarr" link fix could not be saved. Open Settings → Advanced →
-  Run the setup again once after updating.
+  Downloads recover by themselves after a search-site outage: when sites were unreachable for a
+  while, Prowlarr, Sonarr and Radarr paused them for hours. EasyArr now checks paused sites every
+  5 minutes and resumes them as soon as they answer. The home screen tells you when no search site
+  can be reached. Also fixes the request page step failing after updating from an older version.
 
 developer: w1kyu
 website: https://github.com/w1kyu/easyarr
