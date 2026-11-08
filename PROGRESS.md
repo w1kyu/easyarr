@@ -124,6 +124,14 @@ Copy from SPEC as they get resolved. Highest priority first:
 - umbrelOS 2.0 `environment:` manifest settings could expose a few safe knobs (e.g. TZ) in Umbrel's app settings.
 
 ## Session log
+### 2026-11-08 (night) — Hotfix v0.0.13
+- Owner saw "Request page … Didn't work: request/body/id is read-only" after updating. The D-058
+  externalUrl fill-in PUT sent Seerr's readOnly `id` back (seerr-api.yml v3.5.1); only pre-v0.0.11
+  installs take that path, so fresh-install stack tests missed it. Fix strips `id`; the fake Seerr
+  rejects it now. Pinned sha-9943610, stack test green (both arches, leak test passed), store synced.
+- Indexer-unreachable issue still open: owner asked to test it; MCP can't exec/read EasyArr logs and
+  SSH needs a password, so the in-netns commands were handed to the owner again.
+
 ### 2026-11-08 (later) — Phase 07: dashboard + settings → v0.0.12 (Claude Code on the Mac)
 - Server: `GET /api/status` (D-059): health + version per service, qBittorrent + SABnzbd queues,
   disk, Jellyfin recently added (posters via `/api/media/:id/image`), warnings (VPN not set up/down,
