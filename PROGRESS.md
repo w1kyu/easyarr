@@ -4,16 +4,13 @@
 > Newest session log entries go on top.
 
 ## Current phase
-**Phase 06 — 🟨 owner test in progress.** v0.0.8 on the owner's Umbrel: wizard, VPN routing
-(all VPN-side services exit via the VPN IP), Prowlarr site and request work. The first request
-stayed "Missing" because TRaSH blocks LQ releases (YTS) → v0.0.9 makes LQ a last resort (D-055)
-and re-runs the wiring on app start (D-056). v0.0.10 (D-057): Cleanuparr's Queue Cleaner +
-proactive search on (stuck "downloading metadata" torrent ≈ 15 min → removed, blocklisted,
-re-searched). Open: why the owner's second request never reached qBittorrent (needs Radarr/Sonarr
-history; EasyArr not yet granted in Umbrel MCP). Remaining owner check: the download lands in
-Jellyfin. Open: FlareSolverr tag not ready in Prowlarr's add-site form on the owner's install
-(cause unknown — waiting for the diagnostic output).
-Next prompt: `prompts/07-dashboard.md` (after the owner's phase 06 test).
+**Phase 07 — 🟨 built, owner test pending (v0.0.12).** Dashboard home (Simple/Advanced, downloads,
+recently added, warnings, VPN details, redacted logs) and Settings (download method, VPN, Usenet,
+libraries/quality, account read-only, advanced re-run/repair, about; backups placeholder).
+Phase 06 owner test still open: the last check (a download lands in Jellyfin) is blocked by the
+owner's torrent sites being unreachable from inside the VPN (2026-11-07, see session log), which
+the owner deferred; diagnose it before phase 08 if possible.
+Next prompt: `prompts/08-backup-restore.md` (after the owner's phase 07 test).
 
 ## Phase status
 | Phase | Title | Status | Notes |
@@ -25,7 +22,7 @@ Next prompt: `prompts/07-dashboard.md` (after the owner's phase 06 test).
 | 04 | VPN (wrapper, kill switch, wizard step) | ✅ done (owner: VPN works) | v0.0.4; VPN image ghcr.io/w1kyu/easyarr-vpn amd64/arm64; leak tests green in CI (image smoke test + stack) |
 | 05 | Wiring engine + service proxy | ✅ done (owner test pending) | v0.0.5–v0.0.7; wiretest green against real services (amd64 + arm64) |
 | 06 | Wizard steps 6–9 | 🟨 owner test in progress | v0.0.8 → v0.0.10 (LQ last resort, wiring on start, Cleanuparr cleans up); e2e torrents/usenet/both + stack wizard e2e through Finish |
-| 07 | Dashboard + settings | ⬜ todo | |
+| 07 | Dashboard + settings | 🟨 built (owner test pending) | v0.0.12; /api/status, Simple/Advanced, warnings, Settings; e2e for mode toggle + settings change; stack test reads /api/status |
 | 08 | Backup & restore | ⬜ todo | |
 | 09 | Diagnostics + AI help | ⬜ todo | |
 | 10 | Documentation | ⬜ todo | |
@@ -127,6 +124,30 @@ Copy from SPEC as they get resolved. Highest priority first:
 - umbrelOS 2.0 `environment:` manifest settings could expose a few safe knobs (e.g. TZ) in Umbrel's app settings.
 
 ## Session log
+### 2026-11-08 (later) — Phase 07: dashboard + settings → v0.0.12 (Claude Code on the Mac)
+- Server: `GET /api/status` (D-059): health + version per service, qBittorrent + SABnzbd queues,
+  disk, Jellyfin recently added (posters via `/api/media/:id/image`), warnings (VPN not set up/down,
+  disk < 10 %, used service down, wiring problems, second Jellyfin via DNS `jellyfin_server_1`,
+  update via store manifest vs `APP_VERSION`). `PUT /api/ui` stores Simple/Advanced in state.json.
+  `GET /api/logs/:source` (VPN, qBittorrent, Sonarr, Radarr, Lidarr, Prowlarr), secrets masked.
+- Web: dashboard home (Simple default; Advanced adds app tiles with health/version, VPN details,
+  log viewer), warnings banner with links to the fix; Settings reusing the wizard step forms, a
+  saved change re-runs the wiring with the live checklist and marks setup finished again (D-061).
+  Account is read-only for now (D-060). New doc `docs/two-jellyfins.md`.
+- Compose (pin commit): dashboard gets `APP_VERSION`.
+- Verified: 244 unit tests; e2e 35 passed (incl. mode toggle remembered across reloads and a
+  settings change end to end, screenshots checked at 1280 px and 390 px); stack test green on
+  e97d8a0 (amd64 + arm64) incl. `/api/status` sees real Sonarr + Jellyfin, leak test passed; CI
+  green on cd891ba (an e2e race fixed). Fresh clone frozen install green. Store synced v0.0.12.
+- Not done / limits: log viewer has no SABnzbd/Bazarr/Jellyfin logs; Seerr shows no version;
+  posters only for items with a Primary image; route-level code splitting still open.
+- Owner test (v0.0.12): see `prompts/07-dashboard.md → My checklist`:
+  - [ ] Home shows real downloads, VPN status (country), free space
+  - [ ] Switch Simple/Advanced; reload → it stays; open each app from its tile
+  - [ ] Settings → VPN: change the server country → reconnects, the home screen's VPN chip updates
+  - [ ] Break the VPN (wrong key) → "The VPN isn't connected" warning appears; fix it → gone
+  - [ ] Settings → Libraries & quality: change something → checklist runs → "Done"
+
 ### 2026-11-08 — Owner diagnostics; Seerr links → v0.0.11 (Claude Code on the Mac)
 - v0.0.10 confirmed on the owner's Umbrel: Queue Cleaner on, the stuck metadata torrent was
   removed (Radarr `downloadFailed` 20:10, ~15 min after the update).
