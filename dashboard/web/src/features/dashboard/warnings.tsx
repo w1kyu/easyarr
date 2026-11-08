@@ -14,6 +14,7 @@ const ACTION: Record<StatusWarning['code'], { to: string; label: string } | null
   officialJellyfin: { to: '/help/two-jellyfins', label: 'dash.warning.action.learn' },
   updateAvailable: null,
   wiringProblems: { to: '/settings/advanced', label: 'dash.warning.action.repair' },
+  indexersDown: { to: '/settings/vpn', label: 'dash.warning.action.vpnServer' },
 };
 
 /** SPEC §12 warnings banner: one row per problem, plain words + where to fix it. */

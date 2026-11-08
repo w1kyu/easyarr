@@ -49,6 +49,11 @@ export class FakeServarr {
   log: Json[] = [];
   /** Implementation whose download-client POST fails validation (like a missing category). */
   reject: string | null = null;
+  /** Indexer back-offs: indexer id → disabledTill (ISO), as GET /indexerstatus lists them. */
+  paused = new Map<number, string>();
+  /** Indexers whose site doesn't answer: a test fails and keeps them paused. */
+  unreachable = new Set<number>();
+  tests: number[] = [];
   readonly app: string;
   readonly key: string;
   constructor(app: string, key: string) {
@@ -120,6 +125,34 @@ export class FakeServarr {
         ],
       });
       return [200, [t('NZBgeek'), t('Generic Newznab')]];
+    }
+    if (res === 'indexerstatus') {
+      return [
+        200,
+        [...this.paused].map(([indexerId, disabledTill], i) => ({
+          id: i + 1,
+          indexerId,
+          disabledTill,
+          initialFailure: disabledTill,
+          mostRecentFailure: disabledTill,
+        })),
+      ];
+    }
+    const testedId = (body as Json | undefined)?.['id'];
+    if (
+      res === 'indexer' &&
+      id === 'test' &&
+      typeof testedId === 'number' &&
+      (this.paused.has(testedId) || this.unreachable.has(testedId))
+    ) {
+      // IndexerFactory.Test: success → RecordSuccess (pause cleared), failure → RecordFailure.
+      this.tests.push(testedId);
+      if (this.unreachable.has(testedId)) {
+        this.paused.set(testedId, new Date(Date.now() + 3600_000).toISOString());
+        return [400, [{ propertyName: '', errorMessage: 'Unable to connect to indexer' }]];
+      }
+      this.paused.delete(testedId);
+      return [200, {}];
     }
     if (res === 'indexer' && (id === 'test' || m === 'POST')) {
       const b = body as Json;

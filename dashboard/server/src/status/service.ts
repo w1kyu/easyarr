@@ -16,6 +16,7 @@ import {
   type VpnStatusView,
 } from '@easyarr/shared';
 import { redactString } from '../redact.js';
+import type { IndexerHealth } from './indexer-health.js';
 import type { Secrets, State } from '../state/index.js';
 import {
   jellyfinImage,
@@ -43,6 +44,8 @@ export interface StatusServiceOptions extends ProbeDeps {
   latestVersion?: () => Promise<string | null>;
   /** Is the official Umbrel Jellyfin app installed too? */
   officialJellyfin?: () => Promise<boolean>;
+  /** The search-site check's last result (IndexerHealer). */
+  indexerHealth?: () => IndexerHealth | null;
   now?: () => number;
 }
 
@@ -221,6 +224,18 @@ export class StatusService {
       .filter((s) => !(vpnBlocked && SERVICES.find((x) => x.id === s.id)?.network === 'vpn'))
       .map((s) => s.id);
     if (down.length > 0) out.push({ code: 'serviceDown', services: down });
+    // Every search site paused: nothing new can be found. Not while the VPN is down (that warning
+    // already says it) or Prowlarr itself is down.
+    const sites = this.opts.indexerHealth?.() ?? null;
+    if (
+      sites &&
+      sites.total > 0 &&
+      sites.blocked === sites.total &&
+      !vpnBlocked &&
+      !down.includes('prowlarr')
+    ) {
+      out.push({ code: 'indexersDown' });
+    }
     if (official) out.push({ code: 'officialJellyfin' });
     if (state.wiring.lastRun && !state.wiring.lastRun.ok) out.push({ code: 'wiringProblems' });
     const installed = this.opts.appVersion;

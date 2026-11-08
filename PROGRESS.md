@@ -124,6 +124,13 @@ Copy from SPEC as they get resolved. Highest priority first:
 - umbrelOS 2.0 `environment:` manifest settings could expose a few safe knobs (e.g. TZ) in Umbrel's app settings.
 
 ## Session log
+### 2026-11-09 — Search sites back; automatic un-pausing (D-062)
+- Owner's in-netns test: DNS works (Gluetun 127.0.0.1), nyaa.si 200, YTS API 200, 1337x 403
+  (Cloudflare challenge → FlareSolverr, which answers "ready"). So the 2026-11-07 outage was
+  temporary; what kept downloads stuck were the hours-long indexer back-offs.
+- `status/indexer-health.ts`: every 5 min test paused Prowlarr indexers, then the apps' ones; new
+  home-screen warning `indexersDown`. Fakes: FakeServarr `paused`/`unreachable` + `/indexerstatus`.
+
 ### 2026-11-08 (night) — Hotfix v0.0.13
 - Owner saw "Request page … Didn't work: request/body/id is read-only" after updating. The D-058
   externalUrl fill-in PUT sent Seerr's readOnly `id` back (seerr-api.yml v3.5.1); only pre-v0.0.11

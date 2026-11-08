@@ -162,6 +162,20 @@ describe('StatusService', () => {
     ]);
   });
 
+  it('warns when every search site is paused, but not while the VPN is down', async () => {
+    let sites = { at: '', total: 3, blocked: 3 };
+    const { svc } = setup({ indexerHealth: () => sites });
+    expect((await svc.view()).warnings).toEqual([{ code: 'indexersDown' }]);
+    const down = setup({
+      indexerHealth: () => sites,
+      vpn: async () => ({ ...connected, connection: 'error' }),
+    });
+    expect((await down.svc.view()).warnings.map((w) => w.code)).toEqual(['vpnDown']);
+    sites = { at: '', total: 3, blocked: 2 };
+    const some = setup({ indexerHealth: () => sites });
+    expect((await some.svc.view()).warnings).toEqual([]);
+  });
+
   it('a skipped VPN is not a warning; an unconfigured one is', async () => {
     const notConfigured = async () => ({ ...connected, connection: 'not_configured' as const });
     const skipped = setup({

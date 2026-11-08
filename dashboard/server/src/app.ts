@@ -2,14 +2,20 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import helmet from '@fastify/helmet';
 import fastifyStatic from '@fastify/static';
-import { APP_NAME, serviceUrl } from '@easyarr/shared';
+import { APP_NAME, parseWizardAnswers, serviceUrl } from '@easyarr/shared';
 import Fastify, { LogController, type FastifyBaseLogger, type FastifyInstance } from 'fastify';
 import type { Logger } from 'pino';
 import type { SystemInfo } from '@easyarr/shared';
 import type { ServeConfig } from './config.js';
 import { secretsStore, stateStore } from './state/index.js';
 import { statusRoutes } from './status/routes.js';
-import { fetchStoreVersion, officialJellyfinInstalled, StatusService } from './status/service.js';
+import { IndexerHealer } from './status/indexer-health.js';
+import {
+  fetchStoreVersion,
+  officialJellyfinInstalled,
+  StatusService,
+  usedServices,
+} from './status/service.js';
 import { Mutex } from './state/mutex.js';
 import { collectSystemInfo, diskSpace } from './system/check.js';
 import { VpnFiles } from './vpn/files.js';
@@ -48,6 +54,8 @@ export interface Services {
   lock: Mutex;
   vpn: VpnService;
   portSync: PortSync;
+  /** Un-pauses search sites after an outage (server.ts starts its timer). */
+  indexers?: IndexerHealer;
   /** Built from the config when left out (tests that only exercise other routes). */
   wiring?: WiringEngine;
 }
@@ -93,7 +101,21 @@ export function createServices(
     new QbittorrentClient(config.qbittorrentUrl ?? 'http://127.0.0.1:8090'),
     logger,
   );
-  return { lock, vpn, portSync, wiring: wiringFor(config, lock, collect, logger) };
+  const indexers = new IndexerHealer({
+    url: (id) => config.serviceUrls?.[id] ?? serviceUrl(id),
+    keys: async () => (await secretsStore(config.stateDir).load()).value.apiKeys,
+    canReach: async () => {
+      const { connection } = await vpn.status();
+      if (connection === 'connected') return true;
+      if (connection !== 'not_configured') return false;
+      // Without a VPN (the user skipped it) the apps go out directly.
+      const state = (await stateStore(config.stateDir).load()).value;
+      return parseWizardAnswers(state.wizard.answers).vpn?.mode === 'skipped';
+    },
+    used: async () => usedServices((await stateStore(config.stateDir).load()).value),
+    ...(logger ? { log: logger } : {}),
+  });
+  return { lock, vpn, portSync, indexers, wiring: wiringFor(config, lock, collect, logger) };
 }
 
 export interface BuildAppOptions {
@@ -200,6 +222,7 @@ export async function buildApp({
     vpn: () => svc.vpn.status(),
     disk: () => diskSpace(config.dataDir),
     vpnLog: () => vpnFiles.readLogTail(),
+    indexerHealth: () => svc.indexers?.last() ?? null,
     ...(onUmbrel
       ? { latestVersion: () => fetchStoreVersion(), officialJellyfin: officialJellyfinInstalled }
       : {}),

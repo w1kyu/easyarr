@@ -53,6 +53,7 @@ export const STATUS_WARNING_CODES = [
   'officialJellyfin',
   'updateAvailable',
   'wiringProblems',
+  'indexersDown',
 ] as const;
 export type StatusWarningCode = (typeof STATUS_WARNING_CODES)[number];
 
