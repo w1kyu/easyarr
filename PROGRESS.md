@@ -122,6 +122,19 @@ Copy from SPEC as they get resolved. Highest priority first:
 - umbrelOS 2.0 `environment:` manifest settings could expose a few safe knobs (e.g. TZ) in Umbrel's app settings.
 
 ## Session log
+### 2026-11-08 — Owner diagnostics; Seerr links → v0.0.11 (Claude Code on the Mac)
+- v0.0.10 confirmed on the owner's Umbrel: Queue Cleaner on, the stuck metadata torrent was
+  removed (Radarr `downloadFailed` 20:10, ~15 min after the update).
+- Root cause of "never reached qBittorrent": all torrent sites (1337x, Nyaa, YTS via
+  movies-api.accel.li) fail from inside the VPN since ~15:00 ("Unable to connect … DNS/SSL"),
+  Prowlarr backs off (→ 429 to the *arrs), Sonarr/Radarr disable Prowlarr for up to 6 h ("No
+  available indexers"). Not on Gluetun's malicious blocklist. Waiting for the owner's in-netns
+  DNS/curl test to tell DNS vs blocked VPN server vs Cloudflare. Planned: clear stale backoffs
+  automatically + say "search sites unreachable" in the dashboard.
+- Fixed: Seerr "Open in Radarr/Sonarr" pointed at `w1kyu-easyarr_vpn_1:7878` (no externalUrl).
+  D-058: `http://${DEVICE_DOMAIN_NAME}:39000/apps/<name>`; set once for existing installs.
+  Stack test checks it in the real Seerr (amd64 + arm64, green on db79974). Store synced v0.0.11.
+
 ### 2026-11-07 — Stuck downloads → v0.0.10 (Claude Code on the Mac)
 - Owner report: 2nd request never reached qBittorrent; 3rd stuck on "downloading metadata" 20+ min.
 - Cause found for the 3rd: Cleanuparr was wired (instances + qBit) but a fresh Cleanuparr has the
