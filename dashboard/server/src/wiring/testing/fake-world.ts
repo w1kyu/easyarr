@@ -13,6 +13,9 @@ export type Json = Record<string, unknown>;
 export const FAKE_INDEXER_KEY = 'indexer-key-0123456789';
 export const FAKE_USENET_PASSWORD = 'usenet-password-1';
 export const FAKE_USENET_HOST = 'news.example.com';
+/** A tiny poster for the fake Jellyfin (served with an image content type). */
+export const FAKE_POSTER_SVG =
+  '<svg xmlns="http://www.w3.org/2000/svg" width="2" height="3"><rect width="2" height="3" fill="#357"/></svg>';
 type Handler = (
   m: string,
   path: string,
@@ -41,6 +44,9 @@ export class FakeServarr {
     downloadclient: { id: 1, enableCompletedDownloadHandling: false, autoRedownloadFailed: true },
   };
   posts: string[] = [];
+  version = '1.0.0';
+  /** Log table entries, oldest first ({time, level, logger, message}). */
+  log: Json[] = [];
   /** Implementation whose download-client POST fails validation (like a missing category). */
   reject: string | null = null;
   readonly app: string;
@@ -75,7 +81,12 @@ export class FakeServarr {
     if (h.get('x-api-key') !== this.key) return [401, { message: 'Unauthorized' }];
     const [, res, id] = path.slice(base.length).split('/');
     if (res === 'system')
-      return [200, { appName: this.app.charAt(0).toUpperCase() + this.app.slice(1), version: '1' }];
+      return [
+        200,
+        { appName: this.app.charAt(0).toUpperCase() + this.app.slice(1), version: this.version },
+      ];
+    if (res === 'log')
+      return [200, { page: 1, totalRecords: this.log.length, records: [...this.log].reverse() }];
     if (res === 'config' && id) {
       if (m === 'GET') return [200, this.config[id]];
       // PUT replaces the object: missing keys would be lost, so the client must send everything.
@@ -168,12 +179,20 @@ export class World {
     lidarr: new FakeServarr('lidarr', this.keys['lidarr'] as string),
     prowlarr: new FakeServarr('prowlarr', this.keys['prowlarr'] as string),
   };
-  qbt = { prefs: {} as Json, categories: {} as Record<string, Json> };
+  // torrents: qBittorrent 5.3 /api/v2/torrents/info entries (dashboard status, phase 07).
+  qbt = {
+    prefs: {} as Json,
+    categories: {} as Record<string, Json>,
+    torrents: [] as Json[],
+    log: [] as Json[],
+  };
   // A fresh SABnzbd (INI written by init) has no [categories] section: get_config → {config:{}}.
   sab = {
     categories: [] as Json[],
     servers: [] as Json[],
     passwords: {} as Record<string, string>,
+    /** mode=queue: kbpersec + slots, as SABnzbd 5.1 answers. */
+    queue: { kbpersec: '0', slots: [] as Json[] },
   };
   /** Wizard step 6 secrets, by entry id. */
   usenetSecrets = { servers: {} as Record<string, string>, indexers: {} as Record<string, string> };
@@ -184,6 +203,8 @@ export class World {
     keys: [] as Json[],
     libs: [] as Json[],
     encoding: { HardwareAccelerationType: 'none', Other: 1 } as Json,
+    /** /Items answers (newest first), for "recently added". */
+    items: [] as Json[],
   };
   seerr = {
     type: 4,
@@ -255,6 +276,7 @@ export class World {
     const headers = new Headers();
     if (host === 'jellyseerr' && url.pathname === '/api/v1/auth/jellyfin' && status === 200)
       headers.append('set-cookie', 'connect.sid=abc; Path=/');
+    if (data === FAKE_POSTER_SVG) headers.set('content-type', 'image/svg+xml');
     return new Response(
       data === undefined || status === 204
         ? null
@@ -267,6 +289,8 @@ export class World {
 
   qbittorrent: Handler = (_m, path, _q, body) => {
     if (path === '/api/v2/app/version') return [200, 'v5.3.0'];
+    if (path === '/api/v2/torrents/info') return [200, this.qbt.torrents];
+    if (path === '/api/v2/log/main') return [200, this.qbt.log];
     if (path === '/api/v2/app/setPreferences') {
       Object.assign(this.qbt.prefs, JSON.parse((body as URLSearchParams).get('json') ?? '{}'));
       return [200, ''];
@@ -291,6 +315,7 @@ export class World {
       return [200, { status: false, error: 'API Key Incorrect' }];
     const mode = q.get('mode');
     if (mode === 'version') return [200, { version: '5.1.3' }];
+    if (mode === 'queue') return [200, { queue: this.sab.queue }];
     if (mode === 'get_config' && q.get('section') === 'servers')
       return [200, { config: this.sab.servers.length ? { servers: this.sab.servers } : {} }];
     if (mode === 'get_config') {
@@ -349,6 +374,7 @@ export class World {
     const p = path.slice('/apps/bazarr/api'.length);
     if (p === '/system/ping') return [200, { status: 'OK' }];
     if (h.get('x-api-key') !== this.keys['bazarr']) return [401, ''];
+    if (p === '/system/status') return [200, { data: { bazarr_version: '1.5.3' } }];
     if (p === '/system/languages/profiles') return [200, this.bz.profiles];
     if (p === '/system/settings' && m === 'POST') {
       for (const [k, v] of body as URLSearchParams) {
@@ -369,7 +395,7 @@ export class World {
     const b = body as Json;
     if (path === '/health') return [200, 'Healthy'];
     if (path === '/System/Info/Public')
-      return [200, { Id: 'x', StartupWizardCompleted: this.jf.wizardDone }];
+      return [200, { Id: 'x', Version: '10.11.2', StartupWizardCompleted: this.jf.wizardDone }];
     if (path.startsWith('/Startup/')) {
       if (this.jf.wizardDone) return [401, ''];
       if (path === '/Startup/User' && m === 'GET') this.jf.user ??= { name: 'abc', pw: '' };
@@ -385,6 +411,9 @@ export class World {
     }
     if (!authed) return [401, ''];
     if (path === '/System/Info') return [200, {}];
+    if (path === '/Items' && m === 'GET') return [200, { Items: this.jf.items }];
+    const img = /^\/Items\/([0-9a-f]{32})\/Images\/Primary$/.exec(path);
+    if (img) return [200, FAKE_POSTER_SVG];
     if (path === '/Auth/Keys' && m === 'GET') return [200, { Items: this.jf.keys }];
     if (path === '/Auth/Keys') {
       this.jf.keys.push({
@@ -492,6 +521,7 @@ export class World {
         ? [200, { apiKey: this.cu.apiKey }]
         : [401, ''];
     if (h.get('x-api-key') !== this.cu.apiKey) return [401, ''];
+    if (p === '/api/status') return [200, { application: { version: '2.10.12.0' } }];
     if (p === '/api/configuration/general') {
       if (m === 'GET') return [200, this.cu.general];
       this.cu.general = b;
@@ -556,6 +586,12 @@ export class World {
     }
     return undefined;
   };
+
+  flaresolverr: Handler = (_m, path) =>
+    path === '/' ? [200, { msg: 'FlareSolverr is ready!', version: '3.5.2' }] : undefined;
+
+  recyclarr: Handler = () => undefined;
+  unpackerr: Handler = () => undefined;
 
   deps(): StepDeps {
     return {

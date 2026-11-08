@@ -2,14 +2,16 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import helmet from '@fastify/helmet';
 import fastifyStatic from '@fastify/static';
-import { APP_NAME } from '@easyarr/shared';
+import { APP_NAME, serviceUrl } from '@easyarr/shared';
 import Fastify, { LogController, type FastifyBaseLogger, type FastifyInstance } from 'fastify';
 import type { Logger } from 'pino';
 import type { SystemInfo } from '@easyarr/shared';
 import type { ServeConfig } from './config.js';
-import { secretsStore } from './state/index.js';
+import { secretsStore, stateStore } from './state/index.js';
+import { statusRoutes } from './status/routes.js';
+import { fetchStoreVersion, officialJellyfinInstalled, StatusService } from './status/service.js';
 import { Mutex } from './state/mutex.js';
-import { collectSystemInfo } from './system/check.js';
+import { collectSystemInfo, diskSpace } from './system/check.js';
 import { VpnFiles } from './vpn/files.js';
 import { GluetunClient } from './vpn/gluetun.js';
 import { proxyRoutes } from './proxy/routes.js';
@@ -37,6 +39,7 @@ export type AppConfig = Pick<
       | 'trustedClients'
       | 'serviceUrls'
       | 'publicUrl'
+      | 'appVersion'
       | 'recyclarrDir'
     >
   >;
@@ -183,6 +186,25 @@ export async function buildApp({
   });
   await app.register(vpnRoutes, { vpn: svc.vpn, portSync: svc.portSync });
   await app.register(proxyRoutes, { serviceUrls: config.serviceUrls ?? {} });
+
+  const vpnFiles = new VpnFiles(config.vpnDir ?? path.join(config.stateDir, 'vpn'));
+  // The update check and the second-Jellyfin probe only make sense on a real Umbrel.
+  const onUmbrel = Boolean(config.appVersion);
+  const status = new StatusService({
+    url: (id) => config.serviceUrls?.[id] ?? serviceUrl(id),
+    keys: async () => (await secretsStore(config.stateDir).load()).value.apiKeys,
+    version: config.version,
+    appVersion: config.appVersion ?? null,
+    state: async () => (await stateStore(config.stateDir).load()).value,
+    secrets: async () => (await secretsStore(config.stateDir).load()).value,
+    vpn: () => svc.vpn.status(),
+    disk: () => diskSpace(config.dataDir),
+    vpnLog: () => vpnFiles.readLogTail(),
+    ...(onUmbrel
+      ? { latestVersion: () => fetchStoreVersion(), officialJellyfin: officialJellyfinInstalled }
+      : {}),
+  });
+  await app.register(statusRoutes, { status, stateDir: config.stateDir, lock: svc.lock });
 
   // License notices shipped in the image (SPEC §14.1), linked from the About page.
   if (existsSync(config.licensesDir)) {

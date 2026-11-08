@@ -2,6 +2,7 @@ import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { SERVICES } from '@easyarr/shared';
 import { buildApp } from './app.js';
 
 let webDir: string;
@@ -59,5 +60,40 @@ describe('http app', () => {
     expect(csp).toContain("default-src 'self'");
     expect(csp).not.toContain('upgrade-insecure-requests');
     expect(res.headers['x-content-type-options']).toBe('nosniff');
+  });
+
+  it('/api/status answers even when no service does; the Simple/Advanced choice is remembered', async () => {
+    // Port 9 (discard) refuses connections at once: every probe fails fast.
+    const dead = Object.fromEntries(SERVICES.map((s) => [s.id, 'http://127.0.0.1:9']));
+    const app = await buildApp({
+      config: {
+        version: '1.2.3',
+        webDir,
+        licensesDir: '/nonexistent',
+        stateDir: path.join(webDir, 'state-status'),
+        dataDir: webDir,
+        vpnDir: path.join(webDir, 'vpn'),
+        serviceUrls: dead,
+      },
+    });
+    const first = await app.inject({ method: 'GET', url: '/api/status' });
+    expect(first.statusCode).toBe(200);
+    const body = first.json<{ mode: string; services: { state: string }[]; recent: unknown }>();
+    expect(body.mode).toBe('simple');
+    expect(body.services.every((s) => ['down', 'headless'].includes(s.state))).toBe(true);
+    expect(body.recent).toBeNull();
+
+    const put = await app.inject({ method: 'PUT', url: '/api/ui', payload: { mode: 'advanced' } });
+    expect(put.statusCode).toBe(200);
+    const again = await app.inject({ method: 'GET', url: '/api/status' });
+    expect(again.json<{ mode: string }>().mode).toBe('advanced');
+
+    const bad = await app.inject({ method: 'PUT', url: '/api/ui', payload: { mode: 'expert' } });
+    expect(bad.statusCode).toBe(400);
+    expect((await app.inject({ method: 'GET', url: '/api/logs/secrets' })).statusCode).toBe(404);
+    const img = await app.inject({ method: 'GET', url: '/api/media/..%2F..%2Fetc/image' });
+    expect(img.statusCode).toBe(404);
+    const log = await app.inject({ method: 'GET', url: '/api/logs/sonarr' });
+    expect(log.json()).toEqual({ source: 'sonarr', available: false, lines: [] });
   });
 });

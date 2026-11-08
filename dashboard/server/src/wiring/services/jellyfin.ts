@@ -5,7 +5,9 @@ import { HttpClient, ServiceError } from '../http.js';
  * Jellyfin 12.4 API, the parts the wiring engine needs (research: PROGRESS → Verified facts).
  * Bodies are PascalCase: the named-configuration endpoint ignores camelCase keys.
  */
-const CLIENT = 'Client="EasyArr", Device="EasyArr", DeviceId="easyarr-dashboard", Version="1"';
+/** Jellyfin's client identification; `MediaBrowser <CLIENT>, Token="…"` authenticates. */
+export const CLIENT =
+  'Client="EasyArr", Device="EasyArr", DeviceId="easyarr-dashboard", Version="1"';
 
 export const publicInfoSchema = z.object({
   Id: z.string(),

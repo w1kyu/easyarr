@@ -33,6 +33,8 @@ export interface ServeConfig {
    * Umbrel's DEVICE_DOMAIN_NAME (e.g. umbrel.local) + the app port; EASYARR_PUBLIC_URL overrides.
    */
   publicUrl: string;
+  /** Umbrel's APP_VERSION: the installed app version (the image only knows its commit). */
+  appVersion: string | null;
   /**
    * Addresses allowed to call the API: loopback plus Umbrel's app gateway (the Docker network's
    * gateway, NETWORK_IP + 1). Other apps on Umbrel's shared network are refused (D-041).
@@ -111,6 +113,7 @@ export function loadServeConfig(env: Env = process.env): ServeConfig {
       : ['https://api.ipify.org?format=json', 'https://ipv4.icanhazip.com'],
     recyclarrDir: path.resolve(env['EASYARR_RECYCLARR_DIR'] ?? '/recyclarr'),
     serviceUrls: parseServiceUrls(env['EASYARR_SERVICE_URLS']),
+    appVersion: env['APP_VERSION'] || null,
     publicUrl:
       env['EASYARR_PUBLIC_URL'] ?? `http://${env['DEVICE_DOMAIN_NAME'] || 'umbrel.local'}:39000`,
     trustedClients: [
