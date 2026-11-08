@@ -110,6 +110,11 @@ Copy from SPEC as they get resolved. Highest priority first:
   through the wizard until Settings exist (phase 07).
 
 ## Ideas / later
+- Settings → Account: change the password everywhere (Jellyfin `POST /Users/{id}/Password` with the
+  admin key, Seerr re-login) instead of read-only (D-060).
+- Settings: a "Search sites" section (today Prowlarr is opened directly; the wizard's step 7 covers it).
+- Indexer health on the dashboard: "search sites unreachable" + clearing stale Prowlarr/*arr
+  backoffs (owner issue 2026-11-07, see session log).
 - "Both" download method: decide in phase 05 whether Usenet is preferred (Servarr delay profiles) —
   the docs currently only say EasyArr "takes whichever has it".
 - Main JS chunk is ~710 KB (225 KB gzip) — split routes (wizard/dashboard/settings) in phase 07/10.

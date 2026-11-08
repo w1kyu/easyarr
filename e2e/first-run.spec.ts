@@ -210,3 +210,48 @@ test('dashboard: downloads, recently added, Simple/Advanced remembered', async (
   await expect(page.getByTestId('tile-watch')).toBeVisible();
   await expect(page.getByTestId('services')).toHaveCount(0);
 });
+
+test('settings: a change is saved and applied with the live checklist', async ({ page }, info) => {
+  const shots = process.env['E2E_SHOTS'];
+  await page.goto('/');
+  await page.getByRole('link', { name: 'Settings' }).click();
+  await expect(page).toHaveURL(/\/settings$/);
+  // Usenet only shows up for setups that use it.
+  const usenetLink = page.getByRole('link', { name: 'Usenet', exact: true });
+  await expect(usenetLink).toHaveCount(methodOf(info) === 'torrents' ? 0 : 1);
+
+  await page.getByRole('link', { name: 'Libraries & quality' }).click();
+  await page.getByRole('radio', { name: 'Save space' }).click();
+  await page.getByRole('button', { name: 'Save' }).click();
+  const apply = page.getByTestId('settings-apply');
+  await expect(apply).toHaveAttribute('data-phase', 'done', { timeout: 90_000 });
+  await expect(page.getByTestId('wiring-checklist')).toBeVisible();
+  if (shots)
+    await page.screenshot({ path: `${shots}/settings-${methodOf(info)}.png`, fullPage: true });
+
+  const wizard = (await (await page.request.get('/api/wizard')).json()) as {
+    next: string | null;
+    answers: { library: { quality: string } };
+  };
+  expect(wizard.answers.library.quality).toBe('small');
+  // Still set up: home is the dashboard, not the wizard's Finish step.
+  expect(wizard.next).toBeNull();
+  await page.getByRole('link', { name: 'Home' }).last().click();
+  await expect(page.getByTestId('tile-watch')).toBeVisible();
+
+  // Advanced → repair runs and reports.
+  await page.goto('/settings/advanced');
+  await page.getByRole('button', { name: 'Repair connections' }).click();
+  await expect(page.getByTestId('wiring-checklist')).toBeVisible();
+  await expect(page.getByTestId('last-run')).toContainText('everything worked', {
+    timeout: 90_000,
+  });
+
+  if (shots) {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/settings');
+    await page.screenshot({ path: `${shots}/settings-mobile.png`, fullPage: true });
+    await page.goto('/');
+    await page.screenshot({ path: `${shots}/home-mobile.png`, fullPage: true });
+  }
+});

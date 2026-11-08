@@ -339,6 +339,8 @@ wiretest() {
   check "Jellyfin's first-run wizard is done" ok url_has http://localhost:39096/System/Info/Public '"StartupWizardCompleted":true'
   check "the request page is set up" ok url_has http://localhost:39055/api/v1/settings/public '"initialized":true'
   check "Seerr links to Radarr through the dashboard" ok seerr_radarr_link_ok
+  check "the dashboard status sees Sonarr running" ok url_has http://localhost:39000/api/status '"id":"sonarr","state":"ok"'
+  check "the dashboard status reads Jellyfin's library" ok url_has http://localhost:39000/api/status '"recent":\['
   check "Cleanuparr's Queue Cleaner is on (metadata strikes 3)" ok cleanuparr_has /configuration/queue_cleaner '"downloadingMetadataMaxStrikes": *3'
   check "Cleanuparr has EasyArr's stall rule" ok cleanuparr_has /queue-rules/stall 'EasyArr'
   check "Cleanuparr searches proactively" ok cleanuparr_has /configuration/seeker '"proactiveSearchEnabled": *true'

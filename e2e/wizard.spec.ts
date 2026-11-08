@@ -212,19 +212,17 @@ test('step 9: Finish connects the apps with a live checklist', async ({ page }) 
     await page.getByRole('button', { name: 'Finish anyway' }).click();
     await page.getByRole('dialog').getByRole('button', { name: 'Finish anyway' }).click();
     await expect(page).toHaveURL(/\/$/);
-    await expect(page.getByTestId('home-problems')).toBeVisible();
+    // The dashboard's warnings banner offers the repair.
+    await expect(page.locator('[data-warning="wiringProblems"]')).toBeVisible();
   } else {
     await expect(tour).toContainText('Add at least one search site');
     await page.getByRole('button', { name: /Go to my dashboard/ }).click();
     await expect(page).toHaveURL(/\/$/);
   }
-  await expect(page.getByText('EasyArr is ready')).toBeVisible();
+  await expect(page.getByTestId('tile-watch')).toBeVisible();
 });
 
 test('going back shows saved answers; a saved password is kept', async ({ page }) => {
-  await page.goto('/');
-  await page.getByRole('link', { name: 'Review your answers' }).click();
-  await expect(page).toHaveURL(/\/setup\/welcome$/);
   await page.goto('/setup/account');
   await expect(page.getByLabel('Username')).toHaveValue(USER);
   await expect(page.getByText(/A password is already saved/)).toBeVisible();
