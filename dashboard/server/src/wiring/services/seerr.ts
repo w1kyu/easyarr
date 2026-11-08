@@ -21,12 +21,14 @@ const librarySchema = z.object({
   type: z.string(),
 });
 
-export const servarrInstanceSchema = z.object({
+// Loose: GET returns the whole entry (API key included, unmasked) and PUT replaces it.
+export const servarrInstanceSchema = z.looseObject({
   id: z.number(),
   name: z.string(),
   hostname: z.string(),
   port: z.number(),
   baseUrl: z.string().nullish(),
+  externalUrl: z.string().nullish(),
 });
 export type SeerrServarr = z.infer<typeof servarrInstanceSchema>;
 
@@ -171,6 +173,20 @@ export class SeerrClient {
       body,
     });
     return created.id;
+  }
+
+  /** PUT /settings/{kind}/{id} replaces the entry: send the full object from list(). */
+  async update(
+    apiKey: string,
+    kind: 'sonarr' | 'radarr',
+    id: number,
+    body: Record<string, unknown>,
+  ): Promise<void> {
+    await this.http.json(`/api/v1/settings/${kind}/${String(id)}`, undefined, {
+      method: 'PUT',
+      headers: { 'x-api-key': apiKey },
+      body,
+    });
   }
 
   async initialize(apiKey: string): Promise<void> {

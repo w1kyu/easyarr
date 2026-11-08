@@ -17,6 +17,8 @@ export interface WiringOptions {
   recyclarrDir: string;
   lock: Mutex;
   serviceUrls?: Partial<Record<ServiceId, string>>;
+  /** The dashboard as the browser reaches it (ServeConfig.publicUrl). */
+  publicUrl?: string;
   collectSystemInfo: () => Promise<SystemInfo>;
   /** /sys, to tell Intel from AMD render devices. */
   sysDir?: string;
@@ -48,6 +50,7 @@ export function createWiring(opts: WiringOptions): WiringEngine {
   const secrets = secretsStore(opts.stateDir);
   const deps: StepDeps = {
     url: (id) => opts.serviceUrls?.[id] ?? serviceUrl(id),
+    ...(opts.publicUrl ? { publicUrl: opts.publicUrl } : {}),
     keys: async () => (await secrets.load()).value.apiKeys,
     saveKey: (name, value) =>
       opts.lock.run(async () => {

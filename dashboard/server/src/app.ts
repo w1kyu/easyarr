@@ -36,6 +36,7 @@ export type AppConfig = Pick<
       | 'homeIpUrls'
       | 'trustedClients'
       | 'serviceUrls'
+      | 'publicUrl'
       | 'recyclarrDir'
     >
   >;
@@ -59,6 +60,7 @@ function wiringFor(
     recyclarrDir: config.recyclarrDir ?? path.join(config.stateDir, 'recyclarr'),
     lock,
     serviceUrls: config.serviceUrls ?? {},
+    ...(config.publicUrl ? { publicUrl: config.publicUrl } : {}),
     collectSystemInfo: collect,
     ...(logger ? { log: logger } : {}),
   });

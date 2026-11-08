@@ -278,6 +278,13 @@ cleanuparr_has() {
   out="$(docker exec "$(c cleanuparr)" curl -fsS -m 10 "http://localhost:11011/apps/cleanuparr/api$1")"
   grep -qE -- "$2" <<<"$out"
 }
+# Seerr's "Open in Radarr" link: the external URL must be the dashboard proxy, not the container.
+seerr_radarr_link_ok() {
+  local key out
+  key="$(docker exec "$(c dashboard)" node -p "require('/easyarr/secrets.json').apiKeys.jellyseerr")"
+  out="$(curl -fsS -m 10 -H "X-Api-Key: $key" http://localhost:39055/api/v1/settings/radarr)"
+  grep -qE '"externalUrl": *"http://[^"]+:39000/apps/radarr"' <<<"$out"
+}
 url_has() {
   local out
   out="$(curl -fsS -m 10 "$1")"
@@ -331,6 +338,7 @@ wiretest() {
   check "qBittorrent has the tv/movies/music categories" ok qbittorrent_has_categories
   check "Jellyfin's first-run wizard is done" ok url_has http://localhost:39096/System/Info/Public '"StartupWizardCompleted":true'
   check "the request page is set up" ok url_has http://localhost:39055/api/v1/settings/public '"initialized":true'
+  check "Seerr links to Radarr through the dashboard" ok seerr_radarr_link_ok
   check "Cleanuparr's Queue Cleaner is on (metadata strikes 3)" ok cleanuparr_has /configuration/queue_cleaner '"downloadingMetadataMaxStrikes": *3'
   check "Cleanuparr has EasyArr's stall rule" ok cleanuparr_has /queue-rules/stall 'EasyArr'
   check "Cleanuparr searches proactively" ok cleanuparr_has /configuration/seeker '"proactiveSearchEnabled": *true'

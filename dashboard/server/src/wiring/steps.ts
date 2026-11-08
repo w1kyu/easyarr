@@ -44,6 +44,11 @@ export interface StepDeps {
   /** Wizard step 6 secrets: a Usenet server's password / an indexer's API key, by entry id. */
   usenetSecret(kind: 'servers' | 'indexers', id: string): Promise<string | undefined>;
   fetch?: typeof fetch;
+  /**
+   * The dashboard as the user's browser reaches it (e.g. http://umbrel.local:39000). Seerr's
+   * "Open in Sonarr/Radarr" links point at its /apps/<name> proxy.
+   */
+  publicUrl?: string;
   /** Waiting for Recyclarr's sync (tests make it instant). */
   recyclarrTimeoutMs?: number;
 }
@@ -104,6 +109,7 @@ export function buildSteps(deps: StepDeps): {
     new BazarrClient(`${deps.url('bazarr')}/apps/bazarr`, await key('bazarr'), f);
   const jellyfin = () => new JellyfinClient(deps.url('jellyfin'), f);
   const seerr = () => new SeerrClient(deps.url('jellyseerr'), f);
+  const publicUrl = (deps.publicUrl ?? 'http://umbrel.local:39000').replace(/\/+$/, '');
   const cleanuparr = () => new CleanuparrApi(`${deps.url('cleanuparr')}/apps/cleanuparr`, f);
 
   const health: Partial<Record<ServiceId, () => Promise<unknown>>> = {
@@ -698,6 +704,7 @@ export function buildSteps(deps: StepDeps): {
           apiKey: keys[kind] ?? '',
           baseUrl: URL_BASE[kind],
         };
+        const externalUrl = `${publicUrl}${URL_BASE[kind]}`;
         await ctx.resource({
           key: `jellyseerr.${kind}`,
           kind: 'server',
@@ -740,6 +747,7 @@ export function buildSteps(deps: StepDeps): {
               syncEnabled: true,
               preventSearch: false,
               tagRequests: false,
+              externalUrl,
             };
             const body =
               kind === 'sonarr'
@@ -754,6 +762,16 @@ export function buildSteps(deps: StepDeps): {
                 : { ...common, minimumAvailability: 'released' };
             return String(await s.add(apiKey, kind, body));
           },
+        });
+        // Without an external URL Seerr links to hostname:port — the container name, which no
+        // browser can open (installs before v0.0.11). Filled in once; a URL the user set is kept.
+        await ctx.once(`jellyseerr.${kind}.externalUrl`, async () => {
+          const found = (await s.list(apiKey, kind)).find(
+            (x) => x.hostname === target.hostname && x.port === target.port,
+          );
+          if (!found || found.externalUrl) return false;
+          await s.update(apiKey, kind, found.id, { ...found, externalUrl });
+          return true;
         });
       }
       await ctx.once('jellyseerr.initialize', async () => {

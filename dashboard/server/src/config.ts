@@ -29,6 +29,11 @@ export interface ServeConfig {
   /** Upstream overrides for the service proxy and wiring (dev/e2e), e.g. sonarr=http://127.0.0.1:8989. */
   serviceUrls: Partial<Record<ServiceId, string>>;
   /**
+   * The dashboard as the user's browser reaches it, for links other apps show (Seerr → Radarr).
+   * Umbrel's DEVICE_DOMAIN_NAME (e.g. umbrel.local) + the app port; EASYARR_PUBLIC_URL overrides.
+   */
+  publicUrl: string;
+  /**
    * Addresses allowed to call the API: loopback plus Umbrel's app gateway (the Docker network's
    * gateway, NETWORK_IP + 1). Other apps on Umbrel's shared network are refused (D-041).
    */
@@ -106,6 +111,8 @@ export function loadServeConfig(env: Env = process.env): ServeConfig {
       : ['https://api.ipify.org?format=json', 'https://ipv4.icanhazip.com'],
     recyclarrDir: path.resolve(env['EASYARR_RECYCLARR_DIR'] ?? '/recyclarr'),
     serviceUrls: parseServiceUrls(env['EASYARR_SERVICE_URLS']),
+    publicUrl:
+      env['EASYARR_PUBLIC_URL'] ?? `http://${env['DEVICE_DOMAIN_NAME'] || 'umbrel.local'}:39000`,
     trustedClients: [
       '127.0.0.1',
       '::1',

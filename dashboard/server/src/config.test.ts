@@ -37,6 +37,14 @@ describe('config', () => {
     expect(networkGateway('nope')).toBeNull();
   });
 
+  it("builds the public dashboard URL from Umbrel's device domain", () => {
+    expect(loadServeConfig({}).publicUrl).toBe('http://umbrel.local:39000');
+    expect(loadServeConfig({ DEVICE_DOMAIN_NAME: 'nas.local' }).publicUrl).toBe(
+      'http://nas.local:39000',
+    );
+    expect(loadServeConfig({ EASYARR_PUBLIC_URL: 'http://x:1' }).publicUrl).toBe('http://x:1');
+  });
+
   it('rejects invalid numbers', () => {
     expect(() => loadServeConfig({ PORT: 'abc' })).toThrow(/PORT/);
     expect(() => loadInitConfig({ PUID: '-1' })).toThrow(/PUID/);

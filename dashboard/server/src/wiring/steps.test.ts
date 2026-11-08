@@ -139,8 +139,10 @@ describe('wiring steps', () => {
       baseUrl: '/apps/sonarr',
       activeDirectory: '/data/media/tv',
       activeProfileName: 'EasyArr (Balanced)',
+      externalUrl: 'http://umbrel.local:39000/apps/sonarr',
     });
     expect(w.seerr.radarr.items).toHaveLength(1);
+    expect(w.seerr.radarr.items[0]?.['externalUrl']).toBe('http://umbrel.local:39000/apps/radarr');
 
     expect(w.cu.setup).toBe(true);
     expect(w.keys['cleanuparr']).toBe('cu-key');
@@ -166,6 +168,23 @@ describe('wiring steps', () => {
     expect(w.cu.seeker).toMatchObject({ searchEnabled: true, proactiveSearchEnabled: true });
     expect(Object.values(w.cu.seekerInstances)).toHaveLength(2);
     expect(Object.values(w.cu.seekerInstances).every((i) => i['enabled'] === true)).toBe(true);
+  });
+
+  it('fills in a missing Seerr link URL once (older installs) and keeps one the user set', async () => {
+    const { world: w, store, run } = setup();
+    await run();
+    // An install from before the fix: Seerr entry without externalUrl, ledger without the key.
+    const radarr = w.seerr.radarr.items[0] as Record<string, unknown>;
+    delete radarr['externalUrl'];
+    const sonarr = w.seerr.sonarr.items[0] as Record<string, unknown>;
+    sonarr['externalUrl'] = 'https://my.domain/sonarr';
+    store.applied = store.applied.filter((k) => !k.endsWith('.externalUrl'));
+    await run();
+    expect(w.seerr.radarr.items[0]).toMatchObject({
+      externalUrl: 'http://umbrel.local:39000/apps/radarr',
+      apiKey: w.arr.radarr.key,
+    });
+    expect(w.seerr.sonarr.items[0]?.['externalUrl']).toBe('https://my.domain/sonarr');
   });
 
   it('keeps the Queue Cleaner and Seeker as the user left them', async () => {

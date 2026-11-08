@@ -437,6 +437,14 @@ export class World {
       if (lib) lib['enabled'] = true;
       return [200, lib];
     }
+    const one = /^\/api\/v1\/settings\/(sonarr|radarr)\/(\d+)$/.exec(path);
+    if (one && m === 'PUT') {
+      const col = this.seerr[one[1] as 'sonarr' | 'radarr'];
+      const i = col.items.findIndex((x) => x['id'] === Number(one[2]));
+      if (i < 0) return [404, ''];
+      col.items[i] = { ...b, id: Number(one[2]) };
+      return [200, col.items[i]];
+    }
     const kind = /^\/api\/v1\/settings\/(sonarr|radarr)(\/test)?$/.exec(path);
     if (kind) {
       const col = this.seerr[kind[1] as 'sonarr' | 'radarr'];
