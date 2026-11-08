@@ -175,17 +175,22 @@ export class SeerrClient {
     return created.id;
   }
 
-  /** PUT /settings/{kind}/{id} replaces the entry: send the full object from list(). */
+  /**
+   * PUT /settings/{kind}/{id} replaces the entry: send the full object from list(). `id` is
+   * readOnly in Seerr's OpenAPI schema; sending it back fails with "request/body/id is read-only".
+   */
   async update(
     apiKey: string,
     kind: 'sonarr' | 'radarr',
     id: number,
     body: Record<string, unknown>,
   ): Promise<void> {
+    const rest = { ...body };
+    delete rest['id'];
     await this.http.json(`/api/v1/settings/${kind}/${String(id)}`, undefined, {
       method: 'PUT',
       headers: { 'x-api-key': apiKey },
-      body,
+      body: rest,
     });
   }
 

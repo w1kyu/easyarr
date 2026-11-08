@@ -471,6 +471,8 @@ export class World {
       const col = this.seerr[one[1] as 'sonarr' | 'radarr'];
       const i = col.items.findIndex((x) => x['id'] === Number(one[2]));
       if (i < 0) return [404, ''];
+      // Seerr's OpenAPI validator (v3.5.1 seerr-api.yml): `id` is readOnly in Sonarr/RadarrSettings.
+      if ('id' in b) return [400, { message: 'request/body/id is read-only' }];
       col.items[i] = { ...b, id: Number(one[2]) };
       return [200, col.items[i]];
     }
