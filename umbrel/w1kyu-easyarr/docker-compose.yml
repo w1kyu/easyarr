@@ -16,7 +16,7 @@ services:
 
   # One-shot (SPEC §7.4): /data tree, API keys, minimal service configs. Idempotent (D-031).
   init:
-    image: ghcr.io/w1kyu/easyarr:sha-2cb6475@sha256:4ded7ce9d42d10716f93d81cccd4529890e7bd34b03fdc8969c85e10dc4b100f
+    image: ghcr.io/w1kyu/easyarr:sha-bda60ff@sha256:7bc32364e57221233371e9446df9b7152a57dd4b6b8755d4d1ee5467433d7634
     user: '0:0'
     command: ['init']
     restart: on-failure
@@ -30,7 +30,7 @@ services:
 
   # Dashboard + setup wizard.
   dashboard:
-    image: ghcr.io/w1kyu/easyarr:sha-2cb6475@sha256:4ded7ce9d42d10716f93d81cccd4529890e7bd34b03fdc8969c85e10dc4b100f
+    image: ghcr.io/w1kyu/easyarr:sha-bda60ff@sha256:7bc32364e57221233371e9446df9b7152a57dd4b6b8755d4d1ee5467433d7634
     restart: on-failure
     depends_on:
       init:
@@ -39,6 +39,8 @@ services:
       TZ: 'Etc/UTC'
       # Umbrel's app gateway is NETWORK_IP + 1; only it (and loopback) may use the API (D-041).
       NETWORK_IP: ${NETWORK_IP}
+      # Links other apps show (Seerr → Radarr) use the device's domain, e.g. umbrel.local (D-058).
+      DEVICE_DOMAIN_NAME: ${DEVICE_DOMAIN_NAME}
     volumes:
       - ${APP_DATA_DIR}/data/easyarr:/easyarr
       # VPN settings for the wrapper + its status and log (D-041).

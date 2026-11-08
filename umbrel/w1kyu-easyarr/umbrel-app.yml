@@ -5,7 +5,7 @@ storage:
 category: media
 name: EasyArr
 icon: https://raw.githubusercontent.com/w1kyu/easyarr/main/assets/icon.svg
-version: '0.0.10'
+version: '0.0.11'
 tagline: Your own Netflix-style media setup, wired up for you
 description: >-
   ⚠️ PREVIEW — not ready for everyday use yet. The setup wizard is complete and connects all the
@@ -28,11 +28,9 @@ description: >-
 
   Jellyfin opens on port 39096 and the request page on port 39055 of your Umbrel.
 releaseNotes: >-
-  Stuck downloads now sort themselves out. A torrent that hangs on "downloading metadata" for
-  about 15 minutes, or makes no progress for about 30 minutes, is removed and another release is
-  searched for automatically. Requests that had no release yet are searched again regularly
-  instead of staying "Missing". After the update EasyArr applies this by itself within a few
-  minutes of starting.
+  "Open in Radarr" and "Open in Sonarr" on the request page now open the right page instead of an
+  address your browser can't reach. Also from the last update: stuck downloads are removed and
+  replaced automatically, and requests without a release yet are searched again regularly.
 
 developer: w1kyu
 website: https://github.com/w1kyu/easyarr
