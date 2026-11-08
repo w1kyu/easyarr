@@ -5,7 +5,7 @@ storage:
 category: media
 name: EasyArr
 icon: https://raw.githubusercontent.com/w1kyu/easyarr/main/assets/icon.svg
-version: '0.0.12'
+version: '0.0.13'
 tagline: Your own Netflix-style media setup, wired up for you
 description: >-
   ⚠️ PREVIEW — not ready for everyday use yet. The setup wizard is complete and connects all the
@@ -28,11 +28,9 @@ description: >-
 
   Jellyfin opens on port 39096 and the request page on port 39055 of your Umbrel.
 releaseNotes: >-
-  A real home screen: big Watch and Request buttons, your VPN, downloads and free space at a
-  glance, current downloads and what was added recently. Switch to Advanced for every app with its
-  status and version, VPN details and logs. Warnings tell you when something needs attention
-  (VPN down, disk almost full, an app not answering, an update). New Settings let you change the
-  download method, VPN, Usenet, libraries and quality later; changes are applied right away.
+  Fixes "Request page: Jellyfin, Sonarr and Radarr — Didn't work" after updating from an older
+  version: the "Open in Radarr/Sonarr" link fix could not be saved. Open Settings → Advanced →
+  Run the setup again once after updating.
 
 developer: w1kyu
 website: https://github.com/w1kyu/easyarr
