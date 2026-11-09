@@ -54,6 +54,10 @@ describe('init', () => {
       expect(st.isDirectory()).toBe(true);
       expect(st.mode & 0o7777).toBe(0o2775);
     }
+    // Jellyfin's backups folder, shared with the dashboard (D-070).
+    const jfBackups = await fs.stat(path.join(cfg.appDataDir, 'jellyfin/data/backups'));
+    expect(jfBackups.isDirectory()).toBe(true);
+    expect(jfBackups.mode & 0o7777).toBe(0o750);
     const sonarr = await read('sonarr/config.xml');
     const keys = (await secrets()).apiKeys;
     expect(sonarr).toContain('<UrlBase>/apps/sonarr</UrlBase>');

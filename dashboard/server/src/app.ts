@@ -30,6 +30,9 @@ import { createWiring } from './wiring/index.js';
 import type { WiringEngine } from './wiring/engine.js';
 import { wiringRoutes } from './wiring/routes.js';
 import { wizardRoutes } from './wizard/routes.js';
+import { backupRoutes, UPLOAD_HEADER, UPLOAD_PATH } from './backup/routes.js';
+import { BackupService } from './backup/service.js';
+import { realNativeOps } from './backup/native-ops.js';
 import { usenetRoutes } from './usenet/routes.js';
 import { UsenetService } from './usenet/service.js';
 
@@ -49,6 +52,8 @@ export type AppConfig = Pick<
       | 'publicUrl'
       | 'appVersion'
       | 'recyclarrDir'
+      | 'backupsDir'
+      | 'jellyfinBackupsDir'
     >
   >;
 
@@ -64,6 +69,8 @@ export interface Services {
   stuck?: StuckFinder;
   /** Built from the config when left out (tests that only exercise other routes). */
   wiring?: WiringEngine;
+  /** Backup & restore + the daily automatic backup (server.ts starts its timer). */
+  backup?: BackupService;
 }
 
 function wiringFor(
@@ -149,15 +156,24 @@ export function createServices(
       (await stateStore(config.stateDir).load()).value.searches?.autoAccept ?? false,
     ...(logger ? { log: logger } : {}),
   });
-  return {
+  const wiring = wiringFor(config, lock, collect, logger);
+  const url = (id: Parameters<typeof serviceUrl>[0]) => config.serviceUrls?.[id] ?? serviceUrl(id);
+  const backup = new BackupService({
+    stateDir: config.stateDir,
+    backupsDir: config.backupsDir ?? path.join(config.stateDir, 'backups'),
+    version: config.version,
     lock,
+    native: realNativeOps({
+      url,
+      jellyfinBackupsDir:
+        config.jellyfinBackupsDir ?? path.join(config.stateDir, 'jellyfin-backups'),
+    }),
     vpn,
-    portSync,
-    indexers,
-    recheck,
-    stuck,
-    wiring: wiringFor(config, lock, collect, logger),
-  };
+    wiring,
+    collectSystemInfo: collect,
+    ...(logger ? { log: logger } : {}),
+  });
+  return { lock, vpn, portSync, indexers, recheck, stuck, wiring, backup };
 }
 
 export interface BuildAppOptions {
@@ -224,6 +240,16 @@ export async function buildApp({
     const type = String(request.headers['content-type'] ?? '')
       .split(';')[0]
       ?.trim();
+    // Backup uploads are raw bytes. The custom header needs a CORS preflight too, so the
+    // cross-site protection above still holds (D-072).
+    if (
+      request.method === 'POST' &&
+      request.url === UPLOAD_PATH &&
+      type === 'application/octet-stream' &&
+      request.headers[UPLOAD_HEADER] === '1'
+    ) {
+      return;
+    }
     if (type !== 'application/json') {
       return reply.code(415).send({ error: 'unsupported_media_type' });
     }
@@ -250,6 +276,7 @@ export async function buildApp({
   });
   await app.register(vpnRoutes, { vpn: svc.vpn, portSync: svc.portSync });
   await app.register(proxyRoutes, { serviceUrls: config.serviceUrls ?? {} });
+  if (svc.backup) await app.register(backupRoutes, { backup: svc.backup });
 
   const vpnFiles = new VpnFiles(config.vpnDir ?? path.join(config.stateDir, 'vpn'));
   // The update check and the second-Jellyfin probe only make sense on a real Umbrel.

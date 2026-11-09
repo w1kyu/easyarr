@@ -62,6 +62,25 @@ export const stateSchema = z.object({
       autoAccept: z.boolean().optional(),
     })
     .optional(),
+  /** Automatic backups (phase 08, D-069). Optional: older files load as they are (defaults). */
+  backups: z
+    .object({
+      enabled: z.boolean(),
+      hour: z.number().int().min(0).max(23),
+      minute: z.number().int().min(0).max(59),
+      keep: z.number().int().min(1).max(30),
+      timeZone: z.string(),
+      lastAuto: z
+        .object({
+          at: z.string(),
+          /** The local day (in timeZone) it ran for, "2026-11-09": one automatic backup a day. */
+          day: z.string(),
+          ok: z.boolean(),
+          error: z.string().nullable(),
+        })
+        .nullable(),
+    })
+    .optional(),
   /**
    * The owner's account from wizard step 3 (v2). Only a password *hash* lives here; the plaintext
    * is in secrets.json because it must be applied to Jellyfin later (phase 05).

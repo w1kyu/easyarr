@@ -75,7 +75,7 @@ export const LIBRARIES: {
   { lib: 'music', app: 'lidarr', category: 'music', jellyfin: 'music', name: 'Music' },
 ];
 
-const URL_BASE: Record<ServarrApp, string> = {
+export const URL_BASE: Record<ServarrApp, string> = {
   sonarr: '/apps/sonarr',
   radarr: '/apps/radarr',
   lidarr: '/apps/lidarr',

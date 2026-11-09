@@ -29,6 +29,8 @@ export async function startServer(config: ServeConfig): Promise<void> {
   services.recheck?.start();
   // Why didn't it download? Finds out and offers a way out on the home screen (D-068).
   services.stuck?.start();
+  // Daily automatic backup (SPEC §11).
+  services.backup?.start();
   // Only this dashboard and the request page may connect to the VPN-side services (D-046).
   const allowlist = new ClientAllowlist({ vpnDir: config.vpnDir, log });
   allowlist.start();
@@ -48,6 +50,7 @@ export async function startServer(config: ServeConfig): Promise<void> {
     services.indexers?.stop();
     services.recheck?.stop();
     services.stuck?.stop();
+    services.backup?.stop();
     allowlist.stop();
     startup?.stop();
     await app.close();

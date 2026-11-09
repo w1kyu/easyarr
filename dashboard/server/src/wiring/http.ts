@@ -96,8 +96,10 @@ export class HttpClient {
       ...this.opts.headers,
       ...options.headers,
     };
-    let body: string | undefined;
-    if (options.body instanceof URLSearchParams) {
+    let body: string | FormData | undefined;
+    if (options.body instanceof FormData) {
+      body = options.body; // fetch sets the multipart content-type with its boundary
+    } else if (options.body instanceof URLSearchParams) {
       headers['content-type'] = 'application/x-www-form-urlencoded';
       body = options.body.toString();
     } else if (options.body !== undefined) {

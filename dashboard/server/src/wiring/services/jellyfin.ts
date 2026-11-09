@@ -148,6 +148,30 @@ export class JellyfinClient {
     return { key, created: true };
   }
 
+  /**
+   * Built-in backup (Jellyfin 10.11+, D-070): database only (users, watch history, libraries,
+   * settings); metadata/images are fetched again by a library scan. The archive lands in Jellyfin's
+   * own backups folder; Jellyfin's answer names its path inside the Jellyfin container.
+   */
+  async createBackup(token: string): Promise<{ path: string }> {
+    const m = await this.http.json('/Backup/Create', z.looseObject({ Path: z.string() }), {
+      method: 'POST',
+      headers: this.auth(token),
+      body: { Database: true, Metadata: false, Trickplay: false, Subtitles: false },
+      timeoutMs: 10 * 60_000,
+    });
+    return { path: m.Path };
+  }
+
+  /** Schedules the restore of an archive in Jellyfin's backups folder and restarts the server (in-process). */
+  async restoreBackup(token: string, containerPath: string): Promise<void> {
+    await this.http.json('/Backup/Restore', undefined, {
+      method: 'POST',
+      headers: this.auth(token),
+      body: { ArchiveFileName: containerPath },
+    });
+  }
+
   libraries(apiKey: string): Promise<VirtualFolder[]> {
     return this.http.json('/Library/VirtualFolders', z.array(virtualFolderSchema), {
       headers: this.auth(apiKey),

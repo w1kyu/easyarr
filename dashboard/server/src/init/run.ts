@@ -79,6 +79,24 @@ export async function runInit(cfg: InitConfig, log: Logger): Promise<InitReport>
     await ensureDir(path.join(cfg.dataRoot, rel), 0o2775, own, changes, cfg.dataRoot);
   }
 
+  // Jellyfin's backups folder is shared with the dashboard (D-070). Docker creates a missing
+  // bind-mount source as root, which would lock Jellyfin out of its own data folder: make both
+  // folders exist and belong to the app user before Jellyfin starts.
+  await ensureDir(
+    path.join(cfg.appDataDir, 'jellyfin', 'data'),
+    0o755,
+    own,
+    changes,
+    cfg.appDataDir,
+  );
+  await ensureDir(
+    path.join(cfg.appDataDir, 'jellyfin', 'data', 'backups'),
+    0o750,
+    own,
+    changes,
+    cfg.appDataDir,
+  );
+
   // 2. EasyArr state + secrets.
   const stateDir = path.join(cfg.appDataDir, 'easyarr');
   await ensureDir(stateDir, 0o700, own, changes, cfg.appDataDir);

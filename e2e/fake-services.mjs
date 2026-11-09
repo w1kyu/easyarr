@@ -31,8 +31,13 @@ const readBody = (req) =>
  * Starts the fakes. Returns the env for the dashboard (service URLs, Recyclarr folder) and writes
  * the API keys init would have written into the fresh state dir's secrets.json.
  */
-export async function startFakeServices({ stateDir, recyclarrDir }) {
+export async function startFakeServices({ stateDir, recyclarrDir, jellyfinBackupsDir }) {
   const world = new World();
+  // Jellyfin's backups folder, shared with the dashboard like on Umbrel (D-070).
+  if (jellyfinBackupsDir) {
+    mkdirSync(jellyfinBackupsDir, { recursive: true });
+    world.jfBackupsDir = jellyfinBackupsDir;
+  }
   // Something to show on the dashboard (phase 07): one torrent, one Usenet job, one new movie.
   world.qbt.torrents = [
     {
@@ -81,7 +86,14 @@ export async function startFakeServices({ stateDir, recyclarrDir }) {
       const r = await world.fetch(`http://${id}${req.url}`, {
         method: req.method,
         headers,
-        ...(body.length ? { body: body.toString('utf8') } : {}),
+        // Multipart uploads (Servarr restore) stay binary; everything else is text.
+        ...(body.length
+          ? {
+              body: String(req.headers['content-type'] ?? '').startsWith('multipart/')
+                ? body
+                : body.toString('utf8'),
+            }
+          : {}),
       });
       const out = {};
       r.headers.forEach((v, k) => (out[k] = v));

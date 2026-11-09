@@ -26,6 +26,10 @@ export interface ServeConfig {
   homeIpUrls: string[];
   /** Recyclarr's /config: the dashboard writes recyclarr.yml there and asks for syncs (D-048). */
   recyclarrDir: string;
+  /** Automatic backups: EasyArr/backups in Umbrel's Files (SPEC §11, D-069). */
+  backupsDir: string;
+  /** Jellyfin's own backups folder, shared to hand its archives over (D-070). */
+  jellyfinBackupsDir: string;
   /** Upstream overrides for the service proxy and wiring (dev/e2e), e.g. sonarr=http://127.0.0.1:8989. */
   serviceUrls: Partial<Record<ServiceId, string>>;
   /**
@@ -115,6 +119,8 @@ export function loadServeConfig(env: Env = process.env): ServeConfig {
       ? list(env['EASYARR_HOME_IP_URLS'])
       : ['https://api.ipify.org?format=json', 'https://ipv4.icanhazip.com'],
     recyclarrDir: path.resolve(env['EASYARR_RECYCLARR_DIR'] ?? '/recyclarr'),
+    backupsDir: path.resolve(env['EASYARR_BACKUPS_DIR'] ?? '/backups'),
+    jellyfinBackupsDir: path.resolve(env['EASYARR_JELLYFIN_BACKUPS_DIR'] ?? '/jellyfin-backups'),
     serviceUrls: parseServiceUrls(env['EASYARR_SERVICE_URLS']),
     appVersion: env['APP_VERSION'] || null,
     publicUrl:

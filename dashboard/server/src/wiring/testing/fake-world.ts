@@ -1,3 +1,5 @@
+import { readFileSync, writeFileSync } from 'node:fs';
+import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate';
 import type { StepDeps } from '../steps.js';
 
 // Only erasable TypeScript in this file: the e2e server (e2e/serve.mjs) loads it with Node's
@@ -54,8 +56,16 @@ export class FakeServarr {
   /** Indexers whose site doesn't answer: a test fails and keeps them paused. */
   unreachable = new Set<number>();
   tests: number[] = [];
+  /** Changes on every (re)start; GET /system/status shows it. */
+  startTime = '2026-11-01T00:00:00.000Z';
+  /** Backups/manual (Servarr BackupService): zip with config.xml + the database. */
+  backups: { id: number; name: string; data: Uint8Array; time: string }[] = [];
+  /** An uploaded restore: Servarr applies it when it restarts. */
+  pendingRestore: Uint8Array | null = null;
+  commands = new Collection();
+  restarts = 0;
   readonly app: string;
-  readonly key: string;
+  key: string;
   constructor(app: string, key: string) {
     this.app = app;
     this.key = key;
@@ -94,16 +104,117 @@ export class FakeServarr {
       ...(this.app === 'radarr' ? { language: { id: -2, name: 'Original' } } : {}),
     });
   }
+  /** What a backup zip holds: config.xml (with the API key) + the "database" (all collections). */
+  snapshot(): Uint8Array {
+    const db = {
+      c: Object.fromEntries(
+        Object.entries(this.c).map(([k, v]) => [k, { items: v.items, next: v.next }]),
+      ),
+      config: this.config,
+    };
+    return zipSync({
+      'config.xml': strToU8(
+        `<Config>\n  <ApiKey>${this.key}</ApiKey>\n  <UrlBase>/apps/${this.app}</UrlBase>\n</Config>\n`,
+      ),
+      [`${this.app}.db`]: strToU8(JSON.stringify(db)),
+    });
+  }
+  /** POST /system/restart: a new process, which applies a pending restore first. */
+  restart(): void {
+    this.restarts += 1;
+    this.startTime = new Date(Date.parse(this.startTime) + 60_000 * this.restarts).toISOString();
+    if (!this.pendingRestore) return;
+    const files = unzipSync(this.pendingRestore);
+    this.pendingRestore = null;
+    const xmlName = Object.keys(files).find((n) => n.toLowerCase() === 'config.xml');
+    const key = xmlName
+      ? /<ApiKey>([^<]*)<\/ApiKey>/.exec(strFromU8(files[xmlName] as Uint8Array))?.[1]
+      : undefined;
+    if (key) this.key = key;
+    const dbFile = files[`${this.app}.db`];
+    if (dbFile) {
+      const db = JSON.parse(strFromU8(dbFile)) as {
+        c: Record<string, { items: Json[]; next: number }>;
+        config: Record<string, Json>;
+      };
+      for (const [k, v] of Object.entries(db.c)) {
+        const col = new Collection();
+        col.items = v.items;
+        col.next = v.next;
+        this.c[k] = col;
+      }
+      this.config = db.config;
+    }
+  }
   handle: Handler = (m, path, q, body, h) => {
     const base = `/apps/${this.app}/api/${this.app === 'sonarr' || this.app === 'radarr' ? 'v3' : 'v1'}`;
+    // Backup files are served outside the API (BackupFileMapper), name pattern checked.
+    const files = `/apps/${this.app}/backup/manual/`;
+    if (path.startsWith(files)) {
+      if (h.get('x-api-key') !== this.key) return [401, ''];
+      const b = this.backups.find((x) => x.name === path.slice(files.length));
+      return b ? [200, b.data] : [404, ''];
+    }
     if (!path.startsWith(base)) return [404, 'no url base'];
     if (h.get('x-api-key') !== this.key) return [401, { message: 'Unauthorized' }];
-    const [, res, id] = path.slice(base.length).split('/');
+    const [, res, id, sub, sub2] = path.slice(base.length).split('/');
+    if (res === 'system' && id === 'backup') {
+      if (m === 'GET' && !sub)
+        return [
+          200,
+          this.backups.map((b) => ({
+            id: b.id,
+            name: b.name,
+            path: `/backup/manual/${b.name}`,
+            type: 'manual',
+            size: b.data.length,
+            time: b.time,
+          })),
+        ];
+      if (m === 'DELETE' && sub) {
+        this.backups = this.backups.filter((b) => b.id !== Number(sub));
+        return [200, {}];
+      }
+      if (m === 'POST' && sub === 'restore' && sub2 === 'upload') {
+        const file = (body as { file?: Uint8Array } | undefined)?.file;
+        if (!file) return [400, { message: 'file must be provided' }];
+        try {
+          unzipSync(file);
+        } catch {
+          return [500, { message: 'Unable to restore backup' }];
+        }
+        this.pendingRestore = file;
+        return [200, { restartRequired: true }];
+      }
+    }
+    if (res === 'system' && id === 'restart' && m === 'POST') {
+      this.restart();
+      return [200, {}];
+    }
     if (res === 'system')
       return [
         200,
-        { appName: this.app.charAt(0).toUpperCase() + this.app.slice(1), version: this.version },
+        {
+          appName: this.app.charAt(0).toUpperCase() + this.app.slice(1),
+          version: this.version,
+          startTime: this.startTime,
+        },
       ];
+    if (res === 'command' && m === 'POST' && (body as Json)['name'] === 'Backup') {
+      const n = this.backups.length + 1;
+      const name = `${this.app}_backup_v${this.version}_2026.11.09_04.00.${String(n).padStart(2, '0')}.zip`;
+      this.backups.push({
+        id: 1000 + n,
+        name,
+        data: this.snapshot(),
+        time: new Date().toISOString(),
+      });
+      return [201, this.commands.add({ name: 'Backup', status: 'completed' })];
+    }
+    if (res === 'command' && m === 'GET' && id) {
+      const c = this.commands.items.find((x) => x['id'] === Number(id));
+      return c ? [200, c] : [404, ''];
+    }
     if (res === 'log')
       return [200, { page: 1, totalRecords: this.log.length, records: [...this.log].reverse() }];
     if (res === 'config' && id) {
@@ -282,7 +393,15 @@ export class World {
     } as Json,
     /** /Items answers (newest first), for "recently added". */
     items: [] as Json[],
+    /** /health answers 503 this many more times (the restart after a restore). */
+    downProbes: 0,
+    restores: 0,
   };
+  /**
+   * Jellyfin's backups folder (/config/data/backups) on the "host": the dashboard reads and writes
+   * the same folder (D-070). Unset = Backup/Create fails like a missing folder.
+   */
+  jfBackupsDir: string | null = null;
   seerr = {
     type: 4,
     initialized: false,
@@ -332,13 +451,29 @@ export class World {
     const url = new URL(String(input));
     const m = init?.method ?? 'GET';
     const h = new Headers(init?.headers);
-    const raw = init?.body === undefined ? undefined : String(init.body);
-    const body: unknown =
-      raw === undefined
-        ? undefined
-        : (h.get('content-type') ?? '').includes('json')
-          ? JSON.parse(raw)
-          : new URLSearchParams(raw);
+    const type = h.get('content-type') ?? '';
+    let body: unknown;
+    if (init?.body instanceof FormData || type.startsWith('multipart/form-data')) {
+      // Servarr's restore upload: the first file of the form.
+      const form =
+        init?.body instanceof FormData
+          ? init.body
+          : await new Response(init?.body as ConstructorParameters<typeof Response>[0], {
+              headers: { 'content-type': type },
+            }).formData();
+      const file = form.get('file');
+      body = {
+        file: file instanceof Blob ? new Uint8Array(await file.arrayBuffer()) : undefined,
+      };
+    } else {
+      const raw = init?.body === undefined ? undefined : String(init.body);
+      body =
+        raw === undefined
+          ? undefined
+          : type.includes('json')
+            ? JSON.parse(raw)
+            : new URLSearchParams(raw);
+    }
     const host = url.hostname;
     this.calls.push(`${m} ${host}${url.pathname}`);
     const handler: Handler | undefined =
@@ -354,12 +489,15 @@ export class World {
     if (host === 'jellyseerr' && url.pathname === '/api/v1/auth/jellyfin' && status === 200)
       headers.append('set-cookie', 'connect.sid=abc; Path=/');
     if (data === FAKE_POSTER_SVG) headers.set('content-type', 'image/svg+xml');
+    if (data instanceof Uint8Array) headers.set('content-type', 'application/zip');
     return new Response(
       data === undefined || status === 204
         ? null
-        : typeof data === 'string'
-          ? data
-          : JSON.stringify(data),
+        : data instanceof Uint8Array
+          ? new Uint8Array(data)
+          : typeof data === 'string'
+            ? data
+            : JSON.stringify(data),
       { status, headers },
     );
   };
@@ -478,7 +616,13 @@ export class World {
       token !== undefined &&
       (token === 'session' || this.jf.keys.some((k) => k['AccessToken'] === token));
     const b = body as Json;
-    if (path === '/health') return [200, 'Healthy'];
+    if (path === '/health') {
+      if (this.jf.downProbes > 0) {
+        this.jf.downProbes -= 1;
+        return [503, 'Unhealthy'];
+      }
+      return [200, 'Healthy'];
+    }
     if (path === '/System/Info/Public')
       return [200, { Id: 'x', Version: '10.11.2', StartupWizardCompleted: this.jf.wizardDone }];
     if (path.startsWith('/Startup/')) {
@@ -496,6 +640,34 @@ export class World {
     }
     if (!authed) return [401, ''];
     if (path === '/System/Info') return [200, {}];
+    if (path === '/Backup/Create' && m === 'POST') {
+      if (!this.jfBackupsDir) return [500, { message: 'Could not find a part of the path' }];
+      const name = `jellyfin-backup-${Date.now()}-${this.jf.restores}.zip`;
+      const data: Json = { ...this.jf };
+      delete data['downProbes'];
+      delete data['restores'];
+      writeFileSync(
+        `${this.jfBackupsDir}/${name}`,
+        zipSync({ 'jellyfin.json': strToU8(JSON.stringify(data)) }),
+      );
+      return [200, { Path: `/config/data/backups/${name}`, ServerVersion: '10.11.2' }];
+    }
+    if (path === '/Backup/Restore' && m === 'POST') {
+      const file = String(b['ArchiveFileName'] ?? '');
+      if (!this.jfBackupsDir || !file.startsWith('/config/data/backups/')) return [404, ''];
+      let restored: Json;
+      try {
+        const zip = unzipSync(
+          readFileSync(`${this.jfBackupsDir}/${file.split('/').pop() as string}`),
+        );
+        restored = JSON.parse(strFromU8(zip['jellyfin.json'] as Uint8Array)) as Json;
+      } catch {
+        return [404, ''];
+      }
+      // ScheduleRestoreAndRestartServer: down while restoring, then the restored server.
+      Object.assign(this.jf, restored, { downProbes: 2, restores: this.jf.restores + 1 });
+      return [204, undefined];
+    }
     if (path === '/Items' && m === 'GET') return [200, { Items: this.jf.items }];
     const img = /^\/Items\/([0-9a-f]{32})\/Images\/Primary$/.exec(path);
     if (img) return [200, FAKE_POSTER_SVG];

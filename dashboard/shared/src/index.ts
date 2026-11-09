@@ -8,3 +8,4 @@ export * from './wizard.js';
 export * from './vpn-providers.js';
 export * from './vpn-servers.generated.js';
 export * from './vpn-status.js';
+export * from './backup.js';

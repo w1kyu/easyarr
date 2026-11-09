@@ -22,6 +22,7 @@ const vpn = await startFakeVpn(path.join(tmp, 'vpn'));
 const services = await startFakeServices({
   stateDir: path.join(tmp, 'state'),
   recyclarrDir: path.join(tmp, 'recyclarr'),
+  jellyfinBackupsDir: path.join(tmp, 'jellyfin-backups'),
 });
 const child = spawn(process.execPath, [entry, 'serve'], {
   stdio: 'inherit',
@@ -32,6 +33,8 @@ const child = spawn(process.execPath, [entry, 'serve'], {
     EASYARR_WEB_DIR: webDir,
     EASYARR_STATE_DIR: path.join(tmp, 'state'),
     EASYARR_DATA_ROOT: tmp,
+    EASYARR_BACKUPS_DIR: path.join(tmp, 'backups'),
+    EASYARR_JELLYFIN_BACKUPS_DIR: path.join(tmp, 'jellyfin-backups'),
     EASYARR_LICENSES_DIR: root,
     LOG_LEVEL: 'warn',
     ...vpn.env,
