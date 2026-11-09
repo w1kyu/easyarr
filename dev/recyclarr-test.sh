@@ -85,8 +85,6 @@ sync() { # sync <preset> [--v0.0.8]
     exit 1
   fi
   grep -E -i "warn|error" "${WORK}/sync.log" | head -20 || true
-  [ -n "${RT_VERBOSE:-}" ] && sed 's/^/   | /' "${WORK}/sync.log"
-  return 0
 }
 
 profile() { # profile <app> <name>
@@ -108,6 +106,9 @@ check_profile() { # check_profile <app> <preset label>
 
 check_sizes() { # check_sizes <app>: small LQ encodes pass the minimum size (D-063)
   local defs
+  # Radarr/Sonarr cache the definitions for 5 s and PUT /qualitydefinition/update doesn't clear it
+  # (QualityDefinitionService.UpdateMany), so a read right after a sync can show the old sizes.
+  sleep 6
   defs="$("$1" qualitydefinition)"
   echo "   $1 sizes: $(jq -c '[.[] | select(.quality.name | test("^(WEBDL|WEBRip|Bluray|HDTV)-(720|1080)p$")) | {(.quality.name): .minSize}] | add' <<<"${defs}")"
   check "$1: minimum sizes lowered (720p 5, 1080p 10, 2160p 20 MB/min)" \
@@ -130,11 +131,11 @@ check_balanced_radarr() {
 }
 
 echo "== upgrade from a v0.0.8 install (Balanced: old config first, then the new one on top)"
-RT_VERBOSE=1 sync balanced --v0.0.8
+sync balanced --v0.0.8
 old="$(profile radarr 'EasyArr (Balanced)')"
 check "v0.0.8 config: LQ blocked (as before)" \
   '[.formatItems[] | select(.name == "LQ") | .score] == [-10000]' "${old}"
-RT_VERBOSE=1 sync balanced
+sync balanced
 check_profile radarr Balanced
 check_profile sonarr Balanced
 check_balanced_radarr
