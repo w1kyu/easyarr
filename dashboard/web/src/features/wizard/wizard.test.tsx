@@ -445,7 +445,16 @@ describe('setup wizard', () => {
     next();
     expect(await screen.findByText('Choose at least one: movies, shows or music.')).toBeTruthy();
     fireEvent.click(screen.getByRole('switch', { name: 'Movies' }));
-    fireEvent.change(screen.getByLabelText('Language'), { target: { value: 'de' } });
+    // Default: Original, then English. Add German, move it to the top, drop English.
+    fireEvent.change(screen.getByLabelText('Add another language'), { target: { value: 'de' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Move German up' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Move German up' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Remove English' }));
+    expect(
+      screen
+        .getByRole('list', { name: 'Your languages, best first' })
+        .querySelectorAll('[data-language]'),
+    ).toHaveLength(2);
     fireEvent.click(screen.getByRole('radio', { name: 'Save space' }));
     expect(screen.getByRole('radio', { name: 'Balanced' }).getAttribute('aria-checked')).toBe(
       'false',
@@ -454,6 +463,7 @@ describe('setup wizard', () => {
     await waitFor(() => expect(server.posts.at(-1)?.step).toBe('library'));
     expect(server.posts.at(-1)?.body).toEqual({
       libraries: { movies: true, tv: false, music: false },
+      languages: ['de', 'original'],
       language: 'de',
       quality: 'small',
     });

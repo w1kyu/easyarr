@@ -69,16 +69,30 @@ export class FakeServarr {
       'indexer',
       'tag',
       'appprofile',
+      'customformat',
     ]) {
       this.c[n] = new Collection();
     }
     const profiles = app === 'lidarr' ? ['Any', 'Lossless', 'Standard'] : ['Any', 'HD-1080p'];
-    for (const name of profiles) this.coll('qualityprofile').add({ name });
+    for (const name of profiles) this.addProfile(name);
     this.coll('metadataprofile').add({ name: 'Standard' });
     this.coll('appprofile').add({ name: 'Standard' });
   }
   coll(n: string): Collection {
     return this.c[n] as Collection;
+  }
+  /** Like a real profile: one score per custom format; Radarr's has a language ("Original" from the guide). */
+  addProfile(name: string): Json {
+    const formatItems = this.coll('customformat').items.map((f) => ({
+      format: f['id'],
+      name: f['name'],
+      score: 0,
+    }));
+    return this.coll('qualityprofile').add({
+      name,
+      formatItems,
+      ...(this.app === 'radarr' ? { language: { id: -2, name: 'Original' } } : {}),
+    });
   }
   handle: Handler = (m, path, q, body, h) => {
     const base = `/apps/${this.app}/api/${this.app === 'sonarr' || this.app === 'radarr' ? 'v3' : 'v1'}`;
@@ -184,12 +198,28 @@ export class FakeServarr {
       ) {
         return [400, [{ propertyName: 'Host', errorMessage: 'Unable to reach the internet' }]];
       }
+      if (res === 'customformat') {
+        if (col.items.some((f) => f['name'] === b['name']))
+          return [400, [{ propertyName: 'Name', errorMessage: 'Must be unique' }]];
+        const made = col.add(b);
+        // A new format joins every profile with score 0 (CustomFormatService → profiles).
+        for (const p of this.coll('qualityprofile').items)
+          (p['formatItems'] as Json[] | undefined)?.push({
+            format: made['id'],
+            name: made['name'],
+            score: 0,
+          });
+        return [201, made];
+      }
       return [201, col.add(b)];
     }
     if (m === 'PUT' && id) {
       const i = col.items.findIndex((x) => x['id'] === Number(id));
       if (i < 0) return [404, 'gone'];
-      if (q.get('forceSave') !== 'true') return [400, [{ errorMessage: 'test failed' }]];
+      // Providers test on PUT unless forced; formats and profiles have no test.
+      const tested = res !== 'customformat' && res !== 'qualityprofile';
+      if (tested && q.get('forceSave') !== 'true') return [400, [{ errorMessage: 'test failed' }]];
+      this.posts.push(`PUT ${res as string}`);
       col.items[i] = { ...(body as Json), id: Number(id) };
       return [202, col.items[i]];
     }
@@ -229,13 +259,21 @@ export class World {
   };
   /** Wizard step 6 secrets, by entry id. */
   usenetSecrets = { servers: {} as Record<string, string>, indexers: {} as Record<string, string> };
-  bz = { profiles: [] as Json[], settings: {} as Record<string, string> };
+  bz = { profiles: [] as Json[], settings: {} as Record<string, string>, enabled: [] as string[] };
   jf = {
     wizardDone: false,
     user: null as null | { name: string; pw: string },
     keys: [] as Json[],
     libs: [] as Json[],
     encoding: { HardwareAccelerationType: 'none', Other: 1 } as Json,
+    /** The admin's playback settings (Jellyfin 10.11 UserConfiguration defaults). */
+    userConfig: {
+      AudioLanguagePreference: null,
+      PlayDefaultAudioTrack: true,
+      SubtitleLanguagePreference: null,
+      SubtitleMode: 'Default',
+      HidePlayedInLatest: true,
+    } as Json,
     /** /Items answers (newest first), for "recently added". */
     items: [] as Json[],
   };
@@ -410,6 +448,9 @@ export class World {
     if (p === '/system/status') return [200, { data: { bazarr_version: '1.5.3' } }];
     if (p === '/system/languages/profiles') return [200, this.bz.profiles];
     if (p === '/system/settings' && m === 'POST') {
+      const enabled = (body as URLSearchParams).getAll('languages-enabled');
+      // Any languages-enabled value disables every language first, then enables the listed ones.
+      if (enabled.length > 0) this.bz.enabled = enabled;
       for (const [k, v] of body as URLSearchParams) {
         this.bz.settings[k] = v;
         if (k === 'languages-profiles') this.bz.profiles = JSON.parse(v) as Json[];
@@ -454,6 +495,15 @@ export class World {
         AccessToken: `jf-key-${this.jf.keys.length + 1}`,
         DateCreated: '2026-11-01',
       });
+      return [204, undefined];
+    }
+    if (path === '/Users' && m === 'GET')
+      return [200, this.jf.user ? [{ Id: 'u1', Name: this.jf.user.name }] : []];
+    if (path === '/Users/u1' && m === 'GET')
+      return [200, { Id: 'u1', Configuration: this.jf.userConfig }];
+    if (path === '/Users/Configuration' && m === 'POST') {
+      if (q.get('userId') !== 'u1') return [404, ''];
+      this.jf.userConfig = b; // replaces the whole object, like Jellyfin
       return [204, undefined];
     }
     if (path === '/Library/VirtualFolders' && m === 'GET') return [200, this.jf.libs];
@@ -649,8 +699,10 @@ export class World {
           this.recyclarrSyncs += 1;
           const name = /name: (EasyArr[^\n]*)/.exec(this.recyclarrConfig)?.[1]?.trim();
           for (const a of [this.arr.sonarr, this.arr.radarr]) {
-            if (name && !a.coll('qualityprofile').items.some((p) => p['name'] === name))
-              a.coll('qualityprofile').add({ name });
+            const existing = a.coll('qualityprofile').items.find((p) => p['name'] === name);
+            if (name && !existing) a.addProfile(name);
+            // A sync puts the guide's profile language back.
+            if (existing && a.app === 'radarr') existing['language'] = { id: -2, name: 'Original' };
           }
         },
       },

@@ -4,13 +4,16 @@ import {
   QUALITY_PRESETS,
   libraryAnswersSchema,
   DEFAULT_LIBRARY_ANSWERS,
-  type LanguageCode,
+  MAX_MEDIA_LANGUAGES,
+  ORIGINAL_LANGUAGE,
+  primaryLanguage,
   type LibraryAnswers,
+  type MediaLanguage,
   type LibraryId,
   type QualityPreset,
 } from '@easyarr/shared';
 import * as RadioGroup from '@radix-ui/react-radio-group';
-import { Check, Clapperboard, Music, Tv } from 'lucide-react';
+import { ArrowDown, ArrowUp, Check, Clapperboard, Music, Tv, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SelectField } from '~/components/select-field';
@@ -42,7 +45,7 @@ function useLanguageNames() {
 }
 
 /**
- * Step 8 "What do you want?" (SPEC §8): which libraries, the language for subtitles and titles, and
+ * Step 8 "What do you want?" (SPEC §8): which libraries, the media languages in order (D-066), and
  * a quality preset (mapped to TRaSH guide profiles via Recyclarr and EasyArr's Lidarr profile).
  */
 export function LibraryStep({ formId, view, onSaved }: StepFormProps) {
@@ -124,19 +127,20 @@ export function LibraryStep({ formId, view, onSaved }: StepFormProps) {
         <h3 id="library-language" className="text-17 font-semibold -tracking-2">
           {t('library.language.title')}
         </h3>
-        <SelectField
-          label={t('library.language.label')}
-          value={form.language}
-          className="md:max-w-sm"
-          onChange={(e) => setForm((f) => ({ ...f, language: e.target.value as LanguageCode }))}
-          hint={t('library.language.hint')}
-        >
-          {languages.map((l) => (
-            <option key={l.code} value={l.code}>
-              {languageName(l.code)}
-            </option>
-          ))}
-        </SelectField>
+        <p className="max-w-2xl text-13 leading-relaxed text-white/60">
+          {t('library.language.intro')}
+        </p>
+        <LanguageRanking
+          value={form.languages}
+          options={[ORIGINAL_LANGUAGE, ...languages.map((l) => l.code)]}
+          name={(c) => (c === ORIGINAL_LANGUAGE ? t('library.language.original') : languageName(c))}
+          onChange={(next) =>
+            setForm((f) => ({ ...f, languages: next, language: primaryLanguage(next) }))
+          }
+        />
+        <p className="max-w-2xl text-12 leading-relaxed text-white/50">
+          {t('library.language.hint')}
+        </p>
       </section>
 
       <section aria-labelledby="library-quality" className="flex flex-col gap-3">
@@ -204,5 +208,94 @@ export function LibraryStep({ formId, view, onSaved }: StepFormProps) {
       {error && <ErrorAlert description={error} />}
       {save.isError && !error && <ErrorAlert description={errorText(save.error)} />}
     </form>
+  );
+}
+
+/**
+ * The media languages, best first: a numbered list with move up/down and remove, plus a picker to
+ * add another (up to MAX_MEDIA_LANGUAGES). Plain buttons, so it works with keyboard and touch.
+ */
+function LanguageRanking({
+  value,
+  options,
+  name,
+  onChange,
+}: {
+  value: MediaLanguage[];
+  options: MediaLanguage[];
+  name: (code: MediaLanguage) => string;
+  onChange: (next: MediaLanguage[]) => void;
+}) {
+  const { t } = useTranslation();
+  const move = (i: number, by: -1 | 1) => {
+    const next = [...value];
+    const [item] = next.splice(i, 1);
+    if (item === undefined) return;
+    next.splice(i + by, 0, item);
+    onChange(next);
+  };
+  const left = options.filter((o) => !value.includes(o));
+  const iconButton =
+    'grid size-10 shrink-0 place-items-center rounded-full text-white/60 transition-colors hover:bg-white/10 hover:text-white focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:outline-hidden disabled:pointer-events-none disabled:opacity-25';
+  return (
+    <div className="flex flex-col gap-2 md:max-w-md">
+      <ol className="flex flex-col gap-2" aria-label={t('library.language.listLabel')}>
+        {value.map((code, i) => (
+          <li
+            key={code}
+            data-language={code}
+            className="flex items-center gap-2 rounded-16 border border-white/10 bg-white/4 py-1 pr-1 pl-3"
+          >
+            <span className="grid size-7 shrink-0 place-items-center rounded-full bg-brand/30 text-13 font-semibold">
+              {i + 1}
+            </span>
+            <span className="min-w-0 flex-1 truncate text-15 font-medium">{name(code)}</span>
+            <button
+              type="button"
+              className={iconButton}
+              disabled={i === 0}
+              onClick={() => move(i, -1)}
+              aria-label={t('library.language.up', { name: name(code) })}
+            >
+              <ArrowUp className="size-4" aria-hidden />
+            </button>
+            <button
+              type="button"
+              className={iconButton}
+              disabled={i === value.length - 1}
+              onClick={() => move(i, 1)}
+              aria-label={t('library.language.down', { name: name(code) })}
+            >
+              <ArrowDown className="size-4" aria-hidden />
+            </button>
+            <button
+              type="button"
+              className={iconButton}
+              disabled={value.length === 1}
+              onClick={() => onChange(value.filter((c) => c !== code))}
+              aria-label={t('library.language.remove', { name: name(code) })}
+            >
+              <X className="size-4" aria-hidden />
+            </button>
+          </li>
+        ))}
+      </ol>
+      {value.length < MAX_MEDIA_LANGUAGES && left.length > 0 && (
+        <SelectField
+          label={t('library.language.add')}
+          value=""
+          onChange={(e) => {
+            if (e.target.value) onChange([...value, e.target.value as MediaLanguage]);
+          }}
+        >
+          <option value="">{t('library.language.addPlaceholder')}</option>
+          {left.map((c) => (
+            <option key={c} value={c}>
+              {name(c)}
+            </option>
+          ))}
+        </SelectField>
+      )}
+    </div>
   );
 }

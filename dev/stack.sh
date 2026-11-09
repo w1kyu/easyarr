@@ -216,7 +216,8 @@ PY
 }
 
 # Steps that may fail in CI: Recyclarr downloads the TRaSH guides, and CI has no real VPN.
-OFFLINE_STEPS='recyclarr.sync'
+# The language steps need the profile recyclarr.sync makes (D-066), so they fail along with it.
+OFFLINE_STEPS='recyclarr.sync sonarr.languages radarr.languages'
 
 wiring_failed_steps() {
   python3 - "$1" "$OFFLINE_STEPS" <<'PY'

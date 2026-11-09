@@ -87,6 +87,37 @@ describe('wizard registry', () => {
       }).error?.issues[0]?.message,
     ).toBe('wizard.error.libraryRequired');
   });
+
+  it('step 8 media languages: ranked, 1–4, no repeats; `language` follows the list (D-066)', () => {
+    const lib = { libraries: { movies: true, tv: true, music: false }, quality: 'balanced' };
+    expect(libraryAnswersSchema.parse({ ...lib, languages: ['original', 'de', 'en'] })).toEqual({
+      ...lib,
+      languages: ['original', 'de', 'en'],
+      language: 'de',
+    });
+    // Only "Original": subtitles/titles fall back to English.
+    expect(libraryAnswersSchema.parse({ ...lib, languages: ['original'] }).language).toBe('en');
+    const msg = (languages: unknown) =>
+      libraryAnswersSchema.safeParse({ ...lib, languages }).error?.issues[0]?.message;
+    expect(msg([])).toBe('wizard.error.languageRequired');
+    expect(msg(['de', 'en', 'fr', 'es', 'it'])).toBe('wizard.error.languageTooMany');
+    expect(msg(['de', 'de'])).toBe('wizard.error.languageTwice');
+    expect(msg(['xx'])).toBe('wizard.error.languageRequired');
+  });
+
+  it('answers saved before multi-language read as "Original, then <language>"', () => {
+    const old = {
+      libraries: { movies: true, tv: true, music: true },
+      language: 'de',
+      quality: 'best',
+    };
+    expect(libraryAnswersSchema.parse(old)).toEqual({
+      ...old,
+      languages: ['original', 'de'],
+      language: 'de',
+    });
+    expect(parseWizardAnswers({ library: old }).library?.languages).toEqual(['original', 'de']);
+  });
 });
 
 describe('account input', () => {

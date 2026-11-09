@@ -8,6 +8,9 @@ import { ServiceError } from '../http.js';
 
 export type QualityPreset = WiringPlan['quality'];
 
+/** Formats named "EasyArr – Language: …" (languages.ts); Recyclarr matches case-insensitively. */
+export const LANGUAGE_FORMAT_PATTERN = '^EasyArr – Language: ';
+
 /**
  * TRaSH guide profiles per preset (research 2026-10-31, TRaSH-Guides@d24f13c). WEB-centric, no
  * Remux, always with a 1080p fallback so nothing stays "missing" just because no 4K release exists.
@@ -121,7 +124,8 @@ export function recyclarrConfig(
       {
         trash_id: profile.trashId,
         name,
-        reset_unmatched_scores: { enabled: true },
+        // EasyArr's language formats are scored by the wiring (D-066), not by the guide.
+        reset_unmatched_scores: { enabled: true, except_patterns: [LANGUAGE_FORMAT_PATTERN] },
         min_format_score: MIN_FORMAT_SCORE,
         ...(profile.qualities
           ? {

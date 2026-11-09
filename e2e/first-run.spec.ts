@@ -117,7 +117,17 @@ test('step 8: what to collect, language, quality', async ({ page }, info) => {
   if (methodOf(info) === 'torrents') {
     await page.getByRole('switch', { name: 'Music' }).click();
   }
-  await page.getByLabel('Language', { exact: true }).selectOption('de');
+  // Media languages: German first, then the default Original + English.
+  await page.getByLabel('Add another language').selectOption('de');
+  await page.getByRole('button', { name: 'Move German up' }).click();
+  await page.getByRole('button', { name: 'Move German up' }).click();
+  await expect(page.locator('[data-language]')).toHaveText([
+    /German/,
+    /Original language/,
+    /English/,
+  ]);
+  if (info.project.name.endsWith('torrents') && process.env['E2E_SHOTS'])
+    await page.screenshot({ path: `${process.env['E2E_SHOTS']}/languages.png`, fullPage: true });
   await page.getByRole('radio', { name: 'Best quality' }).click();
   await next(page);
   await expect(page).toHaveURL(/\/setup\/finish$/);

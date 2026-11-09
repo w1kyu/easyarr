@@ -9,7 +9,12 @@ export interface WiringPlan {
   usenet: boolean;
   libraries: { movies: boolean; tv: boolean; music: boolean };
   quality: 'best' | 'balanced' | 'small';
-  /** ISO 639-1 (subtitles in Bazarr, titles in Jellyfin) and Jellyfin's metadata country. */
+  /**
+   * Media languages, best first: ISO 639-1 codes or "original" (D-066). Steer which releases
+   * Sonarr/Radarr take and Jellyfin's preferred audio.
+   */
+  languages: string[];
+  /** The first real language of `languages`: subtitles (Bazarr), titles (Jellyfin) + country. */
   language: string;
   country: string;
   /** Wizard step 6 (secrets come from StepDeps.usenetSecret). */

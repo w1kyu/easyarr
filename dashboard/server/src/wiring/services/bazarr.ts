@@ -40,22 +40,23 @@ export class BazarrClient {
   }
 }
 
-/** Bazarr language profile with one language (booleans are strings in Bazarr's API). */
-export function singleLanguageProfile(profileId: number, name: string, language: string) {
+/**
+ * Bazarr language profile: subtitles in these languages, first one first (booleans are strings in
+ * Bazarr's API, item ids are 1-based positions).
+ */
+export function languageProfile(profileId: number, name: string, languages: readonly string[]) {
   return {
     profileId,
     name,
     cutoff: null,
-    items: [
-      {
-        id: 1,
-        language,
-        audio_exclude: 'False',
-        audio_only_include: 'False',
-        hi: 'False',
-        forced: 'False',
-      },
-    ],
+    items: languages.map((language, i) => ({
+      id: i + 1,
+      language,
+      audio_exclude: 'False',
+      audio_only_include: 'False',
+      hi: 'False',
+      forced: 'False',
+    })),
     mustContain: [],
     mustNotContain: [],
     originalFormat: false,

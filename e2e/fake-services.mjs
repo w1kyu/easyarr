@@ -121,8 +121,10 @@ export async function startFakeServices({ stateDir, recyclarrDir }) {
     rmSync(request, { force: true });
     const name = /name: (EasyArr[^\n]*)/.exec(config)?.[1]?.trim();
     for (const a of [world.arr.sonarr, world.arr.radarr]) {
-      if (name && !a.coll('qualityprofile').items.some((p) => p['name'] === name))
-        a.coll('qualityprofile').add({ name });
+      const existing = a.coll('qualityprofile').items.find((p) => p['name'] === name);
+      if (name && !existing) a.addProfile(name);
+      // A real sync puts the guide's profile language back.
+      if (existing && a.app === 'radarr') existing['language'] = { id: -2, name: 'Original' };
     }
     writeFileSync(
       path.join(recyclarrDir, '.easyarr', 'last-sync.json'),

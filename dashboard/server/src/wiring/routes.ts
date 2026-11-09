@@ -14,7 +14,7 @@ import {
 
 /**
  * What to wire, from the wizard answers. Needs the account (step 3) and the download method
- * (step 4); without step 8's answers every library is on, English, "Balanced".
+ * (step 4); without step 8's answers every library is on, Original then English, "Balanced".
  */
 export function planFromState(state: State, system: Pick<SystemInfo, 'gpu'>): WiringPlan {
   const answers = parseWizardAnswers(state.wizard.answers);
@@ -27,6 +27,7 @@ export function planFromState(state: State, system: Pick<SystemInfo, 'gpu'>): Wi
     usenet,
     libraries: { ...library.libraries },
     quality: library.quality,
+    languages: [...library.languages],
     language: library.language,
     country: languageCountry(library.language),
     usenetServers: usenet ? (answers.usenet?.servers ?? []) : [],

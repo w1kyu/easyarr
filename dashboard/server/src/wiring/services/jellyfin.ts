@@ -186,6 +186,40 @@ export class JellyfinClient {
     });
   }
 
+  async userByName(apiKey: string, name: string): Promise<{ Id: string } | undefined> {
+    const users = await this.http.json(
+      '/Users',
+      z.array(z.looseObject({ Id: z.string(), Name: z.string() })),
+      { headers: this.auth(apiKey) },
+    );
+    return users.find((u) => u.Name.toLowerCase() === name.toLowerCase());
+  }
+
+  /**
+   * GET → change → POST a user's playback settings (POST /Users/Configuration replaces the whole
+   * object, so unchanged keys must be sent back). Returns false when `change` changed nothing.
+   */
+  async updateUserConfiguration(
+    apiKey: string,
+    userId: string,
+    change: (c: Record<string, unknown>) => boolean,
+  ): Promise<boolean> {
+    const user = await this.http.json(
+      `/Users/${encodeURIComponent(userId)}`,
+      z.looseObject({ Configuration: z.record(z.string(), z.unknown()) }),
+      { headers: this.auth(apiKey) },
+    );
+    const next = { ...user.Configuration };
+    if (!change(next)) return false;
+    await this.http.json('/Users/Configuration', undefined, {
+      method: 'POST',
+      headers: this.auth(apiKey),
+      query: { userId },
+      body: next,
+    });
+    return true;
+  }
+
   encoding(apiKey: string): Promise<EncodingOptions> {
     return this.http.json('/System/Configuration/encoding', encodingSchema, {
       headers: this.auth(apiKey),

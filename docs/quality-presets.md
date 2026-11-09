@@ -42,8 +42,25 @@ Your Umbrel's home screen and Settings show how much space is free.
     release.
 - **Music:** EasyArr creates its own Lidarr profile with the same name.
 
-Movies and shows are downloaded in their original language. Your language choice is used for
-subtitles (Bazarr) and titles and descriptions in Jellyfin.
+## Languages
+
+In the setup you put the languages you want to hear in order, for example 1. German, 2. Original
+language, 3. English. "Original language" means the language the film or show was made in.
+
+- **Downloads (Sonarr and Radarr):** EasyArr adds its own "EasyArr – Language: …" rules. A
+  release in your first language scores highest, the next one a bit less, and so on. A release in
+  none of your languages is not downloaded. Quality still comes first: a 1080p release in your
+  second language beats a 720p one in your first. Once a better-ranked language shows up at the same
+  quality, it replaces the file automatically.
+- **Subtitles (Bazarr):** subtitles in your languages, in the same order ("Original" is skipped).
+- **Jellyfin:** plays your first language's audio track when a file has several, shows subtitles
+  in your first real language when the audio is in another one, and uses it for titles and
+  descriptions.
+- **Request page (Jellyseerr):** has no language setting of its own. Requests use the EasyArr
+  profiles above, so they follow your languages too.
+
+If you installed EasyArr before multi-language support, your list now reads "Original language,
+then <the language you chose>". Change it in **Settings → Libraries & quality**.
 
 ## Want to fine-tune?
 

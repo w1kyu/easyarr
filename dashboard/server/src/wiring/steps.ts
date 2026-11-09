@@ -3,7 +3,14 @@ import { z } from 'zod';
 import { containerName, type ServiceId } from '@easyarr/shared';
 import type { StepContext, WiringPlan, WiringStep } from './engine.js';
 import { ServiceError } from './http.js';
-import { BazarrClient, singleLanguageProfile } from './services/bazarr.js';
+import {
+  applyPlaybackLanguages,
+  desiredLanguageFormats,
+  LANGUAGE_FORMAT_PREFIX,
+  RADARR_ANY_LANGUAGE,
+  sameSpecifications,
+} from './languages.js';
+import { BazarrClient, languageProfile } from './services/bazarr.js';
 import { CleanuparrApi, type CleanuparrArr } from './services/cleanuparr.js';
 import {
   hardwareAcceleration,
@@ -522,6 +529,96 @@ export function buildSteps(deps: StepDeps): {
     },
   };
 
+  // --- Media languages (Sonarr/Radarr custom formats, D-066) --------------------------------------
+
+  const formatSchema = z.looseObject({
+    id: z.number(),
+    name: z.string(),
+    specifications: z.array(z.unknown()),
+  });
+  const profileSchema = z.looseObject({
+    id: z.number(),
+    name: z.string(),
+    formatItems: z.array(z.looseObject({ format: z.number(), score: z.number() })),
+    language: z.looseObject({ id: z.number() }).optional(),
+  });
+
+  /**
+   * Keeps EasyArr's language formats in line with the wizard's list and scores them in EasyArr's
+   * quality profile; Radarr's profile language becomes "Any". Runs after recyclarr.sync (the profile
+   * must exist; a sync puts the guide's "Original" back). The formats are EasyArr's own, like the
+   * Recyclarr profile: they're kept matching the wizard (formats of languages no longer chosen
+   * score 0) and come back if deleted, since downloads depend on them.
+   */
+  const arrLanguages = (app: 'sonarr' | 'radarr', lib: 'tv' | 'movies'): WiringStep => ({
+    id: `${app}.languages`,
+    service: app,
+    needs: [app],
+    enabled: (p) => p.libraries[lib],
+    async run(ctx) {
+      const a = await servarr(app);
+      const desired = desiredLanguageFormats(ctx.plan.languages);
+      let formats = await a.get('/customformat', z.array(formatSchema));
+      for (const d of desired) {
+        const body = {
+          name: d.name,
+          includeCustomFormatWhenRenaming: false,
+          specifications: d.specifications,
+        };
+        const have = formats.find((f) => f.name === d.name);
+        if (!have) {
+          await a.post('/customformat', body);
+          ctx.changed();
+        } else if (!sameSpecifications(have.specifications, d.specifications)) {
+          await a.put(`/customformat/${have.id}`, { ...body, id: have.id });
+          ctx.changed();
+        }
+      }
+      formats = await a.get('/customformat', z.array(formatSchema));
+      const wanted = new Map(desired.map((d) => [d.name, d.score]));
+      const scoreFor = new Map<number, number>();
+      for (const f of formats) {
+        if (f.name.startsWith(LANGUAGE_FORMAT_PREFIX)) scoreFor.set(f.id, wanted.get(f.name) ?? 0);
+      }
+      const name = qualityProfileName(ctx.plan.quality);
+      const profile = (await a.get('/qualityprofile', z.array(profileSchema))).find(
+        (p) => p.name === name,
+      );
+      if (!profile) {
+        // Made by recyclarr.sync; if that failed, its error says why.
+        throw new ServiceError(
+          app,
+          'invalid_response',
+          `quality profile "${name}" not found (made by the Recyclarr step)`,
+          undefined,
+          ['The quality profile is made by the "Quality profiles" step; fix that one first.'],
+        );
+      }
+      let dirty = false;
+      const items = profile.formatItems.map((i) => {
+        const score = scoreFor.get(i.format);
+        if (score === undefined || score === i.score) return i;
+        dirty = true;
+        return { ...i, score };
+      });
+      for (const [format, score] of scoreFor) {
+        if (!items.some((i) => i.format === format)) {
+          items.push({ format, score, name: formats.find((f) => f.id === format)?.name ?? '' });
+          dirty = true;
+        }
+      }
+      const next: Record<string, unknown> = { ...profile, formatItems: items };
+      if (app === 'radarr' && profile.language?.id !== RADARR_ANY_LANGUAGE.id) {
+        next['language'] = RADARR_ANY_LANGUAGE;
+        dirty = true;
+      }
+      if (dirty) {
+        await a.put(`/qualityprofile/${profile.id}`, next);
+        ctx.changed();
+      }
+    },
+  });
+
   // --- Bazarr -----------------------------------------------------------------------------------
 
   const bazarrSetup: WiringStep = {
@@ -538,15 +635,14 @@ export function buildSteps(deps: StepDeps): {
       // The default profile must exist before Sonarr/Radarr are switched on (first sync assigns it).
       await ctx.once('bazarr.languageProfile', async () => {
         if ((await b.languageProfiles()).length > 0) return false; // never replace the user's
-        const name =
-          new Intl.DisplayNames(['en'], { type: 'language' }).of(ctx.plan.language) ??
-          ctx.plan.language;
+        // Subtitles in every real language the user chose, best first (not "Original").
+        const subs = ctx.plan.languages.filter((l) => l !== 'original');
+        const codes = subs.length > 0 ? subs : [ctx.plan.language];
+        const names = new Intl.DisplayNames(['en'], { type: 'language' });
+        const name = codes.map((c) => names.of(c) ?? c).join(', ');
         await b.saveSettings([
-          ['languages-enabled', ctx.plan.language],
-          [
-            'languages-profiles',
-            JSON.stringify([singleLanguageProfile(1, name, ctx.plan.language)]),
-          ],
+          ...codes.map((c): [string, string] => ['languages-enabled', c]),
+          ['languages-profiles', JSON.stringify([languageProfile(1, name, codes)])],
         ]);
         return true;
       });
@@ -637,6 +733,17 @@ export function buildSteps(deps: StepDeps): {
           },
         });
       }
+      // Preferred audio + subtitle language on the owner's account. Re-applied only when the
+      // wizard's list changes, so a choice made in Jellyfin later stays.
+      await ctx.once(`jellyfin.languages:${ctx.plan.languages.join(',')}`, async () => {
+        const { username } = await deps.account();
+        const user = await j.userByName(apiKey, username);
+        if (!user) return false;
+        const changed = await j.updateUserConfiguration(apiKey, user.Id, (c) =>
+          applyPlaybackLanguages(c, ctx.plan.languages),
+        );
+        return changed;
+      });
       if (ctx.plan.gpu) {
         await ctx.once('jellyfin.hardwareAcceleration', async () => {
           const gpu = await deps.gpu();
@@ -925,6 +1032,8 @@ export function buildSteps(deps: StepDeps): {
     prowlarrUsenetIndexers,
     prowlarrFlaresolverr,
     recyclarrSync,
+    arrLanguages('sonarr', 'tv'),
+    arrLanguages('radarr', 'movies'),
     bazarrSetup,
     jellyfinSetup,
     jellyseerrSetup,
