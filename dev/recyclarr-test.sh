@@ -84,7 +84,9 @@ sync() { # sync <preset> [--v0.0.8]
     tail -40 "${WORK}/sync.log"
     exit 1
   fi
-  grep -E -i "warn|error|quality (size|definition)" "${WORK}/sync.log" | head -20 || true
+  grep -E -i "warn|error" "${WORK}/sync.log" | head -20 || true
+  [ -n "${RT_VERBOSE:-}" ] && sed 's/^/   | /' "${WORK}/sync.log"
+  return 0
 }
 
 profile() { # profile <app> <name>
@@ -128,11 +130,11 @@ check_balanced_radarr() {
 }
 
 echo "== upgrade from a v0.0.8 install (Balanced: old config first, then the new one on top)"
-sync balanced --v0.0.8
+RT_VERBOSE=1 sync balanced --v0.0.8
 old="$(profile radarr 'EasyArr (Balanced)')"
 check "v0.0.8 config: LQ blocked (as before)" \
   '[.formatItems[] | select(.name == "LQ") | .score] == [-10000]' "${old}"
-sync balanced
+RT_VERBOSE=1 sync balanced
 check_profile radarr Balanced
 check_profile sonarr Balanced
 check_balanced_radarr
