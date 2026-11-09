@@ -5,7 +5,7 @@ storage:
 category: media
 name: EasyArr
 icon: https://raw.githubusercontent.com/w1kyu/easyarr/main/assets/icon.svg
-version: '0.0.15'
+version: '0.0.16'
 tagline: Your own Netflix-style media setup, wired up for you
 description: >-
   ⚠️ PREVIEW — not ready for everyday use yet. The setup wizard is complete and connects all the
@@ -28,9 +28,13 @@ description: >-
 
   Jellyfin opens on port 39096 and the request page on port 39055 of your Umbrel.
 releaseNotes: >-
-  Movies and shows that only have small releases (YTS & co.) are downloaded now instead of staying
-  "Missing": Radarr and Sonarr rejected them as too small. Also: search sites paused after an
-  outage are resumed within minutes, and the request page step no longer fails after an update.
+  Choose several audio and subtitle languages in order, and mark the ones you must have: Sonarr and
+  Radarr now download in your languages (dubbed versions were refused before), Bazarr fetches your
+  subtitles and the home screen tells you which are still missing. New "Needs your OK" on the home
+  screen: when something doesn't arrive, EasyArr says why and offers a one-click way out (another
+  language, a lower quality, another version). Whole seasons come as one pack when possible, and
+  missing items are searched again every 6 hours (Settings → Advanced). Plus: the logo leads home,
+  a bigger Simple/Advanced switch, and the right version number in the corner.
 
 developer: w1kyu
 website: https://github.com/w1kyu/easyarr
