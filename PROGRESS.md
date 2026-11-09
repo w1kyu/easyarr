@@ -144,6 +144,12 @@ Copy from SPEC as they get resolved. Highest priority first:
 - Phase 3 (b4eecb4): season packs +1000 with Sonarr min upgrade 1001; `MissingRecheck` asks
   Radarr/Sonarr to search missing items again (default 6 h, Settings → Advanced; ≤ 3 per app per
   10 min, 20 s apart, oldest `lastSearchTime` first, skips queued/unreleased/recent) (D-067).
+- **Released v0.0.16** (pin sha-dcc52b0, release commit fb2ad4c, store 3af86ba): CI + stack test
+  green on both arches, leak test passed. The stack test can't run the language steps (no TRaSH
+  download in CI), so `dev/recyclarr-test.sh` (CI job "Recyclarr profiles", 3870177) now runs the
+  real `radarr/sonarr.languages` step against real Radarr 6.4.4 / Sonarr 4.0.20: scores, German/French
+  parsing, Radarr "Any", idempotent, scores survive a sync, season packs 1000 / min upgrade 1001 — all
+  pass. Owner test of v0.0.16 still to do (owner: "do the test later").
 - Item 11 (fallbacks, D-068) built after the owner's OK (2026-11-10): StuckFinder + home-screen
   "Needs your OK" + Settings → Advanced "Accept alternatives automatically". Owner's follow-ups the
   same day: saved passwords stay hidden with a note (D-064 revised); audio and subtitle lists with
