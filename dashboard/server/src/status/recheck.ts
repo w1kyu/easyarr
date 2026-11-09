@@ -14,6 +14,12 @@ export const MAX_SEARCHES_PER_CHECK = 3;
 export const SEARCH_GAP_MS = 20_000;
 /** How many of the longest-unsearched missing items one check looks at. */
 const PAGE_SIZE = 50;
+/**
+ * A season search only asks the search sites for the whole season ("S01"); Sonarr never falls
+ * back to single episodes. When episodes are still missing this long after a search (and nothing
+ * is downloading), EasyArr searches them one by one.
+ */
+export const EPISODE_FALLBACK_AFTER_MS = 20 * 60_000;
 
 export interface RecheckDeps extends ProbeDeps {
   /** 0 = off. */
@@ -47,10 +53,13 @@ interface Missing {
  * updates, Cleanuparr's included), skipping what's already downloading, movies not released yet,
  * and anything searched within `hours`. A few per check with gaps in between, so indexers aren't
  * flooded. Several missing episodes of one season become one season search, which also finds
- * whole-season packs (item 9).
+ * whole-season packs (item 9). If that finds nothing, the episodes are searched one by one 20 min
+ * later (Sonarr has no such fallback itself, D-073).
  */
 export class MissingRecheck {
   private running = false;
+  /** Episode id → when EasyArr last searched it on its own (the season-pack fallback). */
+  private readonly episodeFallback = new Map<number, number>();
   private timer: NodeJS.Timeout | undefined;
   private first: NodeJS.Timeout | undefined;
   private readonly now: () => number;
@@ -65,11 +74,13 @@ export class MissingRecheck {
     if (this.running) return 'skipped';
     this.running = true;
     try {
-      const hours = await this.deps.hours();
-      if (hours <= 0) return 'off';
+      const setting = await this.deps.hours();
+      // Off = no regular re-search; the season-pack → episodes fallback still runs, once.
+      const hours = setting > 0 ? setting : Number.POSITIVE_INFINITY;
       if (!(await this.deps.canReach()) || !this.deps.sitesUsable()) return 'skipped';
       const keys = await this.deps.keys();
       const used = await this.deps.used();
+      if (setting <= 0) used.delete('radarr');
       let searched = 0;
       for (const app of Object.keys(APPS) as App[]) {
         if (!used.has(app)) continue;
@@ -80,7 +91,7 @@ export class MissingRecheck {
         }
       }
       if (searched > 0) this.deps.log?.info({ searched }, 'searched again for missing items');
-      return { searched };
+      return setting <= 0 && searched === 0 ? 'off' : { searched };
     } finally {
       this.running = false;
     }
@@ -88,7 +99,8 @@ export class MissingRecheck {
 
   private async recheck(app: App, key: string, hours: number): Promise<number> {
     const cutoff = this.now() - hours * 3600_000;
-    const due = (m: Missing) => !m.lastSearchTime || Date.parse(m.lastSearchTime) < cutoff;
+    const due = (m: Missing) =>
+      Number.isFinite(hours) && (!m.lastSearchTime || Date.parse(m.lastSearchTime) < cutoff);
     const queue = await this.call<{ records?: Record<string, unknown>[] }>(
       app,
       key,
@@ -112,8 +124,28 @@ export class MissingRecheck {
     if (app === 'radarr') {
       for (const m of missing) commands.push({ name: 'MoviesSearch', movieIds: [m.id] });
     } else {
+      // 1. Season pack not found: the episodes one by one (first, it's the most urgent).
+      const now = this.now();
+      const fallback = new Map<string, Missing[]>();
+      for (const m of page.records ?? []) {
+        if (busy.has(m.id) || !m.lastSearchTime) continue;
+        const searchedAt = Date.parse(m.lastSearchTime);
+        const ownAt = this.episodeFallback.get(m.id);
+        if (now - searchedAt < EPISODE_FALLBACK_AFTER_MS) continue;
+        if (ownAt !== undefined && ownAt >= searchedAt - 1000) continue; // already ours, no newer search
+        if (ownAt !== undefined && now - ownAt < hours * 3600_000) continue;
+        const k = `${m.seriesId}:${m.seasonNumber}`;
+        fallback.set(k, [...(fallback.get(k) ?? []), m]);
+      }
+      const handled = new Set<number>();
+      for (const eps of fallback.values()) {
+        commands.push({ name: 'EpisodeSearch', episodeIds: eps.map((e) => e.id) });
+        for (const e of eps) handled.add(e.id);
+      }
+      // 2. The regular re-search: a season pack first, again.
+      const due2 = missing.filter((m) => !handled.has(m.id));
       const seasons = new Map<string, Missing[]>();
-      for (const m of missing) {
+      for (const m of due2) {
         const k = `${m.seriesId}:${m.seasonNumber}`;
         seasons.set(k, [...(seasons.get(k) ?? []), m]);
       }
@@ -131,6 +163,9 @@ export class MissingRecheck {
     for (const [i, body] of batch.entries()) {
       if (i > 0) await this.sleep(SEARCH_GAP_MS);
       await this.call(app, key, 'POST', '/command', body);
+      if (body['name'] === 'EpisodeSearch') {
+        for (const id of body['episodeIds'] as number[]) this.episodeFallback.set(id, this.now());
+      }
     }
     return batch.length;
   }

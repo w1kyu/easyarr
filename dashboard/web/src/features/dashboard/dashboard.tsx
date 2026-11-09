@@ -4,6 +4,7 @@ import {
   SERVICES,
   type DownloadItem,
   type RecentItem,
+  type ServiceId,
   type ServiceStatus,
   type StatusView,
 } from '@easyarr/shared';
@@ -485,65 +486,136 @@ function serviceHref(s: ServiceStatus): string | null {
   return info.urlBase ? `${info.urlBase}/` : null;
 }
 
-/** Advanced mode: every service as an app tile (SPEC §12, umbrelOS app-grid look). */
+const SERVICE_GROUPS: { id: string; services: ServiceId[] }[] = [
+  { id: 'watch', services: ['jellyfin', 'jellyseerr'] },
+  { id: 'find', services: ['sonarr', 'radarr', 'lidarr', 'prowlarr', 'bazarr'] },
+  { id: 'download', services: ['qbittorrent', 'sabnzbd'] },
+  { id: 'helpers', services: ['cleanuparr', 'flaresolverr', 'recyclarr', 'unpackerr'] },
+];
+
+/**
+ * Advanced mode: every included app, grouped by what it does, with a one-line description, its
+ * state, version and whether it goes through the VPN (SPEC §12). Apps the setup doesn't use are
+ * folded away at the end.
+ */
 function ServicesGrid({ services }: { services: ServiceStatus[] }) {
   const { t } = useTranslation();
-  const ordered = SERVICES.map((s) => services.find((x) => x.id === s.id)).filter(
-    (s): s is ServiceStatus => s !== undefined,
+  const byId = new Map(services.map((s) => [s.id, s]));
+  const used = services.filter((s) => s.used);
+  const running = used.filter((s) => s.state === 'ok' || s.state === 'headless').length;
+  const problems = used.filter((s) => s.state === 'down').length;
+  const unused = SERVICES.map((s) => byId.get(s.id)).filter(
+    (s): s is ServiceStatus => s !== undefined && !s.used,
   );
   return (
-    <section aria-labelledby="services-title" data-testid="services">
-      <SectionTitle id="services-title">{t('home.services')}</SectionTitle>
-      <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {ordered.map((s) => {
-          const href = serviceHref(s);
-          const body = (
-            <>
-              <ServiceIcon id={s.id} size={48} />
-              <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-                <div className="min-w-0">
-                  <p className="truncate text-15 font-semibold -tracking-2">
-                    {getService(s.id).name}
-                  </p>
-                  <p className="truncate text-12 text-white/55">
-                    {s.version ? t('dash.service.version', { version: s.version }) : ' '}
-                    {!s.used && ` · ${t('dash.service.unused')}`}
-                  </p>
-                </div>
-                <StatusPill
-                  status={s.used || s.state === 'ok' ? SERVICE_STATUS[s.state] : 'idle'}
-                  label={t(`dash.service.state.${s.state}`)}
-                  className="self-start"
-                />
-              </div>
-              {href && <ExternalLink className="size-4 shrink-0 text-white/40" aria-hidden />}
-            </>
-          );
-          const cls =
-            'umbrel-material umbrel-material-popover flex items-center gap-3 rounded-20 p-3.5 transition-transform duration-300';
-          return (
-            <li key={s.id} data-service={s.id}>
-              {href ? (
-                <a
-                  href={href}
-                  target="_blank"
-                  rel="noreferrer"
-                  className={cn(
-                    cls,
-                    'hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-hidden',
-                  )}
-                  aria-label={t('dash.service.open', { name: getService(s.id).name })}
-                >
-                  {body}
-                </a>
-              ) : (
-                <div className={cls}>{body}</div>
-              )}
-            </li>
-          );
-        })}
-      </ul>
+    <section
+      aria-labelledby="services-title"
+      data-testid="services"
+      className="flex flex-col gap-4"
+    >
+      <div className="flex flex-wrap items-end justify-between gap-2">
+        <SectionTitle id="services-title">{t('home.services')}</SectionTitle>
+        <p className="px-1 text-13 text-white/60" data-testid="services-summary">
+          {problems > 0
+            ? t('dash.apps.summaryProblems', { running, total: used.length, count: problems })
+            : t('dash.apps.summary', { running, total: used.length })}
+        </p>
+      </div>
+      {SERVICE_GROUPS.map((g) => {
+        const list = g.services
+          .map((id) => byId.get(id))
+          .filter((s): s is ServiceStatus => s !== undefined && s.used);
+        if (list.length === 0) return null;
+        return (
+          <div key={g.id} className="flex flex-col gap-2" data-group={g.id}>
+            <h3 className="px-1 text-13 font-semibold text-white/75">
+              {t(`dash.apps.group.${g.id}`)}
+            </h3>
+            <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {list.map((s) => (
+                <ServiceTile key={s.id} s={s} />
+              ))}
+            </ul>
+          </div>
+        );
+      })}
+      {unused.length > 0 && (
+        <details className="group px-1" data-testid="services-unused">
+          <summary className="cursor-pointer text-13 text-white/55 select-none hover:text-white/80">
+            {t('dash.apps.unused', { count: unused.length })}
+          </summary>
+          <ul className="mt-2 grid grid-cols-1 gap-3 opacity-70 sm:grid-cols-2 lg:grid-cols-3">
+            {unused.map((s) => (
+              <ServiceTile key={s.id} s={s} />
+            ))}
+          </ul>
+        </details>
+      )}
     </section>
+  );
+}
+
+function ServiceTile({ s }: { s: ServiceStatus }) {
+  const { t } = useTranslation();
+  const info = getService(s.id);
+  const href = serviceHref(s);
+  const viaVpn = info.network === 'vpn';
+  const body = (
+    <>
+      <ServiceIcon id={s.id} size={48} />
+      <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+        <div className="min-w-0">
+          <p className="flex items-center gap-1.5 truncate text-15 font-semibold -tracking-2">
+            {info.name}
+            {viaVpn && (
+              <span title={t('dash.apps.viaVpn')} className="inline-flex">
+                <ShieldCheck
+                  className="size-3.5 shrink-0 text-emerald-300/80"
+                  aria-label={t('dash.apps.viaVpn')}
+                />
+              </span>
+            )}
+          </p>
+          <p className="text-12 leading-snug text-white/65">{t(`service.${s.id}`)}</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <StatusPill
+            status={s.used || s.state === 'ok' ? SERVICE_STATUS[s.state] : 'idle'}
+            label={t(`dash.service.state.${s.state}`)}
+          />
+          {s.version && (
+            <span className="text-11 text-white/45">
+              {t('dash.service.version', { version: s.version })}
+            </span>
+          )}
+        </div>
+      </div>
+      {href && <ExternalLink className="size-4 shrink-0 self-start text-white/40" aria-hidden />}
+    </>
+  );
+  const cls =
+    'umbrel-material umbrel-material-popover flex h-full items-start gap-3 rounded-20 p-3.5 transition-transform duration-300';
+  return (
+    <li data-service={s.id}>
+      {href ? (
+        <a
+          href={href}
+          target="_blank"
+          rel="noreferrer"
+          className={cn(
+            cls,
+            'hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-hidden',
+          )}
+          aria-label={t('dash.service.open', { name: info.name })}
+        >
+          {body}
+        </a>
+      ) : (
+        <div className={cls} title={t('dash.apps.noWindow')}>
+          {body}
+        </div>
+      )}
+    </li>
   );
 }
 

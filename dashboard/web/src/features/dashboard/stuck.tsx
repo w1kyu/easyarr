@@ -1,12 +1,13 @@
 import type { StuckAction, StuckItem } from '@easyarr/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Film, Tv } from 'lucide-react';
+import { BellRing, Film, SearchX, Tv } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GlassPanel } from '~/components/glass-panel';
 import { api } from '~/lib/api';
 import { ErrorAlert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { formatBytes } from './format';
 import { STATUS_QUERY_KEY } from './status-api';
 
@@ -17,14 +18,43 @@ import { STATUS_QUERY_KEY } from './status-api';
 export function StuckList({ items }: { items: StuckItem[] }) {
   const { t } = useTranslation();
   if (items.length === 0) return null;
+  // Things waiting for the user (not EasyArr's own notes like "autoAccepted") drive the alarm look.
+  const waiting = items.filter((i) => i.kind !== 'autoAccepted').length;
   return (
-    <section aria-labelledby="stuck-title" data-testid="stuck">
-      <h2
-        id="stuck-title"
-        className="mb-2.5 px-1 text-13 font-semibold tracking-wide text-white/50 uppercase"
-      >
-        {t('stuck.title')}
-      </h2>
+    <section
+      aria-labelledby="stuck-title"
+      data-testid="stuck"
+      role={waiting > 0 ? 'alert' : undefined}
+      className={cn(
+        'rounded-24 border p-1',
+        waiting > 0
+          ? 'border-amber-400/50 bg-amber-500/10 shadow-[0_0_32px] shadow-amber-500/20'
+          : 'border-white/10',
+      )}
+    >
+      <div className="flex items-center gap-3 px-3 pt-3 pb-2">
+        <span className="relative grid size-10 shrink-0 place-items-center rounded-full bg-amber-400/20">
+          {waiting > 0 && (
+            <span
+              className="absolute inset-0 rounded-full bg-amber-400/30 motion-safe:animate-ping"
+              aria-hidden
+            />
+          )}
+          <BellRing className="relative size-5 text-amber-300" aria-hidden />
+        </span>
+        <div className="min-w-0 flex-1">
+          <h2 id="stuck-title" className="text-17 font-bold -tracking-2">
+            {t('stuck.title')}
+            <span
+              className="ms-2 inline-grid min-w-6 place-items-center rounded-full bg-amber-400 px-1.5 text-12 font-bold text-black"
+              data-testid="stuck-count"
+            >
+              {items.length}
+            </span>
+          </h2>
+          <p className="text-13 text-white/70">{t('stuck.subtitle', { count: items.length })}</p>
+        </div>
+      </div>
       <GlassPanel className="flex flex-col divide-y divide-white/8 p-2">
         {items.map((item) => (
           <StuckRow key={item.id} item={item} />
@@ -55,7 +85,7 @@ function StuckRow({ item }: { item: StuckItem }) {
     quality: offer?.quality ?? '',
     size: offer ? formatBytes(offer.sizeBytes) : '',
   };
-  const Icon = item.type === 'movie' ? Film : Tv;
+  const Icon = item.kind === 'nothingFound' ? SearchX : item.type === 'movie' ? Film : Tv;
   return (
     <div
       className="flex flex-col gap-3 px-3 py-3 sm:flex-row sm:items-center"
@@ -63,8 +93,19 @@ function StuckRow({ item }: { item: StuckItem }) {
       data-id={item.id}
     >
       <div className="flex min-w-0 flex-1 items-start gap-3">
-        <span className="grid size-9 shrink-0 place-items-center rounded-12 bg-white/8">
-          <Icon className="size-4 text-white/70" aria-hidden />
+        <span
+          className={cn(
+            'grid size-9 shrink-0 place-items-center rounded-12',
+            item.kind === 'autoAccepted' ? 'bg-white/8' : 'bg-amber-400/15',
+          )}
+        >
+          <Icon
+            className={cn(
+              'size-4',
+              item.kind === 'autoAccepted' ? 'text-white/70' : 'text-amber-300',
+            )}
+            aria-hidden
+          />
         </span>
         <div className="min-w-0">
           <p className="truncate text-14 font-semibold" title={item.title}>

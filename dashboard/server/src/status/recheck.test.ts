@@ -91,9 +91,64 @@ describe('MissingRecheck (D-067)', () => {
     const { recheck } = make(arr, { used: async () => new Set(['sonarr']) });
     await recheck.runOnce();
     expect(arr.commands.map((c) => c.body)).toEqual([
-      { name: 'SeasonSearch', seriesId: 1, seasonNumber: 2 },
       { name: 'EpisodeSearch', episodeIds: [12] },
+      { name: 'SeasonSearch', seriesId: 1, seasonNumber: 2 },
     ]);
+  });
+
+  it('no season pack found: searches the episodes one by one 20 min later, once per interval', async () => {
+    let now = NOW;
+    const minutesAgo = (m: number) => new Date(now - m * 60_000).toISOString();
+    // A request just ran Sonarr's season search (lastSearchTime = then); nothing was grabbed.
+    const missing = [
+      { id: 20, seriesId: 7, seasonNumber: 1, lastSearchTime: minutesAgo(5) },
+      { id: 21, seriesId: 7, seasonNumber: 1, lastSearchTime: minutesAgo(5) },
+    ];
+    const arr = fakeArr({ sonarrMissing: missing });
+    const { recheck } = make(arr, {
+      used: async () => new Set(['sonarr']),
+      now: () => now,
+    });
+    await recheck.runOnce();
+    expect(arr.commands).toEqual([]); // the season search gets its chance first
+
+    now += 20 * 60_000;
+    await recheck.runOnce();
+    expect(arr.commands.map((c) => c.body)).toEqual([
+      { name: 'EpisodeSearch', episodeIds: [20, 21] },
+    ]);
+
+    // Sonarr updates lastSearchTime; still nothing → no new search until the interval is over.
+    for (const m of missing) m.lastSearchTime = new Date(now).toISOString();
+    now += 60 * 60_000;
+    await recheck.runOnce();
+    expect(arr.commands).toHaveLength(1);
+
+    // 6 h later: a season pack first again, then the episodes once more 20 min after.
+    now += 6 * 3600_000;
+    await recheck.runOnce();
+    expect(arr.commands.at(-1)?.body).toEqual({
+      name: 'SeasonSearch',
+      seriesId: 7,
+      seasonNumber: 1,
+    });
+    for (const m of missing) m.lastSearchTime = new Date(now).toISOString();
+    now += 20 * 60_000;
+    await recheck.runOnce();
+    expect(arr.commands.at(-1)?.body).toEqual({ name: 'EpisodeSearch', episodeIds: [20, 21] });
+  });
+
+  it('does not search episodes one by one while something of them downloads', async () => {
+    const arr = fakeArr({
+      sonarrMissing: [
+        { id: 30, seriesId: 8, seasonNumber: 1, lastSearchTime: hoursAgo(1) },
+        { id: 31, seriesId: 8, seasonNumber: 1, lastSearchTime: hoursAgo(1) },
+      ],
+      sonarrQueue: [{ episodeId: 30 }, { episodeId: 31 }],
+    });
+    const { recheck } = make(arr, { used: async () => new Set(['sonarr']) });
+    await recheck.runOnce();
+    expect(arr.commands).toEqual([]);
   });
 
   it('is rate-limited per check', async () => {

@@ -245,7 +245,7 @@ export class JellyfinNative {
     /** Jellyfin's backups folder as the dashboard sees it. */
     private readonly hostDir: string,
     /** The same folder inside the Jellyfin container. */
-    private readonly containerDir = '/config/data/backups',
+    private readonly containerDir = '/config/data/data/backups',
     private readonly waits: Waits = {},
   ) {}
 

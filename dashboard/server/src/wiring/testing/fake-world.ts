@@ -398,7 +398,7 @@ export class World {
     restores: 0,
   };
   /**
-   * Jellyfin's backups folder (/config/data/backups) on the "host": the dashboard reads and writes
+   * Jellyfin's backups folder (/config/data/data/backups) on the "host": the dashboard reads and writes
    * the same folder (D-070). Unset = Backup/Create fails like a missing folder.
    */
   jfBackupsDir: string | null = null;
@@ -652,11 +652,11 @@ export class World {
         `${this.jfBackupsDir}/${name}`,
         zipSync({ 'jellyfin.json': strToU8(JSON.stringify(data)) }),
       );
-      return [200, { Path: `/config/data/backups/${name}`, ServerVersion: '10.11.2' }];
+      return [200, { Path: `/config/data/data/backups/${name}`, ServerVersion: '10.11.2' }];
     }
     if (path === '/Backup/Restore' && m === 'POST') {
       const file = String(b['ArchiveFileName'] ?? '');
-      if (!this.jfBackupsDir || !file.startsWith('/config/data/backups/')) return [404, ''];
+      if (!this.jfBackupsDir || !file.startsWith('/config/data/data/backups/')) return [404, ''];
       let restored: Json;
       try {
         const zip = unzipSync(

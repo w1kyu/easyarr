@@ -89,8 +89,16 @@ export async function runInit(cfg: InitConfig, log: Logger): Promise<InitReport>
     changes,
     cfg.appDataDir,
   );
+  // Jellyfin's data path is <--datadir>/data, so its backups live in jellyfin/data/data/backups.
   await ensureDir(
-    path.join(cfg.appDataDir, 'jellyfin', 'data', 'backups'),
+    path.join(cfg.appDataDir, 'jellyfin', 'data', 'data'),
+    0o755,
+    own,
+    changes,
+    cfg.appDataDir,
+  );
+  await ensureDir(
+    path.join(cfg.appDataDir, 'jellyfin', 'data', 'data', 'backups'),
     0o750,
     own,
     changes,

@@ -40,7 +40,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('Needs your OK (D-068)', () => {
+describe('Needs your attention (D-068)', () => {
   it('says why in plain words and only acts on a click', async () => {
     const posts = renderList([
       item({}),
@@ -54,7 +54,7 @@ describe('Needs your OK (D-068)', () => {
         actions: ['replace', 'dismiss'],
       },
     ]);
-    expect(screen.getByText('Needs your OK')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: /Needs your attention/ })).toBeTruthy();
     expect(
       screen.getByText(
         /Not available yet in the audio languages you need. There is a version in English/,
@@ -73,6 +73,6 @@ describe('Needs your OK (D-068)', () => {
 
   it('shows nothing when nothing is stuck', () => {
     renderList([]);
-    expect(screen.queryByText('Needs your OK')).toBeNull();
+    expect(screen.queryByRole('heading', { name: /Needs your attention/ })).toBeNull();
   });
 });

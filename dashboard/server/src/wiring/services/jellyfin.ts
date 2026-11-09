@@ -151,7 +151,7 @@ export class JellyfinClient {
   /**
    * Built-in backup (Jellyfin 10.11+, D-070): database only (users, watch history, libraries,
    * settings); metadata/images are fetched again by a library scan. The archive lands in Jellyfin's
-   * own backups folder; Jellyfin's answer names its path inside the Jellyfin container.
+   * own backups folder (DataPath/backups = /config/data/data/backups in the linuxserver image); Jellyfin's answer names its path inside the Jellyfin container.
    */
   async createBackup(token: string): Promise<{ path: string }> {
     const m = await this.http.json('/Backup/Create', z.looseObject({ Path: z.string() }), {
