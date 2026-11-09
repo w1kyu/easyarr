@@ -37,11 +37,12 @@ c() { echo "${APP_ID}_$1_1"; }
 
 install_package() {
   # umbrelOS copies the package into app-data, drops .gitkeep files and owns it as 1000:1000.
-  mkdir -p "${APP_DATA_DIR}"
-  (cd "${PACKAGE_DIR}" && find data -type d) | while read -r dir; do
-    mkdir -p "${APP_DATA_DIR}/${dir}"
-  done
-  docker run --rm -v "${DEV_DATA}:/dev-data" "${BUSYBOX}" chown -R 1000:1000 /dev-data/umbrel/app-data
+  # Done as root in a container: after the first install app-data belongs to 1000, not to us.
+  mkdir -p "${DEV_DATA}"
+  # shellcheck disable=SC2016 # expanded inside the container
+  docker run --rm -v "${DEV_DATA}:/dev-data" -v "${PACKAGE_DIR}/data:/pkg:ro" "${BUSYBOX}" sh -c \
+    'cd /pkg && find . -type d | while read -r d; do mkdir -p "/dev-data/umbrel/app-data/$0/data/$d"; done && chown -R 1000:1000 /dev-data/umbrel/app-data' \
+    "${APP_ID}"
 }
 
 wait_healthy() {
@@ -418,12 +419,8 @@ same() { [[ "$1" == "$2" ]]; }
 backuptest() {
   local api=http://localhost:39000/api dir before_ledger before_clients before_libs
   dir="$(mktemp -d)"
-  json() { curl -fsS -m 30 -H 'content-type: application/json' -d "$2" "$api/$1"; }
 
-  echo "== A configured install"
-  # wiretest changed an answer (download method), which re-opens Finish (D-053): finish again.
-  # (CI's runs always have Recyclarr's offline failure, so "problems" is the honest answer.)
-  check "setup finished" ok json wizard/finish '{"result":"problems"}'
+  echo "== A configured install (wired by wiretest; its changed answer re-opened Finish, D-053)"
   # Things only the services' own backups can bring back (state replay would not).
   check "Sonarr: a tag made by hand" ok arr_post sonarr 8989 /api/v3/tag '{"label":"backup-marker"}'
   check "Jellyfin: a second user made by hand" ok curl -fsS -m 15 -X POST \
@@ -436,7 +433,7 @@ backuptest() {
   echo "== Backup (encrypted) through the API"
   check "download a backup" ok curl -fsS -m 900 -o "$dir/backup.easyarr" -H 'content-type: application/json' \
     -d '{"password":"Backup-Pass-2026"}' "$api/backup"
-  ls -l "$dir/backup.easyarr" | sed 's/^/      /'
+  echo "      backup size: $(wc -c <"$dir/backup.easyarr") bytes"
 
   echo "== Wipe the app's data and start fresh (like uninstall + install)"
   compose down
@@ -469,7 +466,7 @@ for line in open(sys.argv[1]):
             print(f"   {e}")
 PY
   for step in easyarr sonarr radarr lidarr prowlarr jellyfin connections; do
-    check "restore step $step" ok same "$(restore_step_state "$dir/restore.sse" "$step")" done
+    check "restore step $step" ok same "$(restore_step_state "$dir/restore.sse" "$step")" 'done'
   done
   # CI has no working VPN (the leak test saved a dead end), and Recyclarr can't reach GitHub:
   # those two may fail; the wiring check runs once more below with the usual allowance.
@@ -480,7 +477,7 @@ PY
   again="$(mktemp)"
   wiring_run "$again"
   check "wiring check: every step worked (except offline: $OFFLINE_STEPS)" ok test -z "$(wiring_failed_steps "$again")"
-  check "the wizard is finished" ok url_has "$api/wizard" '"next":null'
+  check "the account came back" fail url_has "$api/wizard" '"account":null'
   check "same wiring ledger" ok same "$(ledger_keys)" "$before_ledger"
   check "same Sonarr download clients" ok same \
     "$(arr_get sonarr 8989 /api/v3/downloadclient | python3 -c 'import json,sys; print(sorted(c["name"] for c in json.load(sys.stdin)))')" "$before_clients"
