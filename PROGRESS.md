@@ -23,7 +23,7 @@ Next prompt: `prompts/08-backup-restore.md` (after the owner's phase 07 test).
 | 05 | Wiring engine + service proxy | ✅ done (owner test pending) | v0.0.5–v0.0.7; wiretest green against real services (amd64 + arm64) |
 | 06 | Wizard steps 6–9 | 🟨 owner test in progress | v0.0.8 → v0.0.10 (LQ last resort, wiring on start, Cleanuparr cleans up); e2e torrents/usenet/both + stack wizard e2e through Finish |
 | 07 | Dashboard + settings | 🟨 built (owner test pending) | v0.0.12; /api/status, Simple/Advanced, warnings, Settings; e2e for mode toggle + settings change; stack test reads /api/status |
-| 08 | Backup & restore | ⬜ todo | |
+| 08 | Backup & restore | 🟨 in progress | built; stack test: Jellyfin native backup + Seerr after restore still red |
 | 09 | Diagnostics + AI help | ⬜ todo | |
 | 10 | Documentation | ⬜ todo | |
 | 11 | Release v0.1.0 | ⬜ todo | |
@@ -131,6 +131,18 @@ Copy from SPEC as they get resolved. Highest priority first:
 - umbrelOS 2.0 `environment:` manifest settings could expose a few safe knobs (e.g. TZ) in Umbrel's app settings.
 
 ## Session log
+### 2026-11-09 (afternoon) — Phase 08: backup & restore (Claude Code on the Mac) — IN PROGRESS
+- Built: `.easyarr` format (D-069), native backups for Sonarr/Radarr/Lidarr/Prowlarr + Jellyfin
+  (D-070), restore keeps this install's API keys (D-071), raw upload header (D-072); Settings →
+  Backups, /restore (also from wizard step 1), automatic daily backups, `docs/backup-restore.md`.
+- Verified: 309+ unit tests, Playwright 38 passed locally (incl. encrypted backup → wrong password →
+  restore). Stack test `dev/stack.sh backuptest` (CI, real services, both arches) on 7060fc7:
+  Servarr restore, re-keying, SABnzbd/Prowlarr key fixes, hand-made Sonarr tag — all PASS.
+- Still failing there: (1) Jellyfin's own backup was skipped at backup time (reason unknown; the
+  test now prints the manifest's skip reasons); (2) Jellyseerr refused the first session after its
+  first sign-in on the fresh install (403) → retry added in `seerrKey` (unproven against real Seerr).
+- Not released: v0.0.17 manifest + compose pin (sha-5c15910) are committed, but the store is NOT
+  synced. Next: push the fix → Image → re-pin → `Umbrel app` green on both arches → sync store.
 ### 2026-11-09 (night) — Owner's 11-item list: UI fixes, media languages, season packs, re-search (D-064 – D-067)
 - Phase 1 (UI, 6dd788a): logo → home; status-strip VPN/Downloads icons and recently-added posters
   clickable, dead hover effects removed; 44 px Simple/Advanced segmented control; switching to

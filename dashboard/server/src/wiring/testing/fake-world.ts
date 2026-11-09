@@ -406,6 +406,8 @@ export class World {
     type: 4,
     initialized: false,
     apiKey: 'seerr-key',
+    /** The first session after the first sign-in is refused once (seen after a restore, CI). */
+    refuseNextSession: false,
     libs: [{ id: 'lib1', name: 'Movies', enabled: false, type: 'movie' }] as Json[],
     sonarr: new Collection(),
     radarr: new Collection(),
@@ -725,7 +727,13 @@ export class World {
     }
     const ok = h.get('cookie') === 'connect.sid=abc' || h.get('x-api-key') === this.seerr.apiKey;
     if (!ok) return [403, ''];
-    if (path === '/api/v1/settings/main') return [200, { apiKey: this.seerr.apiKey }];
+    if (path === '/api/v1/settings/main') {
+      if (this.seerr.refuseNextSession) {
+        this.seerr.refuseNextSession = false;
+        return [403, { message: 'You do not have permission to access this endpoint' }];
+      }
+      return [200, { apiKey: this.seerr.apiKey }];
+    }
     if (path === '/api/v1/settings/jellyfin/library/sync') return [200, this.seerr.libs];
     if (path.startsWith('/api/v1/settings/jellyfin/library/')) {
       const lib = this.seerr.libs.find((l) => l['id'] === path.split('/').pop());
@@ -872,6 +880,7 @@ export class World {
       gpu: async () => ({ vendor: 'intel', device: '/dev/dri/renderD128' }),
       usenetSecret: async (kind, id) => this.usenetSecrets[kind][id],
       fetch: this.fetch,
+      sleep: async () => undefined,
       recyclarr: {
         writeConfig: async (content) => {
           const changed = content !== this.recyclarrConfig;

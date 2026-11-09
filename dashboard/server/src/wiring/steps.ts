@@ -56,6 +56,8 @@ export interface StepDeps {
    * "Open in Sonarr/Radarr" links point at its /apps/<name> proxy.
    */
   publicUrl?: string;
+  /** Pauses between retries (tests make them instant). */
+  sleep?: (ms: number) => Promise<void>;
   /** Waiting for Recyclarr's sync (tests make it instant). */
   recyclarrTimeoutMs?: number;
 }
@@ -779,7 +781,17 @@ export function buildSteps(deps: StepDeps): {
       firstRun ? { hostname: containerName('jellyfin'), port: 8096 } : null,
     );
     if (firstRun) ctx.changed();
-    const apiKey = await s.apiKey(cookie);
+    let apiKey: string;
+    try {
+      apiKey = await s.apiKey(cookie);
+    } catch (err) {
+      // Seen once right after Seerr's very first sign-in (fresh Seerr after a restore): the new
+      // admin's session was refused. A second sign-in (Seerr is set up by then) gets a good one.
+      if (!(firstRun && err instanceof ServiceError && err.code === 'auth')) throw err;
+      ctx.log?.warn('Seerr refused the first session; signing in again');
+      await (deps.sleep ?? ((ms: number) => new Promise((r) => setTimeout(r, ms))))(2000);
+      apiKey = await s.apiKey(await s.loginWithJellyfin(username, password, null));
+    }
     await deps.saveKey('jellyseerr', apiKey);
     return apiKey;
   };

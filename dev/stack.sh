@@ -448,6 +448,7 @@ backuptest() {
   up="$(curl -sS -m 120 -X POST -H 'content-type: application/octet-stream' -H 'x-easyarr-upload: 1' \
     --data-binary "@$dir/backup.easyarr" "$api/backup/upload")"
   check "upload: encrypted, locked" ok grep -q '"unlocked":false' <<<"$up"
+  echo "      inside: $(python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("native"), "skipped:", d.get("skipped"))' <<<"$up")"
   local wrong
   wrong="$(curl -sS -m 120 -H 'content-type: application/json' \
     -d '{"source":{"kind":"upload"},"password":"wrong-password"}' "$api/backup/inspect")"

@@ -175,6 +175,15 @@ describe('wiring steps', () => {
     expect(Object.values(w.cu.seekerInstances).every((i) => i['enabled'] === true)).toBe(true);
   });
 
+  it('signs in to Seerr again when it refuses the very first session', async () => {
+    const world = new World();
+    world.seerr.refuseNextSession = true;
+    const { run } = setup(world);
+    const r = await run();
+    expect(r.failed).toEqual([]);
+    expect(world.keys['jellyseerr']).toBe('seerr-key');
+  });
+
   it('fills in a missing Seerr link URL once (older installs) and keeps one the user set', async () => {
     const { world: w, store, run } = setup();
     await run();
