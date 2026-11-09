@@ -95,5 +95,16 @@ describe('http app', () => {
     expect(img.statusCode).toBe(404);
     const log = await app.inject({ method: 'GET', url: '/api/logs/sonarr' });
     expect(log.json()).toEqual({ source: 'sonarr', available: false, lines: [] });
+
+    // Settings → Advanced: the missing re-search schedule (D-067), 6 h by default.
+    const recheck = () => app.inject({ method: 'GET', url: '/api/settings/recheck' });
+    expect((await recheck()).json()).toEqual({ hours: 6 });
+    const set = (hours: unknown) =>
+      app.inject({ method: 'PUT', url: '/api/settings/recheck', payload: { hours } });
+    expect((await set(12)).statusCode).toBe(200);
+    expect((await recheck()).json()).toEqual({ hours: 12 });
+    expect((await set(5)).statusCode).toBe(400);
+    expect((await set(0)).statusCode).toBe(200);
+    expect((await recheck()).json()).toEqual({ hours: 0 });
   });
 });

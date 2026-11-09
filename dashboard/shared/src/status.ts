@@ -123,3 +123,11 @@ export function compareVersions(a: string, b: string): number {
   }
   return 0;
 }
+
+/**
+ * How often EasyArr asks Sonarr/Radarr to search again for monitored items that never started
+ * downloading (D-067). 0 = off.
+ */
+export const RECHECK_HOURS = [0, 3, 6, 12, 24] as const;
+export type RecheckHours = (typeof RECHECK_HOURS)[number];
+export const RECHECK_DEFAULT_HOURS: RecheckHours = 6;

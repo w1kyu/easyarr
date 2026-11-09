@@ -1,6 +1,15 @@
 import { parse } from 'yaml';
 import { describe, expect, it } from 'vitest';
-import { LQ_SCORE, MIN_FORMAT_SCORE, qualityProfileName, recyclarrConfig } from './recyclarr.js';
+import { LANGUAGE_SCORE_STEP } from '../languages.js';
+import {
+  LQ_SCORE,
+  MIN_FORMAT_SCORE,
+  qualityProfileName,
+  recyclarrConfig,
+  SEASON_PACK_SCORE,
+  SEASON_PACK_TRASH_ID,
+  SONARR_MIN_UPGRADE_SCORE,
+} from './recyclarr.js';
 
 const targets = {
   sonarr: { baseUrl: 'http://localhost:8989/apps/sonarr', apiKey: 's'.repeat(32) },
@@ -12,6 +21,7 @@ interface Instance {
     trash_id: string;
     name: string;
     min_format_score: number;
+    min_upgrade_format_score?: number;
     qualities?: { name: string; qualities?: string[] }[];
     upgrade?: { allowed: boolean; until_quality: string };
   }[];
@@ -61,6 +71,26 @@ describe('recyclarrConfig', () => {
         expect(Object.keys(min)).toHaveLength(9);
         expect(min['HDTV-1080p']).toBeUndefined();
       }
+    },
+  );
+
+  it.each(['best', 'balanced', 'small'] as const)(
+    '%s: shows prefer whole-season packs, without re-downloading episodes for them (D-067)',
+    (preset) => {
+      const { sonarr, radarr } = load(preset);
+      const name = qualityProfileName(preset);
+      expect(sonarr.custom_formats[1]).toEqual({
+        trash_ids: [SEASON_PACK_TRASH_ID],
+        assign_scores_to: [{ name, score: SEASON_PACK_SCORE }],
+      });
+      expect(sonarr.quality_profiles[0]?.min_upgrade_format_score).toBe(SONARR_MIN_UPGRADE_SCORE);
+      // The language still decides first; a pack alone isn't worth an upgrade.
+      expect(SEASON_PACK_SCORE).toBeLessThan(LANGUAGE_SCORE_STEP);
+      expect(SONARR_MIN_UPGRADE_SCORE).toBeGreaterThan(SEASON_PACK_SCORE);
+      expect(SONARR_MIN_UPGRADE_SCORE).toBeLessThanOrEqual(LANGUAGE_SCORE_STEP);
+      // Movies have no packs.
+      expect(radarr.custom_formats).toHaveLength(1);
+      expect(radarr.quality_profiles[0]?.min_upgrade_format_score).toBeUndefined();
     },
   );
 

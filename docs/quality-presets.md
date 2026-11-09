@@ -62,6 +62,17 @@ language, 3. English. "Original language" means the language the film or show wa
 If you installed EasyArr before multi-language support, your list now reads "Original language,
 then <the language you chose>". Change it in **Settings → Libraries & quality**.
 
+## Whole seasons and trying again
+
+- **Whole seasons:** when you ask for a show or a season that's already finished, Sonarr searches
+  season by season, and EasyArr's profile gives a whole-season pack a bonus over single episodes.
+  Seasons that are still airing come episode by episode. A season pack alone never makes EasyArr
+  download episodes you already have again.
+- **Trying again:** if nothing was found when you asked for something, EasyArr asks Sonarr and
+  Radarr to search again every 6 hours, a few items at a time so your search sites don't block you.
+  Change how often (or switch it off) in **Settings → Advanced**. It pauses while the VPN is down
+  or every search site is unreachable.
+
 ## Want to fine-tune?
 
 EasyArr owns the "EasyArr (…)" profiles and resets them when it updates them. To customise, open

@@ -25,6 +25,8 @@ export async function startServer(config: ServeConfig): Promise<void> {
   services.portSync.start();
   // Search sites paused after an outage come back within minutes, not hours.
   services.indexers?.start();
+  // Monitored movies/episodes that never started downloading get searched again (D-067).
+  services.recheck?.start();
   // Only this dashboard and the request page may connect to the VPN-side services (D-046).
   const allowlist = new ClientAllowlist({ vpnDir: config.vpnDir, log });
   allowlist.start();
@@ -42,6 +44,7 @@ export async function startServer(config: ServeConfig): Promise<void> {
     log.info({ signal }, 'shutting down');
     services.portSync.stop();
     services.indexers?.stop();
+    services.recheck?.stop();
     allowlist.stop();
     startup?.stop();
     await app.close();

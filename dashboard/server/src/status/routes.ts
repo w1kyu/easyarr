@@ -1,4 +1,4 @@
-import { LOG_SOURCES } from '@easyarr/shared';
+import { LOG_SOURCES, RECHECK_DEFAULT_HOURS, RECHECK_HOURS } from '@easyarr/shared';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { ApiError, useApiErrorHandler } from '../http-errors.js';
@@ -13,6 +13,9 @@ export interface StatusRoutesOptions {
 }
 
 const uiBodySchema = z.object({ mode: z.enum(['simple', 'advanced']) });
+const recheckBodySchema = z.object({
+  hours: z.number().refine((h) => (RECHECK_HOURS as readonly number[]).includes(h)),
+});
 
 /**
  * Dashboard home (SPEC §7.3, §12): GET /api/status, the Simple/Advanced switch (remembered in
@@ -37,6 +40,23 @@ export async function statusRoutes(app: FastifyInstance, opts: StatusRoutesOptio
       }
     });
     return { mode: parsed.data.mode };
+  });
+
+  // Settings → Advanced: how often missing movies/episodes are searched again (D-067).
+  app.get('/api/settings/recheck', async () => {
+    const { value } = await stateStore(opts.stateDir).load();
+    return { hours: value.searches?.recheckHours ?? RECHECK_DEFAULT_HOURS };
+  });
+
+  app.put('/api/settings/recheck', async (request) => {
+    const parsed = recheckBodySchema.safeParse(request.body);
+    if (!parsed.success) throw new ApiError(400, 'invalid_body');
+    const store = stateStore(opts.stateDir);
+    await opts.lock.run(async () => {
+      const { value } = await store.load();
+      await store.save({ ...value, searches: { recheckHours: parsed.data.hours } });
+    });
+    return { hours: parsed.data.hours };
   });
 
   app.get<{ Params: { id: string } }>('/api/media/:id/image', async (request, reply) => {

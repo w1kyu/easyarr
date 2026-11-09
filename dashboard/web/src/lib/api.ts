@@ -158,6 +158,13 @@ export const api = {
   prowlarrIndexers: () =>
     request<{ reachable: boolean; count: number; torrent: number }>('/api/prowlarr/indexers'),
   status: () => request<StatusView>('/api/status'),
+  recheck: () => request<{ hours: number }>('/api/settings/recheck'),
+  setRecheck: (hours: number) =>
+    request<{ hours: number }>('/api/settings/recheck', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ hours }),
+    }),
   setMode: (mode: StatusView['mode']) =>
     request<{ mode: StatusView['mode'] }>('/api/ui', {
       method: 'PUT',

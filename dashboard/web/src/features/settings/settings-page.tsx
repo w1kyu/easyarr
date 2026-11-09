@@ -1,13 +1,15 @@
 import {
   APP_NAME,
   ISSUES_URL,
+  RECHECK_DEFAULT_HOURS,
+  RECHECK_HOURS,
   REPO_URL,
   WIZARD_STEPS,
   type WizardStepId,
   type WizardView,
 } from '@easyarr/shared';
-import { useQuery } from '@tanstack/react-query';
-import { useIsMutating } from '@tanstack/react-query';
+import { useIsMutating, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { SelectField } from '~/components/select-field';
 import {
   ArrowLeft,
   CircleCheckBig,
@@ -303,6 +305,38 @@ function Advanced() {
           <WiringChecklist rows={run.rows} />
         </div>
       )}
+      <RecheckSetting />
+    </div>
+  );
+}
+
+/** How often EasyArr searches again for requests that never started downloading (D-067). */
+function RecheckSetting() {
+  const { t } = useTranslation();
+  const client = useQueryClient();
+  const current = useQuery({ queryKey: ['recheck'], queryFn: api.recheck });
+  const save = useMutation({
+    mutationFn: (hours: number) => api.setRecheck(hours),
+    onSuccess: (data) => client.setQueryData(['recheck'], data),
+  });
+  return (
+    <div className="flex flex-col gap-2 border-t border-white/8 pt-4" data-testid="recheck">
+      <SelectField
+        label={t('settings.recheck.label')}
+        value={String(current.data?.hours ?? RECHECK_DEFAULT_HOURS)}
+        disabled={current.isPending || save.isPending}
+        className="md:max-w-sm"
+        onChange={(e) => save.mutate(Number(e.target.value))}
+        hint={t('settings.recheck.hint')}
+      >
+        {RECHECK_HOURS.map((h) => (
+          <option key={h} value={h}>
+            {h === 0 ? t('settings.recheck.off') : t('settings.recheck.every', { count: h })}
+          </option>
+        ))}
+      </SelectField>
+      {save.isSuccess && <p className="text-12 text-emerald-300">{t('settings.recheck.saved')}</p>}
+      {save.isError && <ErrorAlert description={t('settings.recheck.failed')} />}
     </div>
   );
 }

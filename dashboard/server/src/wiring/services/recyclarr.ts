@@ -45,6 +45,21 @@ const LQ_TRASH_IDS = {
 } as const;
 
 /**
+ * Whole-season packs (owner's item 9, D-067). Sonarr already searches season by season when a show
+ * is added or requested (Seerr starts a SeriesSearch → SeasonSearch per season) and prefers a pack
+ * over single episodes, but only when quality and score are equal (DownloadDecisionComparer:
+ * quality → score → protocol → episode count). The guide's "Season Pack" format (+10) is only a
+ * tiebreak; +1000 lets a pack beat single episodes from a better release group, while staying under
+ * one language step (2000, D-066) so the language still wins. Ongoing seasons have no packs, so
+ * single episodes stay the fallback. An upgrade needs at least +1001, so a pack alone never
+ * re-downloads episodes you already have (quality and language upgrades still happen).
+ * TRaSH-Guides@d24f13c docs/json/sonarr/cf/season-pack.json (ReleaseTypeSpecification = 3).
+ */
+export const SEASON_PACK_TRASH_ID = '3bc5f395426614e155e585a2f056cdf1';
+export const SEASON_PACK_SCORE = 1000;
+export const SONARR_MIN_UPGRADE_SCORE = SEASON_PACK_SCORE + 1;
+
+/**
  * Smallest size (MB per minute) Radarr/Sonarr accept per resolution, for WEB and Bluray releases
  * (D-063). The guide's minimums (e.g. Bluray-1080p 50.8, about 6 GB for a 2-hour movie) reject the
  * small LQ encodes that D-055 keeps as a last resort — a YTS 1080p is ~2 GB (≈16 MB/min), a 720p
@@ -127,6 +142,7 @@ export function recyclarrConfig(
         // EasyArr's language formats are scored by the wiring (D-066), not by the guide.
         reset_unmatched_scores: { enabled: true, except_patterns: [LANGUAGE_FORMAT_PATTERN] },
         min_format_score: MIN_FORMAT_SCORE,
+        ...(app === 'sonarr' ? { min_upgrade_format_score: SONARR_MIN_UPGRADE_SCORE } : {}),
         ...(profile.qualities
           ? {
               qualities: profile.qualities.map((q) =>
@@ -142,6 +158,14 @@ export function recyclarrConfig(
     // An explicit score beats the guide's (Recyclarr sync-plan-phase.md "Score Resolution").
     custom_formats: [
       { trash_ids: [...LQ_TRASH_IDS[app]], assign_scores_to: [{ name, score: LQ_SCORE }] },
+      ...(app === 'sonarr'
+        ? [
+            {
+              trash_ids: [SEASON_PACK_TRASH_ID],
+              assign_scores_to: [{ name, score: SEASON_PACK_SCORE }],
+            },
+          ]
+        : []),
     ],
   });
   const doc: Record<string, unknown> = {};

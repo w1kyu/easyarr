@@ -2,13 +2,14 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import helmet from '@fastify/helmet';
 import fastifyStatic from '@fastify/static';
-import { APP_NAME, parseWizardAnswers, serviceUrl } from '@easyarr/shared';
+import { APP_NAME, parseWizardAnswers, RECHECK_DEFAULT_HOURS, serviceUrl } from '@easyarr/shared';
 import Fastify, { LogController, type FastifyBaseLogger, type FastifyInstance } from 'fastify';
 import type { Logger } from 'pino';
 import type { SystemInfo } from '@easyarr/shared';
 import type { ServeConfig } from './config.js';
 import { secretsStore, stateStore } from './state/index.js';
 import { statusRoutes } from './status/routes.js';
+import { MissingRecheck } from './status/recheck.js';
 import { IndexerHealer } from './status/indexer-health.js';
 import {
   fetchStoreVersion,
@@ -56,6 +57,8 @@ export interface Services {
   portSync: PortSync;
   /** Un-pauses search sites after an outage (server.ts starts its timer). */
   indexers?: IndexerHealer;
+  /** Searches again for missing movies/episodes (server.ts starts its timer, D-067). */
+  recheck?: MissingRecheck;
   /** Built from the config when left out (tests that only exercise other routes). */
   wiring?: WiringEngine;
 }
@@ -101,21 +104,43 @@ export function createServices(
     new QbittorrentClient(config.qbittorrentUrl ?? 'http://127.0.0.1:8090'),
     logger,
   );
+  const canReach = async () => {
+    const { connection } = await vpn.status();
+    if (connection === 'connected') return true;
+    if (connection !== 'not_configured') return false;
+    // Without a VPN (the user skipped it) the apps go out directly.
+    const state = (await stateStore(config.stateDir).load()).value;
+    return parseWizardAnswers(state.wizard.answers).vpn?.mode === 'skipped';
+  };
   const indexers = new IndexerHealer({
     url: (id) => config.serviceUrls?.[id] ?? serviceUrl(id),
     keys: async () => (await secretsStore(config.stateDir).load()).value.apiKeys,
-    canReach: async () => {
-      const { connection } = await vpn.status();
-      if (connection === 'connected') return true;
-      if (connection !== 'not_configured') return false;
-      // Without a VPN (the user skipped it) the apps go out directly.
-      const state = (await stateStore(config.stateDir).load()).value;
-      return parseWizardAnswers(state.wizard.answers).vpn?.mode === 'skipped';
+    canReach,
+    used: async () => usedServices((await stateStore(config.stateDir).load()).value),
+    ...(logger ? { log: logger } : {}),
+  });
+  const recheck = new MissingRecheck({
+    url: (id) => config.serviceUrls?.[id] ?? serviceUrl(id),
+    keys: async () => (await secretsStore(config.stateDir).load()).value.apiKeys,
+    hours: async () =>
+      (await stateStore(config.stateDir).load()).value.searches?.recheckHours ??
+      RECHECK_DEFAULT_HOURS,
+    canReach,
+    sitesUsable: () => {
+      const h = indexers.last();
+      return !h || h.total === 0 || h.blocked < h.total;
     },
     used: async () => usedServices((await stateStore(config.stateDir).load()).value),
     ...(logger ? { log: logger } : {}),
   });
-  return { lock, vpn, portSync, indexers, wiring: wiringFor(config, lock, collect, logger) };
+  return {
+    lock,
+    vpn,
+    portSync,
+    indexers,
+    recheck,
+    wiring: wiringFor(config, lock, collect, logger),
+  };
 }
 
 export interface BuildAppOptions {

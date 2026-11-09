@@ -52,6 +52,11 @@ export const stateSchema = z.object({
     mode: z.enum(['simple', 'advanced']),
   }),
   /**
+   * Automatic re-search of missing movies/episodes (D-067). Optional, so older files load as they
+   * are (default RECHECK_DEFAULT_HOURS) and older versions simply ignore it.
+   */
+  searches: z.object({ recheckHours: z.number().int().min(0).max(168) }).optional(),
+  /**
    * The owner's account from wizard step 3 (v2). Only a password *hash* lives here; the plaintext
    * is in secrets.json because it must be applied to Jellyfin later (phase 05).
    */
