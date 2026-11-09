@@ -70,6 +70,10 @@ Results of SPEC **[VERIFY]** items. Format: `- YYYY-MM-DD — <fact> — <source
 - 2026-11-05 — Radarr 6.4.4 / Sonarr 4.0.20 rank releases by quality first, then custom-format score (`DownloadDecisionComparer`: CompareQuality → CompareCustomFormatScore → protocol → indexer priority → peers/age → size). — https://github.com/Radarr/Radarr/blob/a96bf7c3ecb23cb76993770727285dc17a613fbc/src/NzbDrone.Core/DecisionEngine/DownloadDecisionComparer.cs#L31-L43
 - 2026-11-05 — TRaSH LQ formats (Radarr `90a6f9a2…`, `e204b80c…`; Sonarr `9c11cd3f…`, `e2315f99…`) score −10000 and reach EasyArr's profiles through the default "[Unwanted] Unwanted Formats" group; YTS is in LQ. Other negative guide scores: −51 (v0), −10000, −35000. — https://github.com/TRaSH-Guides/Guides/tree/d24f13ceea5e82ccc20d08b7814fca93840e4046/docs/json/radarr/cf-groups/unwanted-formats.json
 - 2026-11-05 — Recyclarr 8.8.1: an explicit `custom_formats[].assign_scores_to[].score` beats the guide score; `qualities` replaces the guide's list (highest first, Recyclarr reverses for the API), unlisted qualities get disabled, emptied groups are dropped; `upgrade.until_quality` may name a group. Proven against the real images (CI job "Recyclarr profiles"). — https://github.com/recyclarr/recyclarr/blob/874cb274f8b419dff6fb211fc326e4f2dd63c4fb/docs/architecture/sync-plan-phase.md , `src/Recyclarr.Cli/Pipelines/QualityProfile/QualityItemOrganizer.cs`
+- 2026-11-09 — Servarr backup API (Sonarr 4.0.20 / Radarr 6.4.4 / Lidarr 3.1.6 / Prowlarr 2.7.0): `POST /command {"name":"Backup"}` (manual), `GET /system/backup` (path `/backup/manual/<name>`, served by BackupFileMapper), `POST /system/backup/restore/upload` (multipart .zip, moves config.xml + DB, `RestartRequired`), `POST /system/restart` = new process inside the container (`AppLifetime.OnAppStopped` → `SpawnNewProcess`), `/system/status.startTime` tells old and new process apart. — https://github.com/Sonarr/Sonarr/blob/cab419ade8ac7fcab5bf80394ee492abd35d5f5a/src/Sonarr.Api.V3/System/Backup/BackupController.cs (D-070)
+- 2026-11-09 — Jellyfin 12.4 has the 10.11 backup API: `POST /Backup/Create` (Database/Metadata/Trickplay/Subtitles flags), `POST /Backup/Restore {ArchiveFileName}` (restores on an in-process restart), files in `<data>/backups` = `/config/data/backups` in the linuxserver image; no download/upload endpoint. — https://github.com/jellyfin/jellyfin/blob/83d0d0e7f76e23e2e085c8ff67d28b772d35967d/Jellyfin.Api/Controllers/BackupController.cs (D-070)
+- 2026-11-09 — SABnzbd 5.1.3: `mode=config&name=create_backup` writes a zip into the complete folder; restore only through the web form (`interface.py` `config_backup_file`) → not used, state replay instead. — https://github.com/sabnzbd/sabnzbd/blob/a647f73426cb70ad60ae7964b96c2d5e939b4727/sabnzbd/config.py#L1013
+- 2026-11-09 — The compose restart policy isn't involved in restores: Servarr restarts in a new process, Jellyfin in-process → `restart: on-failure` stays (SPEC §11 [VERIFY]). (D-071)
 
 ## Open [VERIFY] items
 Copy from SPEC as they get resolved. Highest priority first:
@@ -79,8 +83,8 @@ Copy from SPEC as they get resolved. Highest priority first:
 - [x] Gluetun control server endpoints + auth requirements; port-forwarding provider list
 - [x] Gluetun DNS: can VPN-side apps resolve Docker container names (e.g. Jellyfin) once the tunnel is up? → No, by design (D-043); use localhost / the dashboard.
 - [x] Sub-path support per service (Servarr, Bazarr, SABnzbd incl. `host_whitelist`, qBittorrent, Cleanuparr `BASE_PATH`) — `docs/dev/research/`, D-045, D-049
-- [ ] Jellyfin startup API + backup/restore API; Seerr setup API (startup + Seerr setup done: `docs/dev/research/jellyfin-seerr.md`; backup/restore still open)
-- [ ] Servarr backup/restore API endpoints
+- [x] Jellyfin startup API + backup/restore API; Seerr setup API (D-070)
+- [x] Servarr backup/restore API endpoints (D-070)
 - [x] Port range 39000/39096/39055 free in official + popular community stores
 - [x] Cleanuparr image name, port, config format (config is created via its UI/API; format TBD in phase 05)
 - [x] umbrelOS UI code: where components/design tokens live upstream; exact LICENSE text incl. any "Required Notice"

@@ -401,10 +401,12 @@ Two layers so restore always works, even when a service's native backup can't be
    re-runs the wiring → same structure, same connections, same VPN, same accounts.
 2. **Native service backups (full fidelity):** history, custom settings, monitored items.
    - Sonarr/Radarr/Lidarr/Prowlarr: trigger built-in backup via API, include the zip; restore via API
-     upload **[VERIFY endpoints per app/version]**.
-   - Jellyfin: use built-in backup/restore if available in the shipped version **[VERIFY]**; otherwise
+     upload (verified, D-070). The restored config.xml keeps this install's API key (D-071).
+   - Jellyfin: built-in backup/restore (Jellyfin 10.11+ API, archive handed over through its shared
+     backups folder, D-070); if that fails,
      v1 restores via state replay (libraries, admin) and documents what's lost (watch history).
-   - qBittorrent / SABnzbd / Bazarr / Jellyseerr: config files where safe **[VERIFY]**; else state replay.
+   - qBittorrent / SABnzbd / Bazarr / Jellyseerr: state replay (no usable backup API, D-070).
+     Lost and documented: Jellyseerr's past requests, Bazarr's history.
    - Active torrents / in-progress downloads: **not** included (documented).
    - Media files are **never** included (documented clearly: "this backs up your setup, not your movies").
 
@@ -422,8 +424,8 @@ Two layers so restore always works, even when a service's native backup can't be
 - Validate manifest + checksums + version compatibility (migrate older formats; refuse newer with clear message).
 - Ask for password if encrypted. Show what will be restored. Confirm.
 - Live progress (SSE). Restarts services through their own APIs where needed (never Docker socket).
-  Services restarted via clean shutdown need a restart policy that brings them back **[VERIFY Umbrel
-  allows `restart: unless-stopped`; else find alternative]**.
+  Servarr restarts into a new process inside its container and Jellyfin restarts in-process, so no
+  restart policy is involved (verified, D-071).
 - Ends with a VPN connection test and a wiring check.
 
 ---
