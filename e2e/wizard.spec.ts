@@ -21,7 +21,10 @@ test('opening EasyArr on a fresh install starts the wizard at Welcome', async ({
   await expect(page.getByRole('heading', { name: 'Welcome to EasyArr' })).toBeVisible();
   await expect(page.getByText('Step 1 of 7')).toBeVisible();
   await expect(page.getByText('Please use it responsibly')).toBeVisible();
-  await expect(page.getByRole('button', { name: /Restore from backup/ })).toBeDisabled();
+  await expect(page.getByRole('link', { name: /Restore from backup/ })).toHaveAttribute(
+    'href',
+    '/restore',
+  );
 });
 
 test('"How does it work?" opens the in-app help, and links inside it work', async ({ page }) => {

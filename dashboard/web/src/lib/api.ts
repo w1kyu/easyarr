@@ -1,4 +1,9 @@
 import type {
+  BackupSettings,
+  BackupSettingsView,
+  RestoreEvent,
+  RestoreSource,
+  RestoreSummary,
   LogSource,
   StuckAction,
   LogView,
@@ -117,7 +122,12 @@ export async function runWiring(
     }
     throw new ApiError(res.status, code);
   }
-  const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+  await readEvents(res.body, onEvent);
+}
+
+/** Server-sent events from a fetch body (`data:` lines, blank-line separated). */
+async function readEvents<E>(body: NonNullable<Response['body']>, onEvent: (e: E) => void) {
+  const reader = body.pipeThrough(new TextDecoderStream()).getReader();
   let buffer = '';
   for (;;) {
     const { value, done } = await reader.read();
@@ -132,10 +142,93 @@ export async function runWiring(
         .filter((l) => l.startsWith('data: '))
         .map((l) => l.slice(6))
         .join('\n');
-      if (data) onEvent(JSON.parse(data) as WiringEvent);
+      if (data) onEvent(JSON.parse(data) as E);
     }
   }
 }
+
+async function errorCode(res: Response): Promise<string> {
+  try {
+    return ((await res.json()) as { error?: string }).error ?? 'http';
+  } catch {
+    return 'http';
+  }
+}
+
+/** Restore events + a final `error` if the server gave up (mirrors routes.ts). */
+export type RestoreStreamEvent = RestoreEvent | { type: 'error'; error: string };
+
+/** Starts a restore and streams its progress (SPEC §11). Bad file/password → ApiError before any event. */
+export async function runRestore(
+  body: { source: RestoreSource; password?: string },
+  onEvent: (e: RestoreStreamEvent) => void,
+): Promise<void> {
+  let res: Response;
+  try {
+    res = await fetch('/api/backup/restore', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', accept: 'text/event-stream' },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    throw new ApiError(0, 'network');
+  }
+  if (!res.ok || !res.body) throw new ApiError(res.status, await errorCode(res));
+  await readEvents(res.body, (e: { type?: string; error?: string }) =>
+    onEvent((e.error && !e.type ? { type: 'error', error: e.error } : e) as RestoreStreamEvent),
+  );
+}
+
+/** Saves a response body as a file in the browser. */
+async function saveDownload(res: Response, fallbackName: string): Promise<void> {
+  const name =
+    /filename="([^"]+)"/.exec(res.headers.get('content-disposition') ?? '')?.[1] ?? fallbackName;
+  const url = URL.createObjectURL(await res.blob());
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
+export const backupApi = {
+  view: () => request<BackupSettingsView>('/api/backup'),
+  saveSettings: (body: BackupSettings) =>
+    request<BackupSettingsView>('/api/backup/settings', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    }),
+  /** Builds a backup on the server and saves it in the browser. */
+  async download(password?: string): Promise<void> {
+    let res: Response;
+    try {
+      res = await fetch('/api/backup', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(password ? { password } : {}),
+      });
+    } catch {
+      throw new ApiError(0, 'network');
+    }
+    if (!res.ok) throw new ApiError(res.status, await errorCode(res));
+    await saveDownload(res, 'easyarr-backup.easyarr');
+  },
+  fileUrl: (name: string) => `/api/backup/files/${encodeURIComponent(name)}`,
+  deleteFile: (name: string) =>
+    request<{ ok: true }>(`/api/backup/files/${encodeURIComponent(name)}`, { method: 'DELETE' }),
+  upload: (file: Blob) =>
+    request<RestoreSummary>('/api/backup/upload', {
+      method: 'POST',
+      // EasyArr's header lets this raw upload past the JSON-only rule (D-072).
+      headers: { 'content-type': 'application/octet-stream', 'x-easyarr-upload': '1' },
+      body: file,
+    }),
+  inspect: (source: RestoreSource, password?: string) =>
+    post<RestoreSummary>('/api/backup/inspect', { source, ...(password ? { password } : {}) }),
+};
 
 export const api = {
   health: () => request<Health>('/api/health'),

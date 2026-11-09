@@ -173,9 +173,8 @@ describe('setup wizard', () => {
     const router = renderAt('/setup');
     await screen.findByRole('heading', { name: 'Welcome to EasyArr' });
     expect(screen.getByText('Step 1 of 7')).toBeTruthy();
-    expect(screen.getByRole('button', { name: /Restore from backup/ })).toHaveProperty(
-      'disabled',
-      true,
+    expect(screen.getByRole('link', { name: /Restore from backup/ }).getAttribute('href')).toBe(
+      '/restore',
     );
     fireEvent.click(screen.getByRole('button', { name: /Start setup/ }));
 

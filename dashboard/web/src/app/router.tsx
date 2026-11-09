@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { createBrowserRouter, type RouteObject } from 'react-router';
 import { Loading } from '@/components/ui/loading';
+import { RestorePage } from '~/features/backup/restore-page';
 import { DocsPage } from '~/features/docs/docs-page';
 import { SettingsPage } from '~/features/settings/settings-page';
 import { SetupIndex, WizardPage } from '~/features/wizard/wizard-page';
@@ -17,6 +18,7 @@ const children: RouteObject[] = [
   { path: 'setup', element: <SetupIndex /> },
   { path: 'setup/:stepId', element: <WizardPage /> },
   { path: 'settings', element: <SettingsPage /> },
+  { path: 'restore', element: <RestorePage /> },
   { path: 'settings/:section', element: <SettingsPage /> },
   { path: 'help/*', element: <DocsPage /> },
   { path: 'unavailable/:service', element: <Unavailable /> },

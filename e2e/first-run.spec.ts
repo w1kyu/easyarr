@@ -305,3 +305,66 @@ test('settings: a change is saved and applied with the live checklist', async ({
     await page.screenshot({ path: `${shots}/home-mobile.png`, fullPage: true });
   }
 });
+
+test('backup: download an encrypted backup, change a setting, restore it', async ({
+  page,
+}, info) => {
+  const shots = process.env['E2E_SHOTS'];
+  await page.goto('/settings/backups');
+  const download = page.getByTestId('backup-download');
+  await download.getByLabel('Backup password', { exact: true }).fill('my-backup-password');
+  await download.getByLabel('Repeat the password').fill('my-backup-password');
+  const [file] = await Promise.all([
+    page.waitForEvent('download', { timeout: 60_000 }),
+    page.getByRole('button', { name: 'Download backup' }).click(),
+  ]);
+  expect(file.suggestedFilename()).toMatch(/^easyarr-backup-\d{4}-\d{2}-\d{2}-\d{4}\.easyarr$/);
+  const saved = info.outputPath('backup.easyarr');
+  await file.saveAs(saved);
+  if (shots) await page.screenshot({ path: `${shots}/backup-settings.png`, fullPage: true });
+
+  // Change something after the backup, so the restore has something to bring back.
+  const wizard = (await (await page.request.get('/api/wizard')).json()) as {
+    answers: { library: Record<string, unknown> };
+  };
+  expect(wizard.answers.library['quality']).toBe('small');
+  const changed = await page.request.post('/api/wizard/library', {
+    data: { ...wizard.answers.library, quality: 'best' },
+  });
+  expect(changed.ok()).toBe(true);
+
+  await page.goto('/settings/backups');
+  await page.getByRole('link', { name: 'Restore from a backup' }).click();
+  await expect(page).toHaveURL(/\/restore$/);
+  await page.getByTestId('restore-file').setInputFiles(saved);
+  await expect(page.getByText('This backup is protected with a password.')).toBeVisible();
+  await page.getByLabel('Backup password', { exact: true }).fill('not-the-password');
+  await page.getByRole('button', { name: 'Open backup' }).click();
+  await expect(page.getByText("That password doesn't open this backup")).toBeVisible();
+  await page.getByLabel('Backup password', { exact: true }).fill('my-backup-password');
+  await page.getByRole('button', { name: 'Open backup' }).click();
+
+  const summary = page.getByTestId('restore-summary');
+  await expect(summary).toContainText('beginner');
+  await expect(summary).toContainText('Prowlarr');
+  await expect(summary).toContainText('Jellyfin');
+  if (shots) await page.screenshot({ path: `${shots}/restore-summary.png`, fullPage: true });
+  await page.getByRole('button', { name: 'Restore this backup' }).click();
+  await page.getByRole('button', { name: 'Restore', exact: true }).click();
+
+  const result = page.getByTestId('restore-result');
+  await expect(result).toHaveAttribute('data-ok', 'true', { timeout: 120_000 });
+  for (const step of ['easyarr', 'prowlarr', 'jellyfin', 'connections', 'vpn', 'wiring']) {
+    await expect(page.getByTestId(`restore-step-${step}`)).toHaveAttribute('data-state', 'done');
+  }
+  if (shots) await page.screenshot({ path: `${shots}/restore-done.png`, fullPage: true });
+
+  const after = (await (await page.request.get('/api/wizard')).json()) as {
+    next: string | null;
+    answers: { library: { quality: string } };
+  };
+  expect(after.answers.library.quality).toBe('small');
+  expect(after.next).toBeNull();
+  await page.getByRole('link', { name: 'Go to your dashboard' }).click();
+  await expect(page.getByTestId('tile-watch')).toBeVisible();
+});

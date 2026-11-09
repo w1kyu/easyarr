@@ -10,7 +10,6 @@ import { WhatsThis } from '~/features/docs/whats-this';
 import { ErrorAlert } from '@/components/ui/alert';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Loading } from '@/components/ui/loading';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { STEP_UI } from './steps';
 import { SAVE_MUTATION_KEY, useWizard } from './wizard-api';
@@ -108,19 +107,10 @@ export function WizardPage() {
             </Link>
           )}
           {ui.offerRestore && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                {/* A disabled button can't show a tooltip, so the wrapper carries it. */}
-                <span tabIndex={0} className="w-full sm:w-auto">
-                  <Button size="md" disabled className="w-full">
-                    <History className="size-3.5" aria-hidden />
-                    {t('wizard.welcome.restore')}
-                    <span className="text-white/60">· {t('wizard.comingSoon')}</span>
-                  </Button>
-                </span>
-              </TooltipTrigger>
-              <TooltipContent>{t('wizard.welcome.restoreSoon')}</TooltipContent>
-            </Tooltip>
+            <Link to="/restore" className={cn(buttonVariants({ size: 'md' }), 'w-full sm:w-auto')}>
+              <History className="size-3.5" aria-hidden />
+              {t('wizard.welcome.restore')}
+            </Link>
           )}
           <Button
             type="submit"

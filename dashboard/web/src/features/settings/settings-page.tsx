@@ -30,6 +30,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, Navigate, NavLink, useNavigate, useParams } from 'react-router';
 import { GlassPanel } from '~/components/glass-panel';
+import { BackupSettings } from '~/features/backup/backup-settings';
 import { WhatsThis } from '~/features/docs/whats-this';
 import { useWiringRun, WiringChecklist } from '~/features/wiring/checklist';
 import { STEP_UI } from '~/features/wizard/steps';
@@ -153,7 +154,7 @@ function Section({
     <GlassPanel className="flex flex-col gap-4">
       <h2 className="text-20 font-bold -tracking-3">{t(`settings.section.${id}`)}</h2>
       {id === 'account' && <AccountInfo view={view} />}
-      {id === 'backups' && <p className="text-14 text-white/65">{t('settings.backups.soon')}</p>}
+      {id === 'backups' && <BackupSettings />}
       {id === 'advanced' && <Advanced />}
       {id === 'about' && <About />}
     </GlassPanel>
