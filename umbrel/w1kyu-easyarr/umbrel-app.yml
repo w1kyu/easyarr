@@ -30,9 +30,10 @@ description: >-
 releaseNotes: >-
   Backups: Settings → Backups downloads a password-protected backup of your setup (not your
   movies), and EasyArr makes one automatically every night (Files → EasyArr → backups). Restore it
-  from the first setup screen after a reinstall, or from Settings: your answers, accounts and VPN
-  come back, and Sonarr, Radarr, Lidarr, Prowlarr and Jellyfin keep their history and watched
-  status.
+  from the first setup screen after a reinstall, or from Settings. TV shows: when no whole-season
+  pack is found, EasyArr now searches the episodes one by one (before, such shows never
+  downloaded). "Needs your attention" on the home screen is easier to spot, and Advanced mode
+  groups the included apps by what they do.
 
 developer: w1kyu
 website: https://github.com/w1kyu/easyarr
@@ -51,7 +52,7 @@ permissions:
 backupIgnore:
   - data/jellyfin/cache/*
   - data/jellyfin/log/*
-  - data/jellyfin/data/backups/*
+  - data/jellyfin/data/data/backups/*
 
 submitter: w1kyu
 submission: https://github.com/w1kyu/easyarr
