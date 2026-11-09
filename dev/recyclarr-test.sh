@@ -104,6 +104,15 @@ check_profile() { # check_profile <app> <preset label>
     '[.formatItems[] | select(.name == "BR-DISK") | .score] == [-10000]' "${p}"
 }
 
+check_sizes() { # check_sizes <app>: small LQ encodes pass the minimum size (D-063)
+  local defs
+  defs="$("$1" qualitydefinition)"
+  check "$1: minimum sizes lowered (720p 5, 1080p 10, 2160p 20 MB/min)" \
+    '[.[] | select(.quality.name | test("^(WEBDL|WEBRip|Bluray)-(720|1080|2160)p$")) | {(.quality.name): .minSize}] | add == {"WEBDL-720p":5,"WEBRip-720p":5,"Bluray-720p":5,"WEBDL-1080p":10,"WEBRip-1080p":10,"Bluray-1080p":10,"WEBDL-2160p":20,"WEBRip-2160p":20,"Bluray-2160p":20}' "${defs}"
+  check "$1: other minimums stay as the guide has them" \
+    '[.[] | select(.quality.name == "HDTV-1080p") | .minSize > 10] == [true]' "${defs}"
+}
+
 check_balanced_radarr() {
   local p
   p="$(profile radarr 'EasyArr (Balanced)')"
@@ -126,6 +135,8 @@ sync balanced
 check_profile radarr Balanced
 check_profile sonarr Balanced
 check_balanced_radarr
+check_sizes radarr
+check_sizes sonarr
 
 # YTS is what public sites mostly have; it must count as LQ.
 title='Night.of.the.Living.Dead.1968.1080p.BluRay.x264-YTS'
@@ -146,6 +157,8 @@ for preset in best:'Best quality' small:'Save space'; do
   sync "${preset%%:*}"
   check_profile radarr "${preset#*:}"
   check_profile sonarr "${preset#*:}"
+  check_sizes radarr
+  check_sizes sonarr
 done
 
 if [ "${FAILED}" -ne 0 ]; then

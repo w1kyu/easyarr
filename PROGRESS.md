@@ -124,6 +124,11 @@ Copy from SPEC as they get resolved. Highest priority first:
 - umbrelOS 2.0 `environment:` manifest settings could expose a few safe knobs (e.g. TZ) in Umbrel's app settings.
 
 ## Session log
+### 2026-11-09 (later) — LQ releases rejected by size (D-063)
+- Owner: some movies still stuck; interactive search shows releases with score −10. Cause: the
+  guide's minimum sizes (Bluray-1080p 50.8 MB/min) reject YTS-sized encodes D-055 meant to allow.
+  Recyclarr now lowers WEB/Bluray minimums to 5/10/20 MB/min (720p/1080p/2160p).
+
 ### 2026-11-09 — Search sites back; automatic un-pausing (D-062)
 - Owner's in-netns test: DNS works (Gluetun 127.0.0.1), nyaa.si 200, YTS API 200, 1337x 403
   (Cloudflare challenge → FlareSolverr, which answers "ready"). So the 2026-11-07 outage was

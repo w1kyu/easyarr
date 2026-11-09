@@ -15,6 +15,7 @@ interface Instance {
     qualities?: { name: string; qualities?: string[] }[];
     upgrade?: { allowed: boolean; until_quality: string };
   }[];
+  quality_definition: { type: string; qualities: { name: string; min: number }[] };
   custom_formats: { trash_ids: string[]; assign_scores_to: { name: string; score: number }[] }[];
 }
 
@@ -44,6 +45,22 @@ describe('recyclarrConfig', () => {
       expect(LQ_SCORE).toBeLessThan(0);
       // Closest other negative guide score is -51: it must stay below the minimum.
       expect(-51).toBeLessThan(MIN_FORMAT_SCORE);
+    },
+  );
+
+  it.each(['best', 'balanced', 'small'] as const)(
+    '%s: small LQ encodes pass the minimum size (YTS 1080p ≈ 16 MB/min)',
+    (preset) => {
+      for (const inst of Object.values(load(preset))) {
+        const min = Object.fromEntries(
+          inst.quality_definition.qualities.map((q) => [q.name, q.min]),
+        );
+        expect(min['Bluray-1080p']).toBe(10);
+        expect(min['WEBRip-720p']).toBe(5);
+        expect(min['WEBDL-2160p']).toBe(20);
+        expect(Object.keys(min)).toHaveLength(9);
+        expect(min['HDTV-1080p']).toBeUndefined();
+      }
     },
   );
 

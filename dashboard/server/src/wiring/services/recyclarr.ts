@@ -41,6 +41,22 @@ const LQ_TRASH_IDS = {
   sonarr: ['9c11cd3f07101cdba90a2d81cf0e56b4', 'e2315f990da2e2cbfc9fa5b7a6fcfe48'],
 } as const;
 
+/**
+ * Smallest size (MB per minute) Radarr/Sonarr accept per resolution, for WEB and Bluray releases
+ * (D-063). The guide's minimums (e.g. Bluray-1080p 50.8, about 6 GB for a 2-hour movie) reject the
+ * small LQ encodes that D-055 keeps as a last resort — a YTS 1080p is ~2 GB (≈16 MB/min), a 720p
+ * ~1 GB (≈8 MB/min) — so those requests stayed "Missing" anyway. Lower floors let them through;
+ * the LQ score still ranks them last and upgrades replace them. Anything under the floor (samples,
+ * fakes) stays rejected. Recyclarr 8.8.1 `quality_definition.qualities` overrides (min only).
+ */
+export const MIN_SIZE_MB_PER_MIN = { '720p': 5, '1080p': 10, '2160p': 20 } as const;
+
+function sizeOverrides(): { name: string; min: number }[] {
+  return Object.entries(MIN_SIZE_MB_PER_MIN).flatMap(([res, min]) =>
+    ['WEBDL', 'WEBRip', 'Bluray'].map((source) => ({ name: `${source}-${res}`, min })),
+  );
+}
+
 const PRESETS: Record<
   QualityPreset,
   { label: string; sonarr: PresetProfile; radarr: PresetProfile; preferredRatio?: number }
@@ -99,6 +115,7 @@ export function recyclarrConfig(
     quality_definition: {
       type: app === 'sonarr' ? 'series' : 'movie',
       ...(p.preferredRatio !== undefined ? { preferred_ratio: p.preferredRatio } : {}),
+      qualities: sizeOverrides(),
     },
     quality_profiles: [
       {
