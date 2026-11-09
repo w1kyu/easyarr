@@ -8,6 +8,7 @@ import {
   type StatusView,
 } from '@easyarr/shared';
 import {
+  ChevronDown,
   Clapperboard,
   Download,
   ExternalLink,
@@ -20,6 +21,8 @@ import {
   Sparkles,
   Tv,
 } from 'lucide-react';
+import { motion } from 'motion/react';
+import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
 import { GlassPanel } from '~/components/glass-panel';
@@ -44,6 +47,10 @@ export function Dashboard() {
   const { t } = useTranslation();
   const status = useStatus();
   const setMode = useSetMode();
+  // Set when the user switches to Advanced here (not when the page opens in Advanced).
+  const [justOpened, setJustOpened] = useState(false);
+  const advancedRef = useRef<HTMLDivElement>(null);
+  const hintDone = useCallback(() => setJustOpened(false), []);
 
   if (status.isPending) return <Loading />;
   if (status.isError) {
@@ -65,7 +72,16 @@ export function Dashboard() {
         <SegmentedControl
           ariaLabel={t('dash.mode.label')}
           value={view.mode}
-          onValueChange={(mode) => setMode.mutate(mode)}
+          onValueChange={(mode) => {
+            // The control reports both the clicked tab and a toggle: act on real changes only.
+            if (mode === view.mode) return;
+            setJustOpened(mode === 'advanced');
+            setMode.mutate(mode);
+          }}
+          size="lg"
+          variant="primary"
+          className="h-11 p-1 text-14"
+          tabClassName="min-w-28 px-5 font-medium"
           tabs={[
             { id: 'simple', label: t('dash.mode.simple') },
             { id: 'advanced', label: t('dash.mode.advanced') },
@@ -103,12 +119,76 @@ export function Dashboard() {
       <Recent items={view.recent} />
 
       {advanced && (
-        <>
+        <motion.div
+          ref={advancedRef}
+          className="flex scroll-mt-4 flex-col gap-5"
+          data-testid="advanced-sections"
+          initial={justOpened ? { opacity: 0, y: 12 } : false}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35, ease: 'easeOut' }}
+        >
+          <div className="flex items-center gap-3 px-1 pt-2" aria-hidden>
+            <span className="h-px flex-1 bg-white/12" />
+            <span className="text-12 font-semibold tracking-wide text-brand-lightest uppercase">
+              {t('dash.mode.advancedDivider')}
+            </span>
+            <span className="h-px flex-1 bg-white/12" />
+          </div>
           <ServicesGrid services={view.services} />
           <VpnDetails view={view} />
           <LogViewer />
-        </>
+        </motion.div>
       )}
+      {advanced && justOpened && <MoreBelowHint target={advancedRef} onDone={hintDone} />}
+    </div>
+  );
+}
+
+const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
+/**
+ * After switching to Advanced: the new sections appear below the fold, so a floating "More
+ * options below" button points at them. It goes away once the user scrolls or clicks it; it
+ * isn't shown at all if the new sections are already on screen.
+ */
+function MoreBelowHint({
+  target,
+  onDone,
+}: {
+  target: React.RefObject<HTMLDivElement | null>;
+  onDone: () => void;
+}) {
+  const { t } = useTranslation();
+  // Layout effect: decided before the first paint, so an unneeded hint never flashes.
+  useLayoutEffect(() => {
+    const el = target.current;
+    if (!el || el.getBoundingClientRect().top < window.innerHeight - 120) {
+      onDone();
+      return;
+    }
+    const startY = window.scrollY;
+    const onScroll = () => {
+      if (Math.abs(window.scrollY - startY) > 40) onDone();
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, [target, onDone]);
+  return (
+    <div className="pointer-events-none fixed inset-x-0 bottom-6 z-50 flex justify-center px-4">
+      <motion.button
+        type="button"
+        data-testid="more-below"
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        onClick={() => {
+          target.current?.scrollIntoView({ behavior: reducedMotion() ? 'auto' : 'smooth' });
+          onDone();
+        }}
+        className="pointer-events-auto inline-flex h-11 items-center gap-2 rounded-full bg-brand px-5 text-14 font-medium text-white shadow-lg shadow-black/40 ring-1 ring-white/20 focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:outline-hidden"
+      >
+        {t('dash.mode.moreBelow')}
+        <ChevronDown className="size-4 motion-safe:animate-bounce" aria-hidden />
+      </motion.button>
     </div>
   );
 }
@@ -179,10 +259,21 @@ function StatusStrip({ view }: { view: StatusView }) {
       <StripItem
         icon={vpn.connection === 'connected' ? ShieldCheck : ShieldAlert}
         label={t('dash.strip.vpn')}
+        to="/settings/vpn"
+        actionLabel={t('dash.strip.vpnOpen')}
       >
         <StatusPill status={vpnState} label={vpnLabel} />
       </StripItem>
-      <StripItem icon={Download} label={t('dash.strip.downloads')}>
+      <StripItem
+        icon={Download}
+        label={t('dash.strip.downloads')}
+        onClick={() =>
+          document
+            .getElementById('downloads-title')
+            ?.scrollIntoView({ behavior: reducedMotion() ? 'auto' : 'smooth' })
+        }
+        actionLabel={t('dash.strip.downloadsOpen')}
+      >
         <span className="text-14 font-medium">
           {active > 0
             ? t('dash.strip.downloading', {
@@ -211,26 +302,56 @@ function StatusStrip({ view }: { view: StatusView }) {
   );
 }
 
+/** One status item; with `to`/`onClick` the whole item (icon included) is a button. */
 function StripItem({
   icon: Icon,
   label,
   children,
+  to,
+  onClick,
+  actionLabel,
 }: {
   icon: typeof Download;
   label: string;
   children: React.ReactNode;
+  to?: string;
+  onClick?: () => void;
+  actionLabel?: string;
 }) {
-  return (
-    <div className="flex items-center gap-3">
-      <div className="grid size-9 shrink-0 place-items-center rounded-12 bg-white/8">
+  const clickable = to !== undefined || onClick !== undefined;
+  const inner = (
+    <>
+      <div
+        className={cn(
+          'grid size-9 shrink-0 place-items-center rounded-12 bg-white/8',
+          clickable && 'transition-colors group-hover:bg-white/15',
+        )}
+      >
         <Icon className="size-4 text-white/70" aria-hidden />
       </div>
-      <div className="flex min-w-0 flex-col gap-0.5">
+      <div className="flex min-w-0 flex-col gap-0.5 text-left">
         <span className="text-12 text-white/50">{label}</span>
         {children}
       </div>
-    </div>
+    </>
   );
+  const cls =
+    'group -m-1.5 flex items-center gap-3 rounded-15 p-1.5 transition-colors hover:bg-white/6 focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-hidden';
+  if (to !== undefined) {
+    return (
+      <Link to={to} className={cls} title={actionLabel}>
+        {inner}
+      </Link>
+    );
+  }
+  if (onClick) {
+    return (
+      <button type="button" onClick={onClick} className={cls} title={actionLabel}>
+        {inner}
+      </button>
+    );
+  }
+  return <div className="flex items-center gap-3">{inner}</div>;
 }
 
 const DOWNLOAD_STATUS: Record<DownloadItem['state'], Status> = {
@@ -260,7 +381,7 @@ function Downloads({ view }: { view: StatusView }) {
             {items.map((item) => (
               <li
                 key={`${item.client}-${item.id}`}
-                className="flex flex-col gap-2 rounded-15 px-3 py-3 hover:bg-white/4"
+                className="flex flex-col gap-2 rounded-15 px-3 py-3"
               >
                 <div className="flex items-center gap-3">
                   <p className="min-w-0 flex-1 truncate text-14 font-medium" title={item.name}>
@@ -311,27 +432,35 @@ function Recent({ items }: { items: RecentItem[] | null }) {
           {items.map((item) => {
             const Icon = RECENT_ICON[item.type];
             return (
-              <li key={item.id} className="flex min-w-0 flex-col gap-1.5">
-                <div className="umbrel-material relative aspect-2/3 overflow-hidden rounded-15">
-                  {item.hasImage ? (
-                    <img
-                      src={`/api/media/${item.id}/image`}
-                      alt=""
-                      loading="lazy"
-                      className="size-full object-cover"
-                    />
-                  ) : (
-                    <div className="grid size-full place-items-center">
-                      <Icon className="size-8 text-white/40" aria-hidden />
-                    </div>
-                  )}
-                </div>
-                <p className="truncate text-13 font-medium" title={item.name}>
-                  {item.name}
-                </p>
-                <p className="-mt-1 text-12 text-white/45">
-                  {[t(`dash.recent.type.${item.type}`), item.year].filter(Boolean).join(' · ')}
-                </p>
+              <li key={item.id} className="min-w-0">
+                <a
+                  href={`${portUrl(JELLYFIN_PORT)}/web/#/details?id=${encodeURIComponent(item.id)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label={t('dash.recent.open', { name: item.name })}
+                  className="group flex min-w-0 flex-col gap-1.5 rounded-15 focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-hidden"
+                >
+                  <div className="umbrel-material relative aspect-2/3 overflow-hidden rounded-15 transition-transform duration-300 group-hover:-translate-y-0.5">
+                    {item.hasImage ? (
+                      <img
+                        src={`/api/media/${item.id}/image`}
+                        alt=""
+                        loading="lazy"
+                        className="size-full object-cover"
+                      />
+                    ) : (
+                      <div className="grid size-full place-items-center">
+                        <Icon className="size-8 text-white/40" aria-hidden />
+                      </div>
+                    )}
+                  </div>
+                  <p className="truncate text-13 font-medium" title={item.name}>
+                    {item.name}
+                  </p>
+                  <p className="-mt-1 text-12 text-white/45">
+                    {[t(`dash.recent.type.${item.type}`), item.year].filter(Boolean).join(' · ')}
+                  </p>
+                </a>
               </li>
             );
           })}

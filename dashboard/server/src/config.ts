@@ -99,7 +99,10 @@ export function loadServeConfig(env: Env = process.env): ServeConfig {
   return {
     host: env['HOST'] ?? '0.0.0.0',
     port: int(env['PORT'], 3000, 'PORT'),
-    version: env['EASYARR_VERSION'] ?? '0.0.0-dev',
+    // The version people see: Umbrel's APP_VERSION, i.e. `version:` in umbrel-app.yml, which the
+    // release flow bumps. The image's own EASYARR_VERSION (0.0.0-sha.<commit>) is only a fallback:
+    // images are built before the release bumps the manifest, so it can't know the number.
+    version: env['APP_VERSION'] || env['EASYARR_VERSION'] || '0.0.0-dev',
     logLevel: env['LOG_LEVEL'] ?? 'info',
     stateDir: path.resolve(env['EASYARR_STATE_DIR'] ?? '/easyarr'),
     dataDir: path.resolve(env['EASYARR_DATA_ROOT'] ?? '/data'),

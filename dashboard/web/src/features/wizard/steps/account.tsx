@@ -1,6 +1,6 @@
 import { accountInputSchema } from '@easyarr/shared';
 import { Users } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Field } from '~/components/field';
 import { PasswordStrengthMeter } from '~/components/password-strength';
@@ -11,14 +11,16 @@ import {
   issuesToFieldErrors,
   useIssueText,
   useSaveErrorText,
+  useSavedSecrets,
   useSaveStep,
   type FieldErrors,
   type StepFormProps,
 } from '../wizard-api';
 
 /**
- * Step 3: the owner's account (Jellyfin admin + Jellyseerr login later). The password is only
- * sent to the server, never read back; when one is saved, leaving the fields empty keeps it.
+ * Step 3: the owner's account (Jellyfin admin + Jellyseerr login later). A saved password is
+ * loaded back into both fields (masked, show/hide on the field) when the step is reopened, so
+ * going back to review it doesn't empty it (D-064). Unchanged or empty fields keep it.
  */
 export function AccountStep({ formId, view, onSaved }: StepFormProps) {
   const { t } = useTranslation();
@@ -30,9 +32,21 @@ export function AccountStep({ formId, view, onSaved }: StepFormProps) {
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [errors, setErrors] = useState<FieldErrors>({});
+  const saved = useSavedSecrets(hasPassword);
+  const savedPassword = saved.data?.account ?? null;
+  const edited = useRef(false);
+  useEffect(() => {
+    if (savedPassword && !edited.current) {
+      setPassword(savedPassword);
+      setConfirm(savedPassword);
+    }
+  }, [savedPassword]);
 
   const submit = () => {
-    const keepPassword = hasPassword && password === '' && confirm === '';
+    const unchanged =
+      (password === '' && confirm === '') ||
+      (savedPassword !== null && password === savedPassword && confirm === savedPassword);
+    const keepPassword = hasPassword && unchanged;
     const body = keepPassword ? { username } : { username, password };
     const parsed = accountInputSchema.safeParse(body);
     const next: FieldErrors = parsed.success
@@ -85,7 +99,10 @@ export function AccountStep({ formId, view, onSaved }: StepFormProps) {
         type="password"
         autoComplete="new-password"
         value={password}
-        onChange={(e) => setPassword(e.target.value)}
+        onChange={(e) => {
+          edited.current = true;
+          setPassword(e.target.value);
+        }}
         error={errors['password']}
         hint={
           password ? (
@@ -101,7 +118,10 @@ export function AccountStep({ formId, view, onSaved }: StepFormProps) {
         type="password"
         autoComplete="new-password"
         value={confirm}
-        onChange={(e) => setConfirm(e.target.value)}
+        onChange={(e) => {
+          edited.current = true;
+          setConfirm(e.target.value);
+        }}
         error={errors['confirm']}
       />
       <div className="flex items-start gap-3 rounded-12 border border-white/8 bg-white/4 p-3.5">

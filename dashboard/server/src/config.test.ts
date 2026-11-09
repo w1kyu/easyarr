@@ -20,6 +20,16 @@ describe('config', () => {
     });
   });
 
+  it("shows Umbrel's app version (umbrel-app.yml), not the image's commit version", () => {
+    expect(loadServeConfig({ EASYARR_VERSION: '0.0.0-sha.60864e3' }).version).toBe(
+      '0.0.0-sha.60864e3',
+    );
+    expect(
+      loadServeConfig({ EASYARR_VERSION: '0.0.0-sha.60864e3', APP_VERSION: '0.0.15' }).version,
+    ).toBe('0.0.15');
+    expect(loadServeConfig({}).version).toBe('0.0.0-dev');
+  });
+
   it('resolves relative paths (dev) to absolute ones', () => {
     const c = loadServeConfig({ EASYARR_WEB_DIR: 'web/dist', EASYARR_STATE_DIR: './state' });
     expect(path.isAbsolute(c.webDir)).toBe(true);

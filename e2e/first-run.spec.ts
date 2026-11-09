@@ -193,11 +193,30 @@ test('dashboard: downloads, recently added, Simple/Advanced remembered', async (
     page.waitForResponse(
       (r) => r.url().endsWith('/api/ui') && r.request().postData()?.includes(mode) === true,
     );
+  // The toggle is a comfortable click target (≥ 40 px high).
+  const toggle = page.getByRole('group', { name: 'Dashboard view' });
+  expect((await toggle.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(40);
+  // Status icons do something: the VPN item opens the VPN settings.
+  await expect(page.getByTestId('status-strip').getByRole('link')).toHaveAttribute(
+    'href',
+    '/settings/vpn',
+  );
+  // Recently added posters open the item in Jellyfin.
+  await expect(page.getByTestId('recent').getByRole('link').first()).toHaveAttribute(
+    'href',
+    /:39096\/web\/#\/details\?id=/,
+  );
+
   let put = saved('advanced');
   await page.getByRole('button', { name: 'Advanced' }).click();
   await put;
+  // The new sections are below the fold: a hint points at them and scrolls there.
+  const hint = page.getByTestId('more-below');
+  await expect(hint).toBeVisible();
+  await hint.click();
+  await expect(hint).toHaveCount(0);
   const services = page.getByTestId('services');
-  await expect(services).toBeVisible();
+  await expect(services).toBeInViewport();
   await expect(services.locator('[data-service="sonarr"]')).toContainText('Running');
   await expect(services.locator('[data-service="sonarr"] a')).toHaveAttribute(
     'href',
@@ -217,6 +236,12 @@ test('dashboard: downloads, recently added, Simple/Advanced remembered', async (
   await page.reload();
   await expect(page.getByTestId('tile-watch')).toBeVisible();
   await expect(page.getByTestId('services')).toHaveCount(0);
+
+  // The logo leads home from anywhere.
+  await page.goto('/settings/vpn');
+  await page.getByTestId('home-link').click();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByTestId('tile-watch')).toBeVisible();
 });
 
 test('settings: a change is saved and applied with the live checklist', async ({ page }, info) => {

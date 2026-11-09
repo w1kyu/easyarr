@@ -1,5 +1,6 @@
 import type {
   LogSource,
+  SavedSecrets,
   LogView,
   StatusView,
   SystemCheckResult,
@@ -140,6 +141,7 @@ export const api = {
   health: () => request<Health>('/api/health'),
   systemCheck: () => request<SystemCheckResult>('/api/system-check'),
   wizard: () => request<WizardView>('/api/wizard'),
+  savedSecrets: () => request<SavedSecrets>('/api/wizard/secrets'),
   saveWizardStep: (step: WizardStepId, body: unknown) =>
     post<WizardView>(`/api/wizard/${step}`, body),
   vpnConfig: () => request<{ config: VpnConfigView | null }>('/api/vpn/config'),

@@ -94,8 +94,8 @@ function ServiceTile({ service }: { service: ServiceInfo }) {
       : service.network === 'vpn'
         ? { status: 'idle' as const, label: t('home.status.vpnLocked') }
         : { status: 'idle' as const, label: t('home.status.waiting') };
-  return (
-    <li className="umbrel-material umbrel-material-popover flex items-center gap-3 rounded-20 p-3.5 transition-transform duration-300 hover:-translate-y-0.5">
+  const body = (
+    <>
       <ServiceIcon id={service.id} size={52} />
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
         <div className="min-w-0">
@@ -104,6 +104,30 @@ function ServiceTile({ service }: { service: ServiceInfo }) {
         </div>
         <StatusPill status={status.status} label={status.label} className="self-start" />
       </div>
+    </>
+  );
+  const cls =
+    'umbrel-material umbrel-material-popover flex items-center gap-3 rounded-20 p-3.5 transition-transform duration-300';
+  // This page only shows when EasyArr's API is down, so only the apps with their own port
+  // (Jellyfin, the request page) can be opened; the rest get no hover effect.
+  return (
+    <li>
+      {service.publishedPort !== undefined ? (
+        <a
+          href={portUrl(service.publishedPort)}
+          target="_blank"
+          rel="noreferrer"
+          aria-label={t('dash.service.open', { name: service.name })}
+          className={cn(
+            cls,
+            'hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-hidden',
+          )}
+        >
+          {body}
+        </a>
+      ) : (
+        <div className={cls}>{body}</div>
+      )}
     </li>
   );
 }
