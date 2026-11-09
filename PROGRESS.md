@@ -95,9 +95,11 @@ Copy from SPEC as they get resolved. Highest priority first:
 - Settings → VPN doesn't exist yet (phase 07); changing the VPN = reopening wizard step 5 (`/setup/vpn`).
 - Changing any wizard answer later = reopen that step (home → "Review your answers"), then run Finish
   again. Settings arrive in phase 07; "Repair connections" (the old /dev/wiring button) too.
-- Language choice only affects subtitles (Bazarr) and Jellyfin metadata, not which audio language
-  gets downloaded (D-052). Bazarr's profile and Jellyfin libraries are set once — changing the
-  language later doesn't rewrite them yet (phase 07).
+- Media languages steer downloads since D-066, but Bazarr's profile and Jellyfin's library metadata
+  language are still set only once; changing the languages later updates Sonarr/Radarr and
+  Jellyfin's playback preferences, not those two.
+- Releases in none of the chosen languages are refused until item 11's "Needs your OK" exists
+  (`docs/dev/fallbacks-plan.md`).
 - Usenet servers/indexers removed from the wizard later are not removed from SABnzbd/Prowlarr.
 - "Get help with AI" on the Finish step is a disabled placeholder (phase 09).
 - Bazarr, Recyclarr, Unpackerr and Cleanuparr configs plus sub-path settings (SABnzbd `url_base`, qBittorrent
@@ -124,6 +126,32 @@ Copy from SPEC as they get resolved. Highest priority first:
 - umbrelOS 2.0 `environment:` manifest settings could expose a few safe knobs (e.g. TZ) in Umbrel's app settings.
 
 ## Session log
+### 2026-11-09 (night) — Owner's 11-item list: UI fixes, media languages, season packs, re-search (D-064 – D-067)
+- Phase 1 (UI, 6dd788a): logo → home; status-strip VPN/Downloads icons and recently-added posters
+  clickable, dead hover effects removed; 44 px Simple/Advanced segmented control; switching to
+  Advanced fades in the new sections + a "More options below" button; reopened account/Usenet
+  steps show saved passwords masked (`GET /api/wizard/secrets`, D-064); shown version = Umbrel's
+  `APP_VERSION` from umbrel-app.yml (D-065).
+- Phase 2 (languages, 0240a42): ranked media languages (≤ 4, incl. "Original"); old single
+  `language` answers read as [original, X], `language` still written. Sonarr/Radarr get
+  "EasyArr – Language: …" custom formats (best rank only, 2000 per rank, "none of yours" −10000),
+  Radarr profile language → Any (the TRaSH profiles say "Original", which refused every dub — so
+  before this, dubbed releases never downloaded), Recyclarr keeps those scores, Bazarr profile with
+  every language, Jellyfin preferred audio/subtitles (D-066). Docs: `docs/quality-presets.md`.
+- Phase 3 (b4eecb4): season packs +1000 with Sonarr min upgrade 1001; `MissingRecheck` asks
+  Radarr/Sonarr to search missing items again (default 6 h, Settings → Advanced; ≤ 3 per app per
+  10 min, 20 s apart, oldest `lastSearchTime` first, skips queued/unreleased/recent) (D-067).
+- Item 11 (fallbacks) is **planned only**: `docs/dev/fallbacks-plan.md` (16 cases), waiting for the
+  owner's OK.
+- Verified locally: lint, typecheck, 269 unit tests, build, Playwright 35 passed (new checks: toggle
+  ≥ 40 px, hint scrolls, VPN/poster links, logo → home, masked saved password, language ranking).
+  **Not pushed (owner's instruction), so no CI / stack test / image yet.** Docker-only parts are
+  unproven against the real apps: the custom-format/profile PUT bodies (Sonarr 4.0.20, Radarr 6.4.4),
+  Recyclarr's `except_patterns` + `min_upgrade_format_score`, Jellyfin `POST /Users/Configuration`.
+  Next: owner OK → push → Image → pin → `Umbrel app` stack test + `dev/recyclarr-test.sh` job; add a
+  real-API check for the language formats to `dev/recyclarr-test.sh` (it already runs real
+  Sonarr/Radarr) before releasing.
+
 ### 2026-11-09 (later) — LQ releases rejected by size (D-063)
 - Owner: some movies still stuck; interactive search shows releases with score −10. Cause: the
   guide's minimum sizes (Bluray-1080p 50.8 MB/min) reject YTS-sized encodes D-055 meant to allow.
