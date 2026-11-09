@@ -4,13 +4,10 @@
 > Newest session log entries go on top.
 
 ## Current phase
-**Phase 07 — 🟨 built, owner test pending (v0.0.12).** Dashboard home (Simple/Advanced, downloads,
-recently added, warnings, VPN details, redacted logs) and Settings (download method, VPN, Usenet,
-libraries/quality, account read-only, advanced re-run/repair, about; backups placeholder).
-Phase 06 owner test still open: the last check (a download lands in Jellyfin) is blocked by the
-owner's torrent sites being unreachable from inside the VPN (2026-11-07, see session log), which
-the owner deferred; diagnose it before phase 08 if possible.
-Next prompt: `prompts/08-backup-restore.md` (after the owner's phase 07 test).
+**Phase 08 — 🟨 built, owner test pending (v0.0.17).** Backups (download, nightly, restore incl.
+Sonarr/Radarr/Lidarr/Prowlarr/Jellyfin native backups) proven against real services in CI.
+Owner tests of phases 06/07 and v0.0.16 are still open too.
+Next prompt: `prompts/09-support.md` (after the owner's phase 08 test).
 
 ## Phase status
 | Phase | Title | Status | Notes |
@@ -23,7 +20,7 @@ Next prompt: `prompts/08-backup-restore.md` (after the owner's phase 07 test).
 | 05 | Wiring engine + service proxy | ✅ done (owner test pending) | v0.0.5–v0.0.7; wiretest green against real services (amd64 + arm64) |
 | 06 | Wizard steps 6–9 | 🟨 owner test in progress | v0.0.8 → v0.0.10 (LQ last resort, wiring on start, Cleanuparr cleans up); e2e torrents/usenet/both + stack wizard e2e through Finish |
 | 07 | Dashboard + settings | 🟨 built (owner test pending) | v0.0.12; /api/status, Simple/Advanced, warnings, Settings; e2e for mode toggle + settings change; stack test reads /api/status |
-| 08 | Backup & restore | 🟨 in progress | built; stack test: Jellyfin native backup + Seerr after restore still red |
+| 08 | Backup & restore | 🟨 built (owner test pending) | v0.0.17; backuptest green (amd64 + arm64) |
 | 09 | Diagnostics + AI help | ⬜ todo | |
 | 10 | Documentation | ⬜ todo | |
 | 11 | Release v0.1.0 | ⬜ todo | |
@@ -71,7 +68,7 @@ Results of SPEC **[VERIFY]** items. Format: `- YYYY-MM-DD — <fact> — <source
 - 2026-11-05 — TRaSH LQ formats (Radarr `90a6f9a2…`, `e204b80c…`; Sonarr `9c11cd3f…`, `e2315f99…`) score −10000 and reach EasyArr's profiles through the default "[Unwanted] Unwanted Formats" group; YTS is in LQ. Other negative guide scores: −51 (v0), −10000, −35000. — https://github.com/TRaSH-Guides/Guides/tree/d24f13ceea5e82ccc20d08b7814fca93840e4046/docs/json/radarr/cf-groups/unwanted-formats.json
 - 2026-11-05 — Recyclarr 8.8.1: an explicit `custom_formats[].assign_scores_to[].score` beats the guide score; `qualities` replaces the guide's list (highest first, Recyclarr reverses for the API), unlisted qualities get disabled, emptied groups are dropped; `upgrade.until_quality` may name a group. Proven against the real images (CI job "Recyclarr profiles"). — https://github.com/recyclarr/recyclarr/blob/874cb274f8b419dff6fb211fc326e4f2dd63c4fb/docs/architecture/sync-plan-phase.md , `src/Recyclarr.Cli/Pipelines/QualityProfile/QualityItemOrganizer.cs`
 - 2026-11-09 — Servarr backup API (Sonarr 4.0.20 / Radarr 6.4.4 / Lidarr 3.1.6 / Prowlarr 2.7.0): `POST /command {"name":"Backup"}` (manual), `GET /system/backup` (path `/backup/manual/<name>`, served by BackupFileMapper), `POST /system/backup/restore/upload` (multipart .zip, moves config.xml + DB, `RestartRequired`), `POST /system/restart` = new process inside the container (`AppLifetime.OnAppStopped` → `SpawnNewProcess`), `/system/status.startTime` tells old and new process apart. — https://github.com/Sonarr/Sonarr/blob/cab419ade8ac7fcab5bf80394ee492abd35d5f5a/src/Sonarr.Api.V3/System/Backup/BackupController.cs (D-070)
-- 2026-11-09 — Jellyfin 12.4 has the 10.11 backup API: `POST /Backup/Create` (Database/Metadata/Trickplay/Subtitles flags), `POST /Backup/Restore {ArchiveFileName}` (restores on an in-process restart), files in `<data>/backups` = `/config/data/backups` in the linuxserver image; no download/upload endpoint. — https://github.com/jellyfin/jellyfin/blob/83d0d0e7f76e23e2e085c8ff67d28b772d35967d/Jellyfin.Api/Controllers/BackupController.cs (D-070)
+- 2026-11-09 — Jellyfin 12.4 has the 10.11 backup API: `POST /Backup/Create` (Database/Metadata/Trickplay/Subtitles flags), `POST /Backup/Restore {ArchiveFileName}` (restores on an in-process restart), files in `DataPath/backups`, DataPath = `<datadir>/data` → `/config/data/data/backups` in the linuxserver image; no download/upload endpoint. — https://github.com/jellyfin/jellyfin/blob/83d0d0e7f76e23e2e085c8ff67d28b772d35967d/Jellyfin.Api/Controllers/BackupController.cs (D-070)
 - 2026-11-09 — SABnzbd 5.1.3: `mode=config&name=create_backup` writes a zip into the complete folder; restore only through the web form (`interface.py` `config_backup_file`) → not used, state replay instead. — https://github.com/sabnzbd/sabnzbd/blob/a647f73426cb70ad60ae7964b96c2d5e939b4727/sabnzbd/config.py#L1013
 - 2026-11-09 — The compose restart policy isn't involved in restores: Servarr restarts in a new process, Jellyfin in-process → `restart: on-failure` stays (SPEC §11 [VERIFY]). (D-071)
 
@@ -131,18 +128,34 @@ Copy from SPEC as they get resolved. Highest priority first:
 - umbrelOS 2.0 `environment:` manifest settings could expose a few safe knobs (e.g. TZ) in Umbrel's app settings.
 
 ## Session log
-### 2026-11-09 (afternoon) — Phase 08: backup & restore (Claude Code on the Mac) — IN PROGRESS
+### 2026-11-09 (afternoon) — Phase 08: backup & restore + owner's list → v0.0.17 (Claude Code on the Mac)
 - Built: `.easyarr` format (D-069), native backups for Sonarr/Radarr/Lidarr/Prowlarr + Jellyfin
-  (D-070), restore keeps this install's API keys (D-071), raw upload header (D-072); Settings →
-  Backups, /restore (also from wizard step 1), automatic daily backups, `docs/backup-restore.md`.
-- Verified: 309+ unit tests, Playwright 38 passed locally (incl. encrypted backup → wrong password →
-  restore). Stack test `dev/stack.sh backuptest` (CI, real services, both arches) on 7060fc7:
-  Servarr restore, re-keying, SABnzbd/Prowlarr key fixes, hand-made Sonarr tag — all PASS.
-- Still failing there: (1) Jellyfin's own backup was skipped at backup time (reason unknown; the
-  test now prints the manifest's skip reasons); (2) Jellyseerr refused the first session after its
-  first sign-in on the fresh install (403) → retry added in `seerrKey` (unproven against real Seerr).
-- Not released: v0.0.17 manifest + compose pin (sha-5c15910) are committed, but the store is NOT
-  synced. Next: push the fix → Image → re-pin → `Umbrel app` green on both arches → sync store.
+  (D-070; Jellyfin's backups are in `/config/data/data/backups`, mounted into the dashboard),
+  restore keeps this install's API keys (D-071), raw upload behind `x-easyarr-upload` (D-072);
+  Settings → Backups, /restore (also from wizard step 1), automatic daily backups (browser's time
+  zone, catch-up, keep N), `docs/backup-restore.md`.
+- Owner's list (same day): (1) no season pack → episodes one by one 20 min later (D-073; Sonarr
+  never falls back by itself, likely why no TV shows arrived); (2) "Needs your OK" → "Needs your
+  attention" (amber frame, pulsing bell, count); (3) Advanced → included apps grouped by job with
+  descriptions, VPN badge, "N of M running", unused folded away; (4) Seerr: second sign-in if the
+  first session is refused (not hit in CI after the Jellyfin path fix). Seerr "Open in Sonarr":
+  cause not found from code (link = `<externalUrl>/series/<slug>`, same as Radarr); asked the owner
+  what happens.
+- Verified: 311 unit tests; Playwright 38 passed locally; CI green on 4b2e9ec incl. stack test on
+  amd64 + arm64: leak test, wiretest, `backuptest` (backup → wipe app-data → fresh → restore:
+  natives incl. Jellyfin restored, hand-made Sonarr tag + Jellyfin user back, Sonarr/Prowlarr
+  connection tests pass, same ledger/libraries/VPN). Store synced v0.0.17.
+- Not proven on a real Umbrel: the episode fallback against real search sites; restore on the
+  owner's install.
+- Owner test (v0.0.17):
+  - [ ] Settings → Backups → download an encrypted backup
+  - [ ] Uninstall EasyArr, reinstall, "Restore from backup" → everything back (Jellyfin users,
+        watched status, Sonarr/Radarr lists)
+  - [ ] A wrong password shows a clear message
+  - [ ] Request a show that has no season pack → episodes start downloading within ~30 min →
+        they appear in Jellyfin
+  - [ ] Seerr → a show → "Open in Sonarr": what happens?
+
 ### 2026-11-09 (night) — Owner's 11-item list: UI fixes, media languages, season packs, re-search (D-064 – D-067)
 - Phase 1 (UI, 6dd788a): logo → home; status-strip VPN/Downloads icons and recently-added posters
   clickable, dead hover effects removed; 44 px Simple/Advanced segmented control; switching to
