@@ -84,7 +84,7 @@ sync() { # sync <preset> [--v0.0.8]
     tail -40 "${WORK}/sync.log"
     exit 1
   fi
-  grep -E -i "warn|error" "${WORK}/sync.log" | head -20 || true
+  grep -E -i "warn|error|quality (size|definition)" "${WORK}/sync.log" | head -20 || true
 }
 
 profile() { # profile <app> <name>
@@ -107,6 +107,7 @@ check_profile() { # check_profile <app> <preset label>
 check_sizes() { # check_sizes <app>: small LQ encodes pass the minimum size (D-063)
   local defs
   defs="$("$1" qualitydefinition)"
+  echo "   $1 sizes: $(jq -c '[.[] | select(.quality.name | test("^(WEBDL|WEBRip|Bluray|HDTV)-(720|1080)p$")) | {(.quality.name): .minSize}] | add' <<<"${defs}")"
   check "$1: minimum sizes lowered (720p 5, 1080p 10, 2160p 20 MB/min)" \
     '[.[] | select(.quality.name | test("^(WEBDL|WEBRip|Bluray)-(720|1080|2160)p$")) | {(.quality.name): .minSize}] | add == {"WEBDL-720p":5,"WEBRip-720p":5,"Bluray-720p":5,"WEBDL-1080p":10,"WEBRip-1080p":10,"Bluray-1080p":10,"WEBDL-2160p":20,"WEBRip-2160p":20,"Bluray-2160p":20}' "${defs}"
   check "$1: other minimums stay as the guide has them" \
