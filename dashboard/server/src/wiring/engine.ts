@@ -10,11 +10,13 @@ export interface WiringPlan {
   libraries: { movies: boolean; tv: boolean; music: boolean };
   quality: 'best' | 'balanced' | 'small';
   /**
-   * Media languages, best first: ISO 639-1 codes or "original" (D-066). Steer which releases
-   * Sonarr/Radarr take and Jellyfin's preferred audio.
+   * Audio languages, best first: ISO 639-1 codes or "original" (D-066). Steer which releases
+   * Sonarr/Radarr take (a file needs one `required` language) and Jellyfin's preferred audio.
    */
-  languages: string[];
-  /** The first real language of `languages`: subtitles (Bazarr), titles (Jellyfin) + country. */
+  audio: { code: string; required: boolean }[];
+  /** Subtitle languages, best first (Bazarr, Jellyfin); `required` ones are watched on the home screen. */
+  subtitles: { code: string; required: boolean }[];
+  /** Titles/descriptions in Jellyfin (primaryLanguage) + country. */
   language: string;
   country: string;
   /** Wizard step 6 (secrets come from StepDeps.usenetSecret). */

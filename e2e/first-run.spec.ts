@@ -117,15 +117,22 @@ test('step 8: what to collect, language, quality', async ({ page }, info) => {
   if (methodOf(info) === 'torrents') {
     await page.getByRole('switch', { name: 'Music' }).click();
   }
-  // Media languages: German first, then the default Original + English.
-  await page.getByLabel('Add another language').selectOption('de');
+  // Audio: German first and a must-have, then the default Original + English.
+  await page.getByLabel('Add an audio language').selectOption('de');
   await page.getByRole('button', { name: 'Move German up' }).click();
   await page.getByRole('button', { name: 'Move German up' }).click();
-  await expect(page.locator('[data-language]')).toHaveText([
+  await page.getByRole('switch', { name: 'German is a must-have' }).click();
+  await expect(page.locator('[data-list="audio"] [data-language]')).toHaveText([
     /German/,
     /Original language/,
     /English/,
   ]);
+  // Subtitles: German (must-have) before the default English.
+  await page.getByLabel('Add a subtitle language').selectOption('de');
+  const subs = page.locator('[data-list="subtitles"]');
+  await subs.getByRole('button', { name: 'Move German up' }).click();
+  await subs.getByRole('switch', { name: 'German is a must-have' }).click();
+  await expect(subs.locator('[data-language]')).toHaveText([/German/, /English/]);
   if (info.project.name.endsWith('torrents') && process.env['E2E_SHOTS'])
     await page.screenshot({ path: `${process.env['E2E_SHOTS']}/languages.png`, fullPage: true });
   await page.getByRole('radio', { name: 'Best quality' }).click();

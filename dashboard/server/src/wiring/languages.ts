@@ -10,9 +10,10 @@ import type { ServarrApp } from './services/servarr.js';
  *   OR'ed, required ones AND'ed — SpecificationMatchesGroup.DidMatch), so a release scores for its
  *   best-ranked language only, never the sum. "Original" uses value -2, which both apps compare
  *   with the series'/movie's original language (LanguageSpecification.cs).
- * - "EasyArr – Language: none of yours" matches when no chosen language is in the release and
- *   scores far below the profile's minimum, so such releases are refused (the dashboard offers
- *   other languages later instead of switching silently).
+ * - "EasyArr – Language: none you need" (only when some languages are must-haves) matches when
+ *   none of the must-have languages is in the release and scores far below the profile's minimum,
+ *   so such releases are refused (the dashboard offers them later instead of switching silently).
+ *   Without must-haves every language is allowed; the order still decides.
  *
  * Releases without a language tag count as the original language (AggregateLanguages.cs), so an
  * untagged English release of an English film is "Original" and "English".
@@ -20,10 +21,10 @@ import type { ServarrApp } from './services/servarr.js';
  */
 
 export const LANGUAGE_FORMAT_PREFIX = 'EasyArr – Language: ';
-export const NONE_OF_YOURS = `${LANGUAGE_FORMAT_PREFIX}none of yours`;
+export const NONE_YOU_NEED = `${LANGUAGE_FORMAT_PREFIX}none you need`;
 /** Points between two neighbouring ranks: more than the guide's release-group tiers differ (≤1800). */
 export const LANGUAGE_SCORE_STEP = 2000;
-export const NONE_OF_YOURS_SCORE = -10000;
+export const NONE_YOU_NEED_SCORE = -10000;
 
 /** Language ids, identical in Sonarr 4.0.20 and Radarr 6.4.4 (src/NzbDrone.Core/Languages/Language.cs). */
 export const SERVARR_LANGUAGE: Record<string, { id: number; name: string }> = {
@@ -81,9 +82,13 @@ const spec = (code: string, negate: boolean, required: boolean): LanguageSpec =>
 export const languageFormatName = (code: string) =>
   `${LANGUAGE_FORMAT_PREFIX}${SERVARR_LANGUAGE[code]?.name ?? code}`;
 
-/** The formats + scores for a ranked list (unknown codes are skipped). */
-export function desiredLanguageFormats(languages: readonly string[]): DesiredFormat[] {
-  const ranked = languages.filter((l) => SERVARR_LANGUAGE[l]);
+/** The formats + scores for a ranked audio list (unknown codes are skipped). */
+export function desiredLanguageFormats(
+  audio: readonly { code: string; required: boolean }[],
+): DesiredFormat[] {
+  const known = audio.filter((a) => SERVARR_LANGUAGE[a.code]);
+  const ranked = known.map((a) => a.code);
+  const required = known.filter((a) => a.required).map((a) => a.code);
   const out: DesiredFormat[] = ranked.map((code, i) => ({
     name: languageFormatName(code),
     score: (ranked.length - i) * LANGUAGE_SCORE_STEP,
@@ -92,11 +97,11 @@ export function desiredLanguageFormats(languages: readonly string[]): DesiredFor
       ...ranked.slice(0, i).map((h) => spec(h, true, true)),
     ],
   }));
-  if (ranked.length > 0) {
+  if (required.length > 0) {
     out.push({
-      name: NONE_OF_YOURS,
-      score: NONE_OF_YOURS_SCORE,
-      specifications: ranked.map((c) => spec(c, true, true)),
+      name: NONE_YOU_NEED,
+      score: NONE_YOU_NEED_SCORE,
+      specifications: required.map((c) => spec(c, true, true)),
     });
   }
   return out;
@@ -138,25 +143,26 @@ const ISO_639_2: Record<string, string> = {
 
 /**
  * Jellyfin playback settings for the owner's account (UserConfiguration, Jellyfin 10.11):
- * - AudioLanguagePreference: the first choice; "OriginalLanguage" is Jellyfin's own value for
+ * - AudioLanguagePreference: the first audio choice; "OriginalLanguage" is Jellyfin's own value for
  *   "Original" (MediaSourceManager). PlayDefaultAudioTrack off, so the preference wins over the
  *   file's default track.
- * - SubtitleLanguagePreference: the first real language; SubtitleMode "Smart" shows those
- *   subtitles only when the audio is in another language.
+ * - SubtitleLanguagePreference: the first subtitle language; SubtitleMode "Smart" shows those
+ *   subtitles only when the audio is in another language. Untouched without subtitle languages.
  * Returns true when something changed.
  */
 export function applyPlaybackLanguages(
   config: Record<string, unknown>,
-  languages: readonly string[],
+  audio: readonly { code: string }[],
+  subtitles: readonly { code: string }[],
 ): boolean {
-  const first = languages[0];
-  const real = languages.find((l) => l !== 'original');
+  const first = audio[0]?.code;
+  const sub = subtitles[0]?.code;
   const want: Record<string, unknown> = {
     AudioLanguagePreference:
       first === 'original' ? 'OriginalLanguage' : (ISO_639_2[first ?? ''] ?? ''),
     PlayDefaultAudioTrack: false,
-    ...(real && ISO_639_2[real]
-      ? { SubtitleLanguagePreference: ISO_639_2[real], SubtitleMode: 'Smart' }
+    ...(sub && ISO_639_2[sub]
+      ? { SubtitleLanguagePreference: ISO_639_2[sub], SubtitleMode: 'Smart' }
       : {}),
   };
   let changed = false;

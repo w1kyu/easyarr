@@ -176,6 +176,44 @@ describe('StatusService', () => {
     expect((await some.svc.view()).warnings).toEqual([]);
   });
 
+  it('warns about must-have subtitles Bazarr has not found yet (D-066)', async () => {
+    const world = new World();
+    world.keys['bazarr'] = 'bz-key';
+    const sub = (code2: string) => ({ name: code2, code2, code3: '', forced: false, hi: false });
+    world.bz.wantedMovies = [
+      { title: 'Dune', missing_subtitles: [sub('de')] },
+      { title: 'Heat', missing_subtitles: [sub('fr')] }, // not a must-have
+    ];
+    world.bz.wantedEpisodes = [
+      { seriesTitle: 'Dark', episode_number: '1x01', missing_subtitles: [sub('de'), sub('en')] },
+    ];
+    const library = {
+      libraries: { movies: true, tv: true, music: false },
+      audio: [{ code: 'original', required: false }],
+      subtitles: [
+        { code: 'de', required: true },
+        { code: 'en', required: false },
+        { code: 'fr', required: false },
+      ],
+      quality: 'balanced',
+    };
+    const { svc } = setup({ state: async () => stateWith({ library }) }, world);
+    expect((await svc.view()).warnings).toEqual([
+      { code: 'subtitlesMissing', count: 2, names: ['Dune', 'Dark 1x01'], languages: ['de'] },
+    ]);
+    // Nothing must-have → no warning.
+    const relaxed = setup(
+      {
+        state: async () =>
+          stateWith({
+            library: { ...library, subtitles: [{ code: 'de', required: false }] },
+          }),
+      },
+      world,
+    );
+    expect((await relaxed.svc.view()).warnings).toEqual([]);
+  });
+
   it('a skipped VPN is not a warning; an unconfigured one is', async () => {
     const notConfigured = async () => ({ ...connected, connection: 'not_configured' as const });
     const skipped = setup({
@@ -264,7 +302,8 @@ describe('usedServices', () => {
         download: { method: 'usenet' },
         library: {
           libraries: { movies: true, tv: false, music: false },
-          language: 'en',
+          audio: [{ code: 'en', required: false }],
+          subtitles: [],
           quality: 'balanced',
         },
       }),

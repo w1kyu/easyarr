@@ -259,7 +259,13 @@ export class World {
   };
   /** Wizard step 6 secrets, by entry id. */
   usenetSecrets = { servers: {} as Record<string, string>, indexers: {} as Record<string, string> };
-  bz = { profiles: [] as Json[], settings: {} as Record<string, string>, enabled: [] as string[] };
+  bz = {
+    profiles: [] as Json[],
+    settings: {} as Record<string, string>,
+    enabled: [] as string[],
+    wantedMovies: [] as Json[],
+    wantedEpisodes: [] as Json[],
+  };
   jf = {
     wizardDone: false,
     user: null as null | { name: string; pw: string },
@@ -447,6 +453,11 @@ export class World {
     if (h.get('x-api-key') !== this.keys['bazarr']) return [401, ''];
     if (p === '/system/status') return [200, { data: { bazarr_version: '1.5.3' } }];
     if (p === '/system/languages/profiles') return [200, this.bz.profiles];
+    // "Wanted" = items still missing a subtitle of their profile (Bazarr 1.6 api/*/wanted.py).
+    if (p === '/movies/wanted' || p === '/episodes/wanted') {
+      const data = p === '/movies/wanted' ? this.bz.wantedMovies : this.bz.wantedEpisodes;
+      return [200, { data, total: data.length }];
+    }
     if (p === '/system/settings' && m === 'POST') {
       const enabled = (body as URLSearchParams).getAll('languages-enabled');
       // Any languages-enabled value disables every language first, then enables the listed ones.

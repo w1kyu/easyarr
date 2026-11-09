@@ -88,24 +88,40 @@ describe('wizard registry', () => {
     ).toBe('wizard.error.libraryRequired');
   });
 
-  it('step 8 media languages: ranked, 1–4, no repeats; `language` follows the list (D-066)', () => {
+  it('step 8: audio + subtitle languages, ranked, 1–4 audio, 0–4 subtitles, no repeats (D-066)', () => {
     const lib = { libraries: { movies: true, tv: true, music: false }, quality: 'balanced' };
-    expect(libraryAnswersSchema.parse({ ...lib, languages: ['original', 'de', 'en'] })).toEqual({
+    const audio = [
+      { code: 'de', required: true },
+      { code: 'original', required: false },
+    ];
+    const subtitles = [{ code: 'de', required: true }];
+    expect(libraryAnswersSchema.parse({ ...lib, audio, subtitles })).toEqual({
       ...lib,
-      languages: ['original', 'de', 'en'],
+      audio,
+      subtitles,
       language: 'de',
     });
-    // Only "Original": subtitles/titles fall back to English.
-    expect(libraryAnswersSchema.parse({ ...lib, languages: ['original'] }).language).toBe('en');
-    const msg = (languages: unknown) =>
-      libraryAnswersSchema.safeParse({ ...lib, languages }).error?.issues[0]?.message;
+    // No subtitles: titles in the first real audio language, else English.
+    expect(libraryAnswersSchema.parse({ ...lib, audio, subtitles: [] }).language).toBe('de');
+    expect(
+      libraryAnswersSchema.parse({
+        ...lib,
+        audio: [{ code: 'original', required: false }],
+        subtitles: [],
+      }).language,
+    ).toBe('en');
+    const msg = (a: unknown, s: unknown = []) =>
+      libraryAnswersSchema.safeParse({ ...lib, audio: a, subtitles: s }).error?.issues[0]?.message;
+    const l = (code: string) => ({ code, required: false });
     expect(msg([])).toBe('wizard.error.languageRequired');
-    expect(msg(['de', 'en', 'fr', 'es', 'it'])).toBe('wizard.error.languageTooMany');
-    expect(msg(['de', 'de'])).toBe('wizard.error.languageTwice');
-    expect(msg(['xx'])).toBe('wizard.error.languageRequired');
+    expect(msg(['de', 'en', 'fr', 'es', 'it'].map(l))).toBe('wizard.error.languageTooMany');
+    expect(msg([l('de'), l('de')])).toBe('wizard.error.languageTwice');
+    expect(msg([l('xx')])).toBe('wizard.error.languageRequired');
+    // "Original" is an audio choice only.
+    expect(msg([l('de')], [l('original')])).toBe('wizard.error.languageRequired');
   });
 
-  it('answers saved before multi-language read as "Original, then <language>"', () => {
+  it('answers saved before multi-language read as audio "Original, then X", subtitles "X"', () => {
     const old = {
       libraries: { movies: true, tv: true, music: true },
       language: 'de',
@@ -113,10 +129,16 @@ describe('wizard registry', () => {
     };
     expect(libraryAnswersSchema.parse(old)).toEqual({
       ...old,
-      languages: ['original', 'de'],
+      audio: [
+        { code: 'original', required: false },
+        { code: 'de', required: false },
+      ],
+      subtitles: [{ code: 'de', required: false }],
       language: 'de',
     });
-    expect(parseWizardAnswers({ library: old }).library?.languages).toEqual(['original', 'de']);
+    expect(parseWizardAnswers({ library: old }).library?.subtitles).toEqual([
+      { code: 'de', required: false },
+    ]);
   });
 });
 

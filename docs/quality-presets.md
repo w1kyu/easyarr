@@ -44,23 +44,35 @@ Your Umbrel's home screen and Settings show how much space is free.
 
 ## Languages
 
-In the setup you put the languages you want to hear in order, for example 1. German, 2. Original
-language, 3. English. "Original language" means the language the film or show was made in.
+In the setup you pick two lists, each best first:
 
-- **Downloads (Sonarr and Radarr):** EasyArr adds its own "EasyArr – Language: …" rules. A
-  release in your first language scores highest, the next one a bit less, and so on. A release in
-  none of your languages is not downloaded. Quality still comes first: a 1080p release in your
-  second language beats a 720p one in your first. Once a better-ranked language shows up at the same
-  quality, it replaces the file automatically.
-- **Subtitles (Bazarr):** subtitles in your languages, in the same order ("Original" is skipped).
-- **Jellyfin:** plays your first language's audio track when a file has several, shows subtitles
-  in your first real language when the audio is in another one, and uses it for titles and
-  descriptions.
+- **Audio** (what you hear), for example 1. German, 2. Original language, 3. English. "Original
+  language" means the language the film or show was made in.
+- **Subtitles** (what you read), for example 1. German, 2. English. The list may be empty.
+
+Any language can be marked **Must have**:
+
+- **Audio must-haves:** a file needs at least one of them. If none of them is available, EasyArr
+  doesn't download anything else without asking you. Without must-haves any language is fine and
+  the order only says what you prefer.
+- **Subtitle must-haves:** downloads don't wait for subtitles. Bazarr keeps looking, and the home
+  screen shows which movies and episodes are still missing them.
+
+What each app does with this:
+
+- **Sonarr and Radarr:** EasyArr adds its own "EasyArr – Language: …" rules. A release in your first
+  audio language scores highest, the next one a bit less, and so on. Quality still comes first: a
+  1080p release in your second language beats a 720p one in your first. When a better-ranked language
+  shows up at the same quality, it replaces the file automatically.
+- **Bazarr:** looks for subtitles in your subtitle languages, in that order.
+- **Jellyfin:** plays your first audio language when a file has several, shows your first subtitle
+  language when the audio is in another language, and uses that language for titles and descriptions.
 - **Request page (Jellyseerr):** has no language setting of its own. Requests use the EasyArr
   profiles above, so they follow your languages too.
 
-If you installed EasyArr before multi-language support, your list now reads "Original language,
-then <the language you chose>". Change it in **Settings → Libraries & quality**.
+If you installed EasyArr before this, your lists now read: audio "Original language, then <the
+language you chose>", subtitles "<the language you chose>", nothing marked as must-have. Change them
+in **Settings → Libraries & quality**.
 
 ## Whole seasons and trying again
 

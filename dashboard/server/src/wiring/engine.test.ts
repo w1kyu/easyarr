@@ -47,7 +47,11 @@ const plan: WiringPlan = {
   usenet: false,
   libraries: { movies: true, tv: true, music: false },
   quality: 'balanced',
-  languages: ['original', 'en'],
+  audio: [
+    { code: 'original', required: false },
+    { code: 'en', required: false },
+  ],
+  subtitles: [{ code: 'en', required: false }],
   language: 'en',
   country: 'US',
   usenetServers: [],

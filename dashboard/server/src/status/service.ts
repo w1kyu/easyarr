@@ -21,6 +21,7 @@ import type { Secrets, State } from '../state/index.js';
 import {
   jellyfinImage,
   jellyfinRecent,
+  bazarrMissingSubtitles,
   parseGluetunLog,
   probeService,
   qbittorrentQueue,
@@ -137,6 +138,7 @@ export class StatusService {
   private readonly latest: Cached<string | null>;
   private readonly official: Cached<boolean>;
   private readonly recent: Cached<StatusView['recent']>;
+  private readonly subtitles: Cached<Awaited<ReturnType<typeof bazarrMissingSubtitles>>>;
 
   constructor(private readonly opts: StatusServiceOptions) {
     this.now = opts.now ?? Date.now;
@@ -144,6 +146,15 @@ export class StatusService {
     this.latest = new Cached(6 * 3600_000, opts.latestVersion ?? (async () => null), this.now);
     this.official = new Cached(10 * 60_000, opts.officialJellyfin ?? (async () => false), this.now);
     this.recent = new Cached(60_000, () => jellyfinRecent(opts), this.now);
+    this.subtitles = new Cached(
+      10 * 60_000,
+      async () => {
+        const lib = parseWizardAnswers((await opts.state()).wizard.answers).library;
+        const codes = (lib?.subtitles ?? []).filter((x) => x.required).map((x) => x.code);
+        return bazarrMissingSubtitles(opts, codes);
+      },
+      this.now,
+    );
   }
 
   private async probeAll(): Promise<Record<string, Probe>> {
@@ -154,17 +165,20 @@ export class StatusService {
   }
 
   async view(): Promise<StatusView> {
-    const [state, probes, vpn, disk, qbit, sab, recent, latest, official] = await Promise.all([
-      this.opts.state(),
-      this.probes.get(),
-      this.opts.vpn(),
-      this.opts.disk(),
-      qbittorrentQueue(this.opts),
-      sabnzbdQueue(this.opts),
-      this.recent.get().catch(() => null),
-      this.latest.get().catch(() => null),
-      this.official.get().catch(() => false),
-    ]);
+    const [state, probes, vpn, disk, qbit, sab, recent, latest, official, subs] = await Promise.all(
+      [
+        this.opts.state(),
+        this.probes.get(),
+        this.opts.vpn(),
+        this.opts.disk(),
+        qbittorrentQueue(this.opts),
+        sabnzbdQueue(this.opts),
+        this.recent.get().catch(() => null),
+        this.latest.get().catch(() => null),
+        this.official.get().catch(() => false),
+        this.subtitles.get().catch(() => null),
+      ],
+    );
     const used = usedServices(state);
     const services: ServiceStatus[] = SERVICES.map((s) => {
       const p = probes[s.id] ?? { state: 'down' as const, version: null };
@@ -179,6 +193,15 @@ export class StatusService {
     });
     const items: DownloadItem[] = [...(qbit ?? []), ...(sab ?? [])];
     const warnings = this.warnings(state, services, vpn, disk, latest, official);
+    // Must-have subtitles Bazarr hasn't found yet (D-066): it keeps looking, the user should know.
+    if (subs && subs.count > 0) {
+      warnings.push({
+        code: 'subtitlesMissing',
+        count: subs.count,
+        names: subs.names.slice(0, 3),
+        languages: subs.languages,
+      });
+    }
     return {
       at: new Date(this.now()).toISOString(),
       version: this.opts.appVersion ?? this.opts.version,

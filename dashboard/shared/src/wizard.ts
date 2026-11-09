@@ -112,8 +112,12 @@ export function languageCountry(code: LanguageCode): string {
 }
 
 /**
- * Media languages (step 8): which audio language downloads should have, best first. `original` =
- * the language the film/show was made in (Sonarr/Radarr "Original"). The UI itself stays English.
+ * Media languages (step 8, D-066): which audio the downloads should have and which subtitles to
+ * fetch, each best first. `original` = the language the film/show was made in (Sonarr/Radarr
+ * "Original"); only audio can be "original". `required` ("must have"):
+ * - audio: a file needs at least one must-have language, otherwise EasyArr asks before downloading;
+ * - subtitles: Bazarr keeps looking and the home screen warns while they're missing.
+ * The UI itself stays English.
  */
 export const ORIGINAL_LANGUAGE = 'original';
 export type MediaLanguage = LanguageCode | typeof ORIGINAL_LANGUAGE;
@@ -122,51 +126,81 @@ const MEDIA_LANGUAGE_CODES = [ORIGINAL_LANGUAGE, ...LANGUAGE_CODES] as [
   ...MediaLanguage[],
 ];
 export const MAX_MEDIA_LANGUAGES = 4;
-export const DEFAULT_MEDIA_LANGUAGES: MediaLanguage[] = [ORIGINAL_LANGUAGE, 'en'];
+
+const unique = (l: readonly { code: string }[]) => new Set(l.map((x) => x.code)).size === l.length;
+
+export const audioLanguageSchema = z.object({
+  code: z.enum(MEDIA_LANGUAGE_CODES, { message: 'wizard.error.languageRequired' }),
+  required: z.boolean(),
+});
+export type AudioLanguage = z.infer<typeof audioLanguageSchema>;
+export const subtitleLanguageSchema = z.object({
+  code: z.enum(LANGUAGE_CODES, { message: 'wizard.error.languageRequired' }),
+  required: z.boolean(),
+});
+export type SubtitleLanguage = z.infer<typeof subtitleLanguageSchema>;
+
+export const DEFAULT_AUDIO: AudioLanguage[] = [
+  { code: ORIGINAL_LANGUAGE, required: false },
+  { code: 'en', required: false },
+];
+export const DEFAULT_SUBTITLES: SubtitleLanguage[] = [{ code: 'en', required: false }];
 
 /**
- * The first real language in the list: subtitles (Bazarr), Jellyfin's titles/descriptions and
- * preferred audio. English when the list is only "Original".
+ * The language people read: titles and descriptions in Jellyfin. The first subtitle language,
+ * else the first real audio language, else English.
  */
-export function primaryLanguage(languages: readonly MediaLanguage[]): LanguageCode {
-  return (languages.find((l) => l !== ORIGINAL_LANGUAGE) as LanguageCode | undefined) ?? 'en';
+export function primaryLanguage(
+  audio: readonly { code: MediaLanguage }[],
+  subtitles: readonly { code: LanguageCode }[],
+): LanguageCode {
+  return (
+    subtitles[0]?.code ??
+    (audio.find((a) => a.code !== ORIGINAL_LANGUAGE)?.code as LanguageCode | undefined) ??
+    'en'
+  );
 }
 
 /**
- * Answers saved before multi-language support only had `language` (subtitles + Jellyfin, downloads
- * in the original language, D-052). They read as "Original, then that language" (D-066). `language`
- * is always rewritten from `languages`, so older EasyArr versions can still read the answers.
+ * Answers saved before multi-language support only had `language: X` (subtitles + Jellyfin, D-052):
+ * they read as audio "Original, then X" and subtitles "X", nothing must-have, so nothing that
+ * downloaded before is refused now. `language` is always rewritten (older versions read it).
  */
 function upgradeLibraryAnswers(raw: unknown): unknown {
   if (typeof raw !== 'object' || raw === null) return raw;
   const v = { ...(raw as Record<string, unknown>) };
-  if (!Array.isArray(v['languages']) && typeof v['language'] === 'string') {
-    v['languages'] =
-      v['language'] === ORIGINAL_LANGUAGE
-        ? [ORIGINAL_LANGUAGE]
-        : [ORIGINAL_LANGUAGE, v['language']];
+  const old = typeof v['language'] === 'string' ? v['language'] : null;
+  if (!Array.isArray(v['audio']) && old) {
+    v['audio'] = [
+      { code: ORIGINAL_LANGUAGE, required: false },
+      ...(old !== ORIGINAL_LANGUAGE ? [{ code: old, required: false }] : []),
+    ];
   }
-  if (Array.isArray(v['languages'])) {
-    const parsed = z.array(z.enum(MEDIA_LANGUAGE_CODES)).safeParse(v['languages']);
-    if (parsed.success && parsed.data.length > 0) v['language'] = primaryLanguage(parsed.data);
+  if (!Array.isArray(v['subtitles']) && old && old !== ORIGINAL_LANGUAGE) {
+    v['subtitles'] = [{ code: old, required: false }];
   }
+  const audio = z.array(audioLanguageSchema).safeParse(v['audio']);
+  const subs = z.array(subtitleLanguageSchema).safeParse(v['subtitles'] ?? []);
+  if (audio.success && subs.success) v['language'] = primaryLanguage(audio.data, subs.data);
   return v;
 }
 
-/** Step 8 "What do you want?": libraries, media languages, quality preset. */
+/** Step 8 "What do you want?": libraries, audio + subtitle languages, quality preset. */
 export const libraryAnswersSchema = z.preprocess(
   upgradeLibraryAnswers,
   z
     .object({
       libraries: z.object({ movies: z.boolean(), tv: z.boolean(), music: z.boolean() }),
-      languages: z
-        .array(z.enum(MEDIA_LANGUAGE_CODES, { message: 'wizard.error.languageRequired' }), {
-          message: 'wizard.error.languageRequired',
-        })
+      audio: z
+        .array(audioLanguageSchema, { message: 'wizard.error.languageRequired' })
         .min(1, { message: 'wizard.error.languageRequired' })
         .max(MAX_MEDIA_LANGUAGES, { message: 'wizard.error.languageTooMany' })
-        .refine((l) => new Set(l).size === l.length, { message: 'wizard.error.languageTwice' }),
-      /** Derived from `languages` (primaryLanguage); kept for older versions and Bazarr/Jellyfin. */
+        .refine(unique, { message: 'wizard.error.languageTwice' }),
+      subtitles: z
+        .array(subtitleLanguageSchema)
+        .max(MAX_MEDIA_LANGUAGES, { message: 'wizard.error.languageTooMany' })
+        .refine(unique, { message: 'wizard.error.languageTwice' }),
+      /** Derived (primaryLanguage); kept for older versions and Jellyfin's metadata language. */
       language: z.enum(LANGUAGE_CODES, { message: 'wizard.error.languageRequired' }),
       quality: z.enum(QUALITY_PRESETS, { message: 'wizard.error.qualityRequired' }),
     })
@@ -179,7 +213,8 @@ export type LibraryAnswers = z.infer<typeof libraryAnswersSchema>;
 
 export const DEFAULT_LIBRARY_ANSWERS: LibraryAnswers = {
   libraries: { movies: true, tv: true, music: true },
-  languages: DEFAULT_MEDIA_LANGUAGES,
+  audio: DEFAULT_AUDIO,
+  subtitles: DEFAULT_SUBTITLES,
   language: 'en',
   quality: 'balanced',
 };

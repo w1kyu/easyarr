@@ -33,7 +33,11 @@ const everything: WiringPlan = {
   usenet: true,
   libraries: { movies: true, tv: true, music: true },
   quality: 'balanced',
-  languages: ['original', 'en'],
+  audio: [
+    { code: 'original', required: false },
+    { code: 'en', required: false },
+  ],
+  subtitles: [{ code: 'en', required: false }],
   language: 'en',
   country: 'US',
   usenetServers: [],
@@ -279,7 +283,11 @@ describe('wiring steps', () => {
       usenet: false,
       libraries: { movies: true, tv: false, music: false },
       quality: 'small',
-      languages: ['de', 'original'],
+      audio: [
+        { code: 'de', required: false },
+        { code: 'original', required: false },
+      ],
+      subtitles: [{ code: 'de', required: false }],
       language: 'de',
       country: 'DE',
       usenetServers: [],
@@ -319,17 +327,31 @@ describe('wiring steps', () => {
       );
     };
 
-    it('ranks the chosen languages in Sonarr + Radarr, refuses the rest, Radarr takes any language', async () => {
+    const a = (code: string, required = false) => ({ code, required });
+
+    it('ranks the audio languages in Sonarr + Radarr, refuses files without a must-have, Radarr takes any language', async () => {
       const { world: w, run } = setup();
-      const plan = { ...everything, languages: ['de', 'en', 'original'] };
+      const plan = {
+        ...everything,
+        audio: [a('de', true), a('en', true), a('original')],
+        subtitles: [a('de', true), a('en')],
+      };
       expect((await run('run', plan)).failed).toEqual([]);
       for (const app of ['sonarr', 'radarr'] as const) {
         expect(scores(w, app)).toEqual({
           'EasyArr – Language: German': 6000,
           'EasyArr – Language: English': 4000,
           'EasyArr – Language: Original': 2000,
-          'EasyArr – Language: none of yours': -10000,
+          'EasyArr – Language: none you need': -10000,
         });
+        // "None you need" = neither German nor English (Original isn't a must-have).
+        const none = w.arr[app]
+          .coll('customformat')
+          .items.find((f) => f['name'] === 'EasyArr – Language: none you need');
+        expect(none?.['specifications']).toMatchObject([
+          { negate: true, required: true, fields: [{ name: 'value', value: 4 }, {}] },
+          { negate: true, required: true, fields: [{ name: 'value', value: 1 }, {}] },
+        ]);
         // English only counts when German isn't there (the best language wins, no sums).
         const english = w.arr[app]
           .coll('customformat')
@@ -345,7 +367,7 @@ describe('wiring steps', () => {
       expect(radarrProfile?.['language']).toEqual({ id: -1, name: 'Any' });
       // Recyclarr leaves these scores alone.
       expect(w.recyclarrConfig).toMatch(/except_patterns:\n\s+- "\^EasyArr – Language: "/);
-      // Subtitles: every real language, in order; Jellyfin plays German audio first.
+      // Subtitles: the subtitle list, in order; Jellyfin plays German audio first.
       expect(w.bz.enabled).toEqual(['de', 'en']);
       expect(w.bz.profiles[0]).toMatchObject({
         name: 'German, English',
@@ -367,20 +389,35 @@ describe('wiring steps', () => {
 
     it('follows a changed list: new order, dropped languages score 0, Original → Jellyfin "OriginalLanguage"', async () => {
       const { world: w, run } = setup();
-      await run('run', { ...everything, languages: ['de', 'en', 'original'] });
-      const r = await run('run', { ...everything, languages: ['original', 'de'] });
+      await run('run', { ...everything, audio: [a('de', true), a('en'), a('original')] });
+      // No must-haves any more: nothing is refused for its language, the order still counts.
+      const r = await run('run', { ...everything, audio: [a('original'), a('de')], subtitles: [] });
       expect(r.failed).toEqual([]);
       expect(scores(w, 'sonarr')).toEqual({
         'EasyArr – Language: German': 2000,
         'EasyArr – Language: English': 0,
         'EasyArr – Language: Original': 4000,
-        'EasyArr – Language: none of yours': -10000,
+        'EasyArr – Language: none you need': 0,
       });
-      const none = w.arr.sonarr
-        .coll('customformat')
-        .items.find((f) => f['name'] === 'EasyArr – Language: none of yours');
-      expect((none?.['specifications'] as unknown[]).length).toBe(2);
       expect(w.jf.userConfig['AudioLanguagePreference']).toBe('OriginalLanguage');
+    });
+
+    it('no subtitle languages: Bazarr gets no profile, Jellyfin subtitle settings stay as they are', async () => {
+      const { world: w, run } = setup();
+      const r = await run('run', { ...everything, audio: [a('original')], subtitles: [] });
+      expect(r.failed).toEqual([]);
+      expect(w.bz.profiles).toEqual([]);
+      expect(w.jf.userConfig).toMatchObject({
+        AudioLanguagePreference: 'OriginalLanguage',
+        SubtitleMode: 'Default',
+        SubtitleLanguagePreference: null,
+      });
+      // No must-have audio: nothing is refused for its language.
+      expect(
+        w.arr.radarr
+          .coll('customformat')
+          .items.some((f) => f['name'] === 'EasyArr – Language: none you need'),
+      ).toBe(false);
     });
 
     it('a Recyclarr sync putting "Original" back is undone in the same run', async () => {

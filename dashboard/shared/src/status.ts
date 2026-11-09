@@ -54,6 +54,7 @@ export const STATUS_WARNING_CODES = [
   'updateAvailable',
   'wiringProblems',
   'indexersDown',
+  'subtitlesMissing',
 ] as const;
 export type StatusWarningCode = (typeof STATUS_WARNING_CODES)[number];
 
@@ -64,6 +65,10 @@ export interface StatusWarning {
   /** diskLow: free share in percent; updateAvailable: the new version. */
   freePercent?: number;
   version?: string;
+  /** subtitlesMissing: how many items, a few of their names, which must-have languages (ISO 639-1). */
+  count?: number;
+  names?: string[];
+  languages?: string[];
 }
 
 export interface StatusView {

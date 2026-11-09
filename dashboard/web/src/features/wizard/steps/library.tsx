@@ -8,6 +8,7 @@ import {
   ORIGINAL_LANGUAGE,
   primaryLanguage,
   type LibraryAnswers,
+  type LanguageCode,
   type MediaLanguage,
   type LibraryId,
   type QualityPreset,
@@ -123,19 +124,42 @@ export function LibraryStep({ formId, view, onSaved }: StepFormProps) {
         </div>
       </section>
 
-      <section aria-labelledby="library-language" className="flex flex-col gap-3">
-        <h3 id="library-language" className="text-17 font-semibold -tracking-2">
-          {t('library.language.title')}
+      <section aria-labelledby="library-audio" className="flex flex-col gap-3">
+        <h3 id="library-audio" className="text-17 font-semibold -tracking-2">
+          {t('library.audio.title')}
         </h3>
         <p className="max-w-2xl text-13 leading-relaxed text-white/60">
-          {t('library.language.intro')}
+          {t('library.audio.intro')}
         </p>
-        <LanguageRanking
-          value={form.languages}
+        <LanguageRanking<MediaLanguage>
+          listId="audio"
+          value={form.audio}
+          min={1}
           options={[ORIGINAL_LANGUAGE, ...languages.map((l) => l.code)]}
           name={(c) => (c === ORIGINAL_LANGUAGE ? t('library.language.original') : languageName(c))}
-          onChange={(next) =>
-            setForm((f) => ({ ...f, languages: next, language: primaryLanguage(next) }))
+          requiredHint={t('library.audio.requiredHint')}
+          onChange={(audio) =>
+            setForm((f) => ({ ...f, audio, language: primaryLanguage(audio, f.subtitles) }))
+          }
+        />
+      </section>
+
+      <section aria-labelledby="library-subtitles" className="flex flex-col gap-3">
+        <h3 id="library-subtitles" className="text-17 font-semibold -tracking-2">
+          {t('library.subtitles.title')}
+        </h3>
+        <p className="max-w-2xl text-13 leading-relaxed text-white/60">
+          {t('library.subtitles.intro')}
+        </p>
+        <LanguageRanking<LanguageCode>
+          listId="subtitles"
+          value={form.subtitles}
+          min={0}
+          options={languages.map((l) => l.code)}
+          name={languageName}
+          requiredHint={t('library.subtitles.requiredHint')}
+          onChange={(subtitles) =>
+            setForm((f) => ({ ...f, subtitles, language: primaryLanguage(f.audio, subtitles) }))
           }
         />
         <p className="max-w-2xl text-12 leading-relaxed text-white/50">
@@ -212,19 +236,26 @@ export function LibraryStep({ formId, view, onSaved }: StepFormProps) {
 }
 
 /**
- * The media languages, best first: a numbered list with move up/down and remove, plus a picker to
- * add another (up to MAX_MEDIA_LANGUAGES). Plain buttons, so it works with keyboard and touch.
+ * A ranked language list: numbered rows with move up/down, a "Must have" switch and remove, plus a
+ * picker to add another (up to MAX_MEDIA_LANGUAGES). Plain buttons, so it works with keyboard and
+ * touch.
  */
-function LanguageRanking({
+function LanguageRanking<C extends string>({
+  listId,
   value,
+  min,
   options,
   name,
+  requiredHint,
   onChange,
 }: {
-  value: MediaLanguage[];
-  options: MediaLanguage[];
-  name: (code: MediaLanguage) => string;
-  onChange: (next: MediaLanguage[]) => void;
+  listId: string;
+  value: { code: C; required: boolean }[];
+  min: number;
+  options: C[];
+  name: (code: C) => string;
+  requiredHint: string;
+  onChange: (next: { code: C; required: boolean }[]) => void;
 }) {
   const { t } = useTranslation();
   const move = (i: number, by: -1 | 1) => {
@@ -234,58 +265,85 @@ function LanguageRanking({
     next.splice(i + by, 0, item);
     onChange(next);
   };
-  const left = options.filter((o) => !value.includes(o));
+  const left = options.filter((o) => !value.some((v) => v.code === o));
   const iconButton =
     'grid size-10 shrink-0 place-items-center rounded-full text-white/60 transition-colors hover:bg-white/10 hover:text-white focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:outline-hidden disabled:pointer-events-none disabled:opacity-25';
   return (
-    <div className="flex flex-col gap-2 md:max-w-md">
-      <ol className="flex flex-col gap-2" aria-label={t('library.language.listLabel')}>
-        {value.map((code, i) => (
-          <li
-            key={code}
-            data-language={code}
-            className="flex items-center gap-2 rounded-16 border border-white/10 bg-white/4 py-1 pr-1 pl-3"
-          >
-            <span className="grid size-7 shrink-0 place-items-center rounded-full bg-brand/30 text-13 font-semibold">
-              {i + 1}
-            </span>
-            <span className="min-w-0 flex-1 truncate text-15 font-medium">{name(code)}</span>
-            <button
-              type="button"
-              className={iconButton}
-              disabled={i === 0}
-              onClick={() => move(i, -1)}
-              aria-label={t('library.language.up', { name: name(code) })}
+    <div className="flex flex-col gap-2 md:max-w-xl">
+      {value.length === 0 ? (
+        <p className="rounded-16 border border-dashed border-white/15 px-4 py-3 text-13 text-white/55">
+          {t('library.language.none')}
+        </p>
+      ) : (
+        <ol
+          className="flex flex-col gap-2"
+          aria-label={t(`library.${listId}.listLabel`)}
+          data-list={listId}
+        >
+          {value.map(({ code, required }, i) => (
+            <li
+              key={code}
+              data-language={code}
+              className={cn(
+                'flex flex-wrap items-center gap-x-2 gap-y-1 rounded-16 border py-1 pr-1 pl-3',
+                required ? 'border-brand/50 bg-brand/10' : 'border-white/10 bg-white/4',
+              )}
             >
-              <ArrowUp className="size-4" aria-hidden />
-            </button>
-            <button
-              type="button"
-              className={iconButton}
-              disabled={i === value.length - 1}
-              onClick={() => move(i, 1)}
-              aria-label={t('library.language.down', { name: name(code) })}
-            >
-              <ArrowDown className="size-4" aria-hidden />
-            </button>
-            <button
-              type="button"
-              className={iconButton}
-              disabled={value.length === 1}
-              onClick={() => onChange(value.filter((c) => c !== code))}
-              aria-label={t('library.language.remove', { name: name(code) })}
-            >
-              <X className="size-4" aria-hidden />
-            </button>
-          </li>
-        ))}
-      </ol>
+              <span className="grid size-7 shrink-0 place-items-center rounded-full bg-brand/30 text-13 font-semibold">
+                {i + 1}
+              </span>
+              <span className="min-w-0 flex-1 truncate text-15 font-medium">{name(code)}</span>
+              <label className="flex cursor-pointer items-center gap-2 px-1 text-13 text-white/70">
+                <Switch
+                  checked={required}
+                  aria-label={t('library.language.mustHaveFor', { name: name(code) })}
+                  onCheckedChange={(v) =>
+                    onChange(value.map((x) => (x.code === code ? { ...x, required: v } : x)))
+                  }
+                />
+                <span aria-hidden>{t('library.language.mustHave')}</span>
+              </label>
+              <span className="flex">
+                <button
+                  type="button"
+                  className={iconButton}
+                  disabled={i === 0}
+                  onClick={() => move(i, -1)}
+                  aria-label={t('library.language.up', { name: name(code) })}
+                >
+                  <ArrowUp className="size-4" aria-hidden />
+                </button>
+                <button
+                  type="button"
+                  className={iconButton}
+                  disabled={i === value.length - 1}
+                  onClick={() => move(i, 1)}
+                  aria-label={t('library.language.down', { name: name(code) })}
+                >
+                  <ArrowDown className="size-4" aria-hidden />
+                </button>
+                <button
+                  type="button"
+                  className={iconButton}
+                  disabled={value.length <= min}
+                  onClick={() => onChange(value.filter((c) => c.code !== code))}
+                  aria-label={t('library.language.remove', { name: name(code) })}
+                >
+                  <X className="size-4" aria-hidden />
+                </button>
+              </span>
+            </li>
+          ))}
+        </ol>
+      )}
+      <p className="px-1 text-12 leading-relaxed text-white/50">{requiredHint}</p>
       {value.length < MAX_MEDIA_LANGUAGES && left.length > 0 && (
         <SelectField
-          label={t('library.language.add')}
+          label={t(`library.${listId}.add`)}
           value=""
           onChange={(e) => {
-            if (e.target.value) onChange([...value, e.target.value as MediaLanguage]);
+            if (e.target.value)
+              onChange([...value, { code: e.target.value as C, required: false }]);
           }}
         >
           <option value="">{t('library.language.addPlaceholder')}</option>

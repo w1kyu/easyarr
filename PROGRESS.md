@@ -98,7 +98,7 @@ Copy from SPEC as they get resolved. Highest priority first:
 - Media languages steer downloads since D-066, but Bazarr's profile and Jellyfin's library metadata
   language are still set only once; changing the languages later updates Sonarr/Radarr and
   Jellyfin's playback preferences, not those two.
-- Releases in none of the chosen languages are refused until item 11's "Needs your OK" exists
+- Releases without a must-have audio language are refused until item 11's "Needs your OK" exists
   (`docs/dev/fallbacks-plan.md`).
 - Usenet servers/indexers removed from the wizard later are not removed from SABnzbd/Prowlarr.
 - "Get help with AI" on the Finish step is a disabled placeholder (phase 09).
@@ -132,12 +132,14 @@ Copy from SPEC as they get resolved. Highest priority first:
   Advanced fades in the new sections + a "More options below" button; reopened account/Usenet
   steps say the saved password is hidden for security (never sent back, D-064); shown version = Umbrel's
   `APP_VERSION` from umbrel-app.yml (D-065).
-- Phase 2 (languages, 0240a42): ranked media languages (≤ 4, incl. "Original"); old single
-  `language` answers read as [original, X], `language` still written. Sonarr/Radarr get
-  "EasyArr – Language: …" custom formats (best rank only, 2000 per rank, "none of yours" −10000),
-  Radarr profile language → Any (the TRaSH profiles say "Original", which refused every dub — so
-  before this, dubbed releases never downloaded), Recyclarr keeps those scores, Bazarr profile with
-  every language, Jellyfin preferred audio/subtitles (D-066). Docs: `docs/quality-presets.md`.
+- Phase 2 (languages, 0240a42 + follow-up): two ranked lists, audio (incl. "Original") and
+  subtitles, each language optionally "must have" (owner: audio = a file needs at least one
+  must-have, else EasyArr asks; subtitles = Bazarr keeps looking + home-screen warning
+  `subtitlesMissing`). Sonarr/Radarr get "EasyArr – Language: …" custom formats (best rank only,
+  2000 per rank, "none you need" −10000 only with must-haves), Radarr profile language → Any (the
+  TRaSH profiles say "Original", which refused every dub — so before this, dubbed releases never
+  downloaded), Recyclarr keeps those scores, Bazarr profile from the subtitle list, Jellyfin
+  preferred audio/subtitles (D-066). Docs: `docs/quality-presets.md`.
 - Phase 3 (b4eecb4): season packs +1000 with Sonarr min upgrade 1001; `MissingRecheck` asks
   Radarr/Sonarr to search missing items again (default 6 h, Settings → Advanced; ≤ 3 per app per
   10 min, 20 s apart, oldest `lastSearchTime` first, skips queued/unreleased/recent) (D-067).

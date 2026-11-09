@@ -234,6 +234,42 @@ export async function sabnzbdQueue(deps: ProbeDeps): Promise<DownloadItem[] | nu
 
 export const JELLYFIN_ITEM_ID = /^[0-9a-f]{32}$/;
 
+/**
+ * Movies/episodes still missing a must-have subtitle language (D-066), from Bazarr's "wanted" lists
+ * (Bazarr v1.6.2 `api/movies/wanted.py`, `api/episodes/wanted.py`: `missing_subtitles[].code2`).
+ * null = Bazarr didn't answer.
+ */
+export async function bazarrMissingSubtitles(
+  deps: ProbeDeps,
+  codes: readonly string[],
+): Promise<{ count: number; names: string[]; languages: string[] } | null> {
+  if (codes.length === 0) return { count: 0, names: [], languages: [] };
+  const key = (await deps.keys())['bazarr'] ?? '';
+  const base = `${deps.url('bazarr')}/apps/bazarr/api`;
+  const lists = await Promise.all(
+    ['movies', 'episodes'].map((kind) =>
+      get(deps, `${base}/${kind}/wanted?start=0&length=-1`, { 'x-api-key': key }),
+    ),
+  );
+  if (lists.some((r) => !r || r.status !== 200)) return null;
+  const names: string[] = [];
+  const languages = new Set<string>();
+  for (const r of lists) {
+    for (const item of arr(obj(r?.body)['data'])) {
+      const o = obj(item);
+      const missing = arr(o['missing_subtitles'])
+        .map((m) => str(obj(m)['code2']))
+        .filter((c): c is string => c !== null && codes.includes(c));
+      if (missing.length === 0) continue;
+      for (const c of missing) languages.add(c);
+      const series = str(o['seriesTitle']);
+      const ep = str(o['episode_number']);
+      names.push(series ? `${series}${ep ? ` ${ep}` : ''}` : (str(o['title']) ?? '?'));
+    }
+  }
+  return { count: names.length, names, languages: codes.filter((c) => languages.has(c)) };
+}
+
 function jellyfinAuth(key: string): Record<string, string> {
   return { authorization: `MediaBrowser ${CLIENT}, Token="${key}"` };
 }

@@ -557,7 +557,7 @@ export function buildSteps(deps: StepDeps): {
     enabled: (p) => p.libraries[lib],
     async run(ctx) {
       const a = await servarr(app);
-      const desired = desiredLanguageFormats(ctx.plan.languages);
+      const desired = desiredLanguageFormats(ctx.plan.audio);
       let formats = await a.get('/customformat', z.array(formatSchema));
       for (const d of desired) {
         const body = {
@@ -635,9 +635,9 @@ export function buildSteps(deps: StepDeps): {
       // The default profile must exist before Sonarr/Radarr are switched on (first sync assigns it).
       await ctx.once('bazarr.languageProfile', async () => {
         if ((await b.languageProfiles()).length > 0) return false; // never replace the user's
-        // Subtitles in every real language the user chose, best first (not "Original").
-        const subs = ctx.plan.languages.filter((l) => l !== 'original');
-        const codes = subs.length > 0 ? subs : [ctx.plan.language];
+        // Subtitles in the chosen languages, best first; none chosen → no profile, no subtitles.
+        const codes = ctx.plan.subtitles.map((l) => l.code);
+        if (codes.length === 0) return false;
         const names = new Intl.DisplayNames(['en'], { type: 'language' });
         const name = codes.map((c) => names.of(c) ?? c).join(', ');
         await b.saveSettings([
@@ -735,12 +735,15 @@ export function buildSteps(deps: StepDeps): {
       }
       // Preferred audio + subtitle language on the owner's account. Re-applied only when the
       // wizard's list changes, so a choice made in Jellyfin later stays.
-      await ctx.once(`jellyfin.languages:${ctx.plan.languages.join(',')}`, async () => {
+      const langKey = [ctx.plan.audio, ctx.plan.subtitles]
+        .map((l) => l.map((x) => x.code).join(','))
+        .join('|');
+      await ctx.once(`jellyfin.languages:${langKey}`, async () => {
         const { username } = await deps.account();
         const user = await j.userByName(apiKey, username);
         if (!user) return false;
         const changed = await j.updateUserConfiguration(apiKey, user.Id, (c) =>
-          applyPlaybackLanguages(c, ctx.plan.languages),
+          applyPlaybackLanguages(c, ctx.plan.audio, ctx.plan.subtitles),
         );
         return changed;
       });
