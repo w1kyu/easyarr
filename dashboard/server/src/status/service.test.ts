@@ -181,11 +181,15 @@ describe('StatusService', () => {
     world.keys['bazarr'] = 'bz-key';
     const sub = (code2: string) => ({ name: code2, code2, code3: '', forced: false, hi: false });
     world.bz.wantedMovies = [
-      { title: 'Dune', missing_subtitles: [sub('de')] },
-      { title: 'Heat', missing_subtitles: [sub('fr')] }, // not a must-have
+      { title: 'Sintel', missing_subtitles: [sub('de')] },
+      { title: 'Elephants Dream', missing_subtitles: [sub('fr')] }, // not a must-have
     ];
     world.bz.wantedEpisodes = [
-      { seriesTitle: 'Dark', episode_number: '1x01', missing_subtitles: [sub('de'), sub('en')] },
+      {
+        seriesTitle: 'Pioneer One',
+        episode_number: '1x01',
+        missing_subtitles: [sub('de'), sub('en')],
+      },
     ];
     const library = {
       libraries: { movies: true, tv: true, music: false },
@@ -199,7 +203,12 @@ describe('StatusService', () => {
     };
     const { svc } = setup({ state: async () => stateWith({ library }) }, world);
     expect((await svc.view()).warnings).toEqual([
-      { code: 'subtitlesMissing', count: 2, names: ['Dune', 'Dark 1x01'], languages: ['de'] },
+      {
+        code: 'subtitlesMissing',
+        count: 2,
+        names: ['Sintel', 'Pioneer One 1x01'],
+        languages: ['de'],
+      },
     ]);
     // Nothing must-have → no warning.
     const relaxed = setup(

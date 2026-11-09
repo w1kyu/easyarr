@@ -8,7 +8,8 @@
 #
 # Checks per quality preset: the profiles Recyclarr makes have LQ as a last resort (D-055), the
 # Balanced movie profile has one 1080p group, a second sync changes nothing, and a v0.0.8 install
-# (profiles made with the old config) is converted by the new one.
+# (profiles made with the old config) is converted by the new one. Also runs EasyArr's real media
+# language step (D-066) against these Radarr/Sonarr and checks the season-pack scores (D-067).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -155,6 +156,38 @@ if [ "${before}" = "${after}" ]; then pass "idempotent"; else
   fail "second sync changed the profiles"
   diff <(echo "${before}") <(echo "${after}") | head -40
 fi
+
+echo "== media languages (D-066): EasyArr's real wiring step against Radarr + Sonarr"
+LANG_STEP="${ROOT}/dashboard/server/scripts/language-step.mjs"
+langs() { node "${LANG_STEP}" http://127.0.0.1:17878 "${RK}" http://127.0.0.1:18989 "${SK}" balanced "$1"; }
+first="$(langs 'de!,en!,original')" || { fail "language step"; first=0; }
+check "language step made changes on the first run" '. > 0' "${first}"
+for app in radarr sonarr; do
+  p="$(profile "${app}" 'EasyArr (Balanced)')"
+  check "${app}: language scores in the EasyArr profile" \
+    '[.formatItems[] | select(.name | startswith("EasyArr – Language: ")) | {(.name): .score}] | add == {"EasyArr – Language: German": 6000, "EasyArr – Language: English": 4000, "EasyArr – Language: Original": 2000, "EasyArr – Language: none you need": -10000}' "${p}"
+  check "${app}: a German release counts as German" \
+    '[.customFormats[]?.name] | index("EasyArr – Language: German") != null' \
+    "$(${app} "parse?title=Some.Title.2020.GERMAN.1080p.WEB.h264-GRP")"
+  check "${app}: a French-only release has none of the must-haves" \
+    '[.customFormats[]?.name] | index("EasyArr – Language: none you need") != null' \
+    "$(${app} "parse?title=Some.Title.2020.FRENCH.1080p.WEB.h264-GRP")"
+done
+check "radarr: profile language is Any (dubs allowed)" '.language.name == "Any"' \
+  "$(profile radarr 'EasyArr (Balanced)')"
+again="$(langs 'de!,en!,original')" || again=-1
+check "language step: a second run changes nothing" '. == 0' "${again}"
+sync balanced
+check "after a Recyclarr sync: language scores kept (except_patterns)" \
+  '[.formatItems[] | select(.name == "EasyArr – Language: German") | .score] == [6000]' \
+  "$(profile radarr 'EasyArr (Balanced)')"
+fixed="$(langs 'de!,en!,original')" || fixed=-1
+check "after a sync: the step sets Radarr's language back to Any" \
+  '.language.name == "Any"' "$(profile radarr 'EasyArr (Balanced)')"
+check "  …with at most one change" '. <= 1' "${fixed}"
+check "sonarr: season packs score 1000, upgrades need +1001 (D-067)" \
+  '([.formatItems[] | select(.name == "Season Pack") | .score] == [1000]) and .minUpgradeFormatScore == 1001' \
+  "$(profile sonarr 'EasyArr (Balanced)')"
 
 for preset in best:'Best quality' small:'Save space'; do
   echo "== ${preset%%:*}"

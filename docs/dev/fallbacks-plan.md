@@ -14,7 +14,7 @@ default).
 
 | # | Case | How EasyArr detects it | What the user sees | One-click choice |
 |---|---|---|---|---|
-| 1 | Only releases without a must-have audio language | Interactive search (`GET /api/v3/release?movieId=` / `?episodeId=`): releases whose custom formats include "EasyArr – Language: none you need" (D-066) | "*Dune* isn't available in German yet. It is in English." | "Download in English" → grab that release (`POST /api/v3/release`) — this item only, nothing else changes; it's upgraded later if a chosen language shows up |
+| 1 | Only releases without a must-have audio language | Interactive search (`GET /api/v3/release?movieId=` / `?episodeId=`): releases whose custom formats include "EasyArr – Language: none you need" (D-066) | "*Sintel* isn't available in German yet. It is in English." | "Download in English" → grab that release (`POST /api/v3/release`) — this item only, nothing else changes; it's upgraded later if a chosen language shows up |
 | 2 | Only a lower quality than the preset allows (720p/SD/CAM) | Same search: rejections "Quality … not wanted in profile" | "Only a 720p version exists so far." | "Accept 720p" → grab that release (CAM/TS never offered) |
 | 3 | Nothing at all on the search sites | Same search returns no releases | "Your search sites have nothing for this yet. EasyArr looks again every 6 h." | "Add more search sites" (→ Prowlarr guide) |
 | 4 | No seeders | Rejections "Not enough seeders"; qBittorrent `stalledDL` with 0 seeds | "Nobody is sharing this file right now." | "Try another release" → queue `DELETE …?blocklist=true` + search |

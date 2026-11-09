@@ -11,7 +11,7 @@ const DAY = 24 * 3600_000;
 const release = (over: Record<string, unknown> = {}) => ({
   guid: 'g1',
   indexerId: 3,
-  title: 'Dune.2021.1080p.WEB-DL',
+  title: 'Sintel.2010.1080p.WEB-DL',
   rejected: false,
   temporarilyRejected: false,
   rejections: [] as string[],
@@ -102,7 +102,7 @@ function fakeArr() {
     if (method !== 'GET')
       posts.push({ url, body: init?.body ? JSON.parse(String(init.body)) : null });
     if (url.includes('/request?filter=failed')) return json({ results: data.seerrFailed });
-    if (url.includes('/api/v1/movie/')) return json({ title: 'Heat' });
+    if (url.includes('/api/v1/movie/')) return json({ title: 'Elephants Dream' });
     if (url.includes('/request/') && url.endsWith('/retry')) return json({});
     if (url.includes('/queue?'))
       return json({ records: url.includes('radarr') ? data.radarrQueue : [] });
@@ -130,10 +130,10 @@ function make(over: Partial<StuckDeps> = {}) {
   return { finder, ...arr };
 }
 
-const dune = {
+const sintel = {
   id: 7,
-  title: 'Dune',
-  year: 2021,
+  title: 'Sintel',
+  year: 2010,
   isAvailable: true,
   added: ago(2 * DAY),
   lastSearchTime: ago(DAY),
@@ -142,14 +142,14 @@ const dune = {
 describe('StuckFinder (D-068)', () => {
   it('asks Radarr why a missing movie has no download and offers English after confirmation', async () => {
     const { finder, data, posts, calls } = make();
-    data.radarrMissing = [dune];
+    data.radarrMissing = [sintel];
     data.releases = [languageRejected()];
     await finder.runOnce();
     expect(finder.list()).toMatchObject([
       {
         id: 'radarr:movie:7',
         kind: 'language',
-        title: 'Dune (2021)',
+        title: 'Sintel (2010)',
         offer: { languages: ['English'], quality: 'WEBDL-1080p', seeders: 12 },
         actions: ['accept', 'dismiss'],
       },
@@ -166,7 +166,7 @@ describe('StuckFinder (D-068)', () => {
 
   it('"accept" when the offer is gone reports a change instead of grabbing something else', async () => {
     const { finder, data, posts } = make();
-    data.radarrMissing = [dune];
+    data.radarrMissing = [sintel];
     data.releases = [languageRejected()];
     await finder.runOnce();
     data.releases = [qualityRejected('WEBDL-720p', { guid: 'other' })];
@@ -178,9 +178,9 @@ describe('StuckFinder (D-068)', () => {
   it('only looks at items searched at least once and missing for a while', async () => {
     const { finder, data, calls } = make();
     data.radarrMissing = [
-      { ...dune, id: 1, lastSearchTime: null },
-      { ...dune, id: 2, added: ago(STUCK_AFTER_MS / 2) },
-      { ...dune, id: 3, isAvailable: false },
+      { ...sintel, id: 1, lastSearchTime: null },
+      { ...sintel, id: 2, added: ago(STUCK_AFTER_MS / 2) },
+      { ...sintel, id: 3, isAvailable: false },
     ];
     await finder.runOnce();
     expect(calls.some((c) => c.includes('/release?'))).toBe(false);
@@ -192,7 +192,7 @@ describe('StuckFinder (D-068)', () => {
       {
         id: 91,
         movieId: 7,
-        movie: { title: 'Dune', year: 2021 },
+        movie: { title: 'Sintel', year: 2010 },
         trackedDownloadState: 'importBlocked',
         trackedDownloadStatus: 'warning',
         statusMessages: [{ title: 'x', messages: ['No files found are eligible for import'] }],
@@ -220,7 +220,7 @@ describe('StuckFinder (D-068)', () => {
       seriesId: 4,
       seasonNumber: season,
       episodeNumber: episode,
-      series: { title: 'Dark' },
+      series: { title: 'Pioneer One' },
       airDateUtc: ago(30 * DAY),
       lastSearchTime: ago(DAY),
     });
@@ -233,8 +233,8 @@ describe('StuckFinder (D-068)', () => {
       'GET /apps/sonarr/api/v3/release?episodeId=12',
     ]);
     expect(finder.list().map((i) => [i.title, i.kind])).toEqual([
-      ['Dark – season 2', 'nothingFound'],
-      ['Dark S03E05', 'nothingFound'],
+      ['Pioneer One – season 2', 'nothingFound'],
+      ['Pioneer One S03E05', 'nothingFound'],
     ]);
     await finder.act('sonarr:season:4:2', 'retry');
     expect(posts.at(-1)?.body).toEqual({ name: 'SeasonSearch', seriesId: 4, seasonNumber: 2 });
@@ -242,7 +242,7 @@ describe('StuckFinder (D-068)', () => {
 
   it('with "accept alternatives automatically" it grabs the offer and just tells the user', async () => {
     const { finder, data, posts } = make({ autoAccept: async () => true });
-    data.radarrMissing = [dune];
+    data.radarrMissing = [sintel];
     data.releases = [languageRejected()];
     await finder.runOnce();
     expect(posts).toHaveLength(1);
@@ -251,10 +251,10 @@ describe('StuckFinder (D-068)', () => {
 
   it('failed requests on the request page can be sent again; "not now" hides an item', async () => {
     const { finder, data, posts } = make({ canReach: async () => false });
-    data.seerrFailed = [{ id: 5, type: 'movie', media: { tmdbId: 949 }, createdAt: ago(DAY) }];
+    data.seerrFailed = [{ id: 5, type: 'movie', media: { tmdbId: 9761 }, createdAt: ago(DAY) }];
     await finder.runOnce();
     expect(finder.list()).toMatchObject([
-      { id: 'seerr:request:5', kind: 'requestFailed', title: 'Heat' },
+      { id: 'seerr:request:5', kind: 'requestFailed', title: 'Elephants Dream' },
     ]);
     expect(await finder.act('seerr:request:5', 'dismiss')).toBe('ok');
     expect(finder.list()).toEqual([]);
@@ -266,7 +266,7 @@ describe('StuckFinder (D-068)', () => {
   it('stays quiet while the VPN is down or every search site is paused', async () => {
     for (const over of [{ canReach: async () => false }, { sitesUsable: () => false }]) {
       const { finder, data, calls } = make(over);
-      data.radarrMissing = [dune];
+      data.radarrMissing = [sintel];
       expect(await finder.runOnce()).toBe('skipped');
       expect(calls.some((c) => c.includes('radarr'))).toBe(false);
     }
