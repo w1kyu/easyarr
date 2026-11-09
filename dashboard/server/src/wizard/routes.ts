@@ -21,12 +21,6 @@ export async function wizardRoutes(app: FastifyInstance, opts: WizardRoutesOptio
 
   app.get('/api/wizard', async () => wizard.view());
 
-  // Only fetched by the account and Usenet forms; never cached by the browser (D-064).
-  app.get('/api/wizard/secrets', async (_request, reply) => {
-    void reply.header('Cache-Control', 'no-store');
-    return wizard.savedSecrets();
-  });
-
   app.get<{ Params: { step: string } }>('/api/wizard/:step', async (request) => {
     const { step } = request.params;
     if (!isWizardStepId(step)) throw new WizardError(404, 'unknown_step');

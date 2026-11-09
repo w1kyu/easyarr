@@ -30,12 +30,6 @@ function fakeServer(info: SystemInfo) {
     /** Server-sent events the fake wiring run sends. */
     wiringEvents: [] as unknown[],
     secrets: { servers: [] as string[], indexers: [] as string[] },
-    /** Plaintext values the fake secrets.json holds (GET /api/wizard/secrets). */
-    saved: {
-      account: null as string | null,
-      usenetServers: {} as Record<string, string>,
-      usenetIndexers: {} as Record<string, string>,
-    },
   };
   const posts: { step: string; body: unknown }[] = [];
   const vpnPosts: { url: string; body: unknown }[] = [];
@@ -54,7 +48,6 @@ function fakeServer(info: SystemInfo) {
   const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
     if (url === '/api/system-check') return json(evaluateSystem(info));
     if (url === '/api/wizard') return json(view());
-    if (url === '/api/wizard/secrets') return json(db.saved);
     if (url === '/api/prowlarr/indexers')
       return json({ reachable: true, count: db.prowlarrCount, torrent: db.prowlarrCount });
     if (url === '/api/usenet/test-server' || url === '/api/usenet/test-indexer') {
@@ -291,31 +284,8 @@ describe('setup wizard', () => {
     server.db.account = { username: 'kevin' };
     server.db.answers = { account: { username: 'kevin' } };
     renderAt('/setup/account');
-    await screen.findByText(/A password is already saved/);
+    await screen.findByText(/isn't shown here for security reasons/);
     expect((screen.getByLabelText('Username') as HTMLInputElement).value).toBe('kevin');
-    next();
-    await waitFor(() =>
-      expect(server.posts).toEqual([{ step: 'account', body: { username: 'kevin' } }]),
-    );
-  });
-
-  it('shows a saved password again (masked) when the account step is reopened', async () => {
-    server.db.completed = ['welcome', 'system', 'account'];
-    server.db.account = { username: 'kevin' };
-    server.db.answers = { account: { username: 'kevin' } };
-    server.db.saved.account = 'Correct-Horse-42';
-    renderAt('/setup/account');
-    const password = (await screen.findByLabelText('Password', {
-      exact: true,
-    })) as HTMLInputElement;
-    await waitFor(() => expect(password.value).toBe('Correct-Horse-42'));
-    expect(password.type).toBe('password');
-    expect((screen.getByLabelText('Repeat password') as HTMLInputElement).value).toBe(
-      'Correct-Horse-42',
-    );
-    fireEvent.click(screen.getAllByRole('button', { name: 'Show password' })[0] as HTMLElement);
-    expect(password.type).toBe('text');
-    // Unchanged: the password isn't sent again.
     next();
     await waitFor(() =>
       expect(server.posts).toEqual([{ step: 'account', body: { username: 'kevin' } }]),

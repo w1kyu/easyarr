@@ -19,7 +19,7 @@ import {
   Server,
   Trash2,
 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Field } from '~/components/field';
 import { SelectField } from '~/components/select-field';
@@ -31,7 +31,6 @@ import { cn } from '@/lib/utils';
 import {
   useIssueText,
   useSaveErrorText,
-  useSavedSecrets,
   useSaveStep,
   type FieldErrors,
   type StepFormProps,
@@ -105,7 +104,7 @@ const indexerBody = (x: IndexerForm) => ({
 /**
  * Step 6 (Usenet, SPEC §8): explains provider vs indexer, then one form per provider and indexer.
  * Presets fill in the address; "Test" asks SABnzbd/Prowlarr to try it, through the VPN like a
- * real download. Saved passwords/API keys are loaded back masked when the step is reopened (D-064).
+ * real download. Passwords/API keys are only sent, never read back.
  */
 export function UsenetStep({ formId, view, onSaved }: StepFormProps) {
   const { t } = useTranslation();
@@ -126,22 +125,6 @@ export function UsenetStep({ formId, view, onSaved }: StepFormProps) {
     saved?.indexers.map((x) => ({ ...x, apiKey: '' })) ?? [emptyIndexer()],
   );
   const [errors, setErrors] = useState<FieldErrors>({});
-  // Saved passwords/API keys come back masked, so reopening the step doesn't empty them (D-064).
-  const savedValues = useSavedSecrets(
-    savedSecrets.servers.length > 0 || savedSecrets.indexers.length > 0,
-  );
-  const filled = useRef(false);
-  useEffect(() => {
-    const data = savedValues.data;
-    if (!data || filled.current) return;
-    filled.current = true;
-    setServers((prev) =>
-      prev.map((s) => (s.password ? s : { ...s, password: data.usenetServers[s.id] ?? '' })),
-    );
-    setIndexers((prev) =>
-      prev.map((x) => (x.apiKey ? x : { ...x, apiKey: data.usenetIndexers[x.id] ?? '' })),
-    );
-  }, [savedValues.data]);
 
   const toErrors = (issues: { path: string; message: string }[]) => {
     const out: FieldErrors = {};

@@ -225,12 +225,9 @@ test('step 9: Finish connects the apps with a live checklist', async ({ page }) 
 test('going back shows saved answers; a saved password is kept', async ({ page }) => {
   await page.goto('/setup/account');
   await expect(page.getByLabel('Username')).toHaveValue(USER);
-  // The saved password comes back masked, with a show/hide button (D-064).
-  const password = page.getByLabel('Password', { exact: true });
-  await expect(password).toHaveValue(PASSWORD);
-  await expect(password).toHaveAttribute('type', 'password');
-  await page.getByRole('button', { name: 'Show password' }).first().click();
-  await expect(password).toHaveAttribute('type', 'text');
+  // The saved password is never sent back to the browser (D-064).
+  await expect(page.getByText(/isn't shown here for security reasons/)).toBeVisible();
+  await expect(page.getByLabel('Password', { exact: true })).toHaveValue('');
   await next(page);
   await expect(page).toHaveURL(/\/setup\/download$/);
   await expect(page.getByRole('radio', { name: 'Torrents' })).toHaveAttribute(

@@ -290,16 +290,6 @@ export function canOpenWizardStep(
 }
 
 /** What GET /api/wizard returns. The account never includes a password, only whether one is set. */
-/**
- * GET /api/wizard/secrets: what the user typed earlier, so reopened forms aren't empty (D-064).
- * Usenet entries are keyed by server/indexer id.
- */
-export interface SavedSecrets {
-  account: string | null;
-  usenetServers: Record<string, string>;
-  usenetIndexers: Record<string, string>;
-}
-
 export interface WizardView {
   steps: { id: WizardStepId; completed: boolean }[];
   next: WizardStepId | null;

@@ -14,7 +14,6 @@ import {
   systemAnswersSchema,
   visibleWizardSteps,
   welcomeAnswersSchema,
-  type SavedSecrets,
   type SystemCheckResult,
   type WizardStepId,
   type WizardView,
@@ -66,19 +65,6 @@ export class WizardService {
   async view(): Promise<WizardView> {
     const { value: state } = await stateStore(this.stateDir).load();
     return toView(state, (await secretsStore(this.stateDir).load()).value);
-  }
-
-  /**
-   * The saved passwords and API keys, so a reopened step shows them (masked) instead of empty
-   * fields (D-064). Read from secrets.json, where they already are; nothing is written.
-   */
-  async savedSecrets(): Promise<SavedSecrets> {
-    const { value } = await secretsStore(this.stateDir).load();
-    return {
-      account: value.account?.password ?? null,
-      usenetServers: { ...value.usenet?.servers },
-      usenetIndexers: { ...value.usenet?.indexers },
-    };
   }
 
   async saveStep(id: WizardStepId, body: unknown): Promise<WizardView> {

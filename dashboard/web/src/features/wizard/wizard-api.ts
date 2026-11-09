@@ -10,21 +10,6 @@ export function useWizard() {
   return useQuery({ queryKey: WIZARD_QUERY_KEY, queryFn: api.wizard, staleTime: 5_000 });
 }
 
-/**
- * The passwords/API keys saved earlier, so reopened forms show them masked (D-064). Kept only in
- * memory for the open form (no cache after it unmounts).
- */
-export function useSavedSecrets(enabled: boolean) {
-  return useQuery({
-    queryKey: ['wizard-secrets'],
-    queryFn: api.savedSecrets,
-    enabled,
-    staleTime: 0,
-    gcTime: 0,
-    retry: false,
-  });
-}
-
 /** Saves one step's answers and refreshes the cached wizard state. */
 export function useSaveStep(step: WizardStepId) {
   const client = useQueryClient();

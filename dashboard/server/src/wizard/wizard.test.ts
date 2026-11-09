@@ -176,23 +176,6 @@ describe('wizard API', () => {
       expect(step.account).toEqual({ username: 'kevin', hasPassword: true });
     });
 
-    it('hands the saved password back only on /api/wizard/secrets, uncached (D-064)', async () => {
-      const app = await make();
-      const before = await app.inject({ method: 'GET', url: '/api/wizard/secrets' });
-      expect(before.json()).toEqual({ account: null, usenetServers: {}, usenetIndexers: {} });
-      await finishThrough(app, 'account');
-      const res = await app.inject({ method: 'GET', url: '/api/wizard/secrets' });
-      expect(res.statusCode).toBe(200);
-      expect(res.headers['cache-control']).toBe('no-store');
-      expect(res.json()).toEqual({
-        account: GOOD.password,
-        usenetServers: {},
-        usenetIndexers: {},
-      });
-      // Reading it changes nothing on disk.
-      expect((await readJson('secrets.json')).account).toEqual({ password: GOOD.password });
-    });
-
     it('requires a password the first time, keeps the old one when left out later', async () => {
       const app = await make();
       await finishThrough(app, 'system');

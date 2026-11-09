@@ -130,7 +130,7 @@ Copy from SPEC as they get resolved. Highest priority first:
 - Phase 1 (UI, 6dd788a): logo → home; status-strip VPN/Downloads icons and recently-added posters
   clickable, dead hover effects removed; 44 px Simple/Advanced segmented control; switching to
   Advanced fades in the new sections + a "More options below" button; reopened account/Usenet
-  steps show saved passwords masked (`GET /api/wizard/secrets`, D-064); shown version = Umbrel's
+  steps say the saved password is hidden for security (never sent back, D-064); shown version = Umbrel's
   `APP_VERSION` from umbrel-app.yml (D-065).
 - Phase 2 (languages, 0240a42): ranked media languages (≤ 4, incl. "Original"); old single
   `language` answers read as [original, X], `language` still written. Sonarr/Radarr get
@@ -144,7 +144,7 @@ Copy from SPEC as they get resolved. Highest priority first:
 - Item 11 (fallbacks) is **planned only**: `docs/dev/fallbacks-plan.md` (16 cases), waiting for the
   owner's OK.
 - Verified locally: lint, typecheck, 269 unit tests, build, Playwright 35 passed (new checks: toggle
-  ≥ 40 px, hint scrolls, VPN/poster links, logo → home, masked saved password, language ranking).
+  ≥ 40 px, hint scrolls, VPN/poster links, logo → home, hidden-password note, language ranking).
   **Not pushed (owner's instruction), so no CI / stack test / image yet.** Docker-only parts are
   unproven against the real apps: the custom-format/profile PUT bodies (Sonarr 4.0.20, Radarr 6.4.4),
   Recyclarr's `except_patterns` + `min_upgrade_format_score`, Jellyfin `POST /Users/Configuration`.
