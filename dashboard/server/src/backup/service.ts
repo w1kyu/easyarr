@@ -276,10 +276,12 @@ export class BackupService {
             ? [{ username: state.account.username, password: secrets.account.password }]
             : [],
       };
-      // Before the setup is finished the services hold nothing worth keeping.
-      const setupDone = state.wizard.completedSteps.includes('finish');
+      // Until the wiring has run once the services hold nothing worth keeping. (Not "setup
+      // finished": a changed answer re-opens Finish (D-053), and a nightly backup taken then must
+      // still contain the services' own backups.)
+      const wired = state.wiring.lastRun !== null;
       for (const id of NATIVE_BACKUP_SERVICES) {
-        if (!setupDone || !used.has(id)) continue;
+        if (!wired || !used.has(id)) continue;
         try {
           files.push({ name: nativeFile(id), data: await this.opts.native.create(id, ctx) });
           parts.push(id);
@@ -351,7 +353,8 @@ export class BackupService {
   async due(): Promise<boolean> {
     if (this.busy) return false;
     const { value: state } = await stateStore(this.opts.stateDir).load();
-    if (!state.wizard.completedSteps.includes('finish')) return false;
+    // Nothing to keep before the apps were set up for the first time.
+    if (state.wiring.lastRun === null) return false;
     const s = this.settingsFrom(state);
     if (!s.enabled) return false;
     const now = localParts(this.now(), s.timeZone);

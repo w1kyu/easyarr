@@ -210,7 +210,7 @@ describe('creating backups', () => {
     expect(manifest.encrypted).toBe(true);
   });
 
-  it('before the setup is finished, backs up EasyArr only', async () => {
+  it('before the apps were ever set up, backs up EasyArr only', async () => {
     const a = path.join(root, 'a');
     await stateStore(a).load();
     await secretsStore(a).load();
