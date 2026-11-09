@@ -98,8 +98,9 @@ Copy from SPEC as they get resolved. Highest priority first:
 - Media languages steer downloads since D-066, but Bazarr's profile and Jellyfin's library metadata
   language are still set only once; changing the languages later updates Sonarr/Radarr and
   Jellyfin's playback preferences, not those two.
-- Releases without a must-have audio language are refused until item 11's "Needs your OK" exists
-  (`docs/dev/fallbacks-plan.md`).
+- Releases without a must-have audio language are refused; "Needs your OK" offers them (D-068).
+- "Needs your OK" is only proven against fakes; the real interactive-search/grab path needs an owner
+  test (request something only available in another language).
 - Usenet servers/indexers removed from the wizard later are not removed from SABnzbd/Prowlarr.
 - "Get help with AI" on the Finish step is a disabled placeholder (phase 09).
 - Bazarr, Recyclarr, Unpackerr and Cleanuparr configs plus sub-path settings (SABnzbd `url_base`, qBittorrent
@@ -143,8 +144,10 @@ Copy from SPEC as they get resolved. Highest priority first:
 - Phase 3 (b4eecb4): season packs +1000 with Sonarr min upgrade 1001; `MissingRecheck` asks
   Radarr/Sonarr to search missing items again (default 6 h, Settings → Advanced; ≤ 3 per app per
   10 min, 20 s apart, oldest `lastSearchTime` first, skips queued/unreleased/recent) (D-067).
-- Item 11 (fallbacks) is **planned only**: `docs/dev/fallbacks-plan.md` (16 cases), waiting for the
-  owner's OK.
+- Item 11 (fallbacks, D-068) built after the owner's OK (2026-11-10): StuckFinder + home-screen
+  "Needs your OK" + Settings → Advanced "Accept alternatives automatically". Owner's follow-ups the
+  same day: saved passwords stay hidden with a note (D-064 revised); audio and subtitle lists with
+  must-haves (D-066 revised).
 - Verified locally: lint, typecheck, 269 unit tests, build, Playwright 35 passed (new checks: toggle
   ≥ 40 px, hint scrolls, VPN/poster links, logo → home, hidden-password note, language ranking).
   **Not pushed (owner's instruction), so no CI / stack test / image yet.** Docker-only parts are

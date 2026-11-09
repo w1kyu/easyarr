@@ -37,6 +37,7 @@ import { cn } from '@/lib/utils';
 import { formatBytes, formatEta, formatSpeed, portUrl } from './format';
 import { LogViewer } from './log-viewer';
 import { useSetMode, useStatus } from './status-api';
+import { StuckList } from './stuck';
 import { WarningsBanner } from './warnings';
 
 const JELLYFIN_PORT = getService('jellyfin').publishedPort ?? 39096;
@@ -94,6 +95,7 @@ export function Dashboard() {
       </div>
 
       <WarningsBanner warnings={view.warnings} />
+      <StuckList items={view.stuck} />
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <BigTile

@@ -71,6 +71,46 @@ export interface StatusWarning {
   languages?: string[];
 }
 
+/**
+ * Why a requested movie/episode hasn't arrived, and what the user can do (owner's item 11, D-068).
+ * - language / quality / languageQuality: only releases EasyArr refused because of the audio
+ *   language and/or a lower quality exist; `offer` is the best of them → "accept".
+ * - blocklisted: every release found failed before → "accept" tries the best one again.
+ * - nothingFound / noSeeders: nothing usable on the search sites → "retry" searches now.
+ * - downloadProblem: a download is stuck or couldn't be added → "replace" removes it, blocks that
+ *   release and searches for another one.
+ * - requestFailed: the request page couldn't hand the request to Sonarr/Radarr → "retry".
+ * - autoAccepted: "Accept alternatives automatically" took `offer` (information only).
+ */
+export const STUCK_KINDS = [
+  'language',
+  'quality',
+  'languageQuality',
+  'blocklisted',
+  'nothingFound',
+  'noSeeders',
+  'downloadProblem',
+  'requestFailed',
+  'autoAccepted',
+] as const;
+export type StuckKind = (typeof STUCK_KINDS)[number];
+export type StuckAction = 'accept' | 'retry' | 'replace' | 'dismiss';
+
+export interface StuckItem {
+  /** e.g. radarr:movie:12, sonarr:season:4:2, sonarr:episode:77, radarr:queue:9, seerr:request:3 */
+  id: string;
+  kind: StuckKind;
+  type: 'movie' | 'series';
+  /** "Dune (2021)", "Dark – season 2", "Dark S01E05" */
+  title: string;
+  /** downloadProblem: the app's own message (English). */
+  detail?: string;
+  offer?: { languages: string[]; quality: string; sizeBytes: number; seeders: number | null };
+  /** When EasyArr noticed it (ISO). */
+  since: string;
+  actions: StuckAction[];
+}
+
 export interface StatusView {
   at: string;
   version: string;
@@ -88,6 +128,8 @@ export interface StatusView {
   /** null = Jellyfin not reachable or not set up yet. */
   recent: RecentItem[] | null;
   warnings: StatusWarning[];
+  /** Requests that need the user's OK or attention (item 11). */
+  stuck: StuckItem[];
 }
 
 /** Disk warning threshold (SPEC §12: less than 10 % free). */

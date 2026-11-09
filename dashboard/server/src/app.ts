@@ -10,6 +10,7 @@ import type { ServeConfig } from './config.js';
 import { secretsStore, stateStore } from './state/index.js';
 import { statusRoutes } from './status/routes.js';
 import { MissingRecheck } from './status/recheck.js';
+import { StuckFinder } from './status/stuck.js';
 import { IndexerHealer } from './status/indexer-health.js';
 import {
   fetchStoreVersion,
@@ -59,6 +60,8 @@ export interface Services {
   indexers?: IndexerHealer;
   /** Searches again for missing movies/episodes (server.ts starts its timer, D-067). */
   recheck?: MissingRecheck;
+  /** Finds out why requests don't arrive and offers a way out (D-068). */
+  stuck?: StuckFinder;
   /** Built from the config when left out (tests that only exercise other routes). */
   wiring?: WiringEngine;
 }
@@ -133,12 +136,26 @@ export function createServices(
     used: async () => usedServices((await stateStore(config.stateDir).load()).value),
     ...(logger ? { log: logger } : {}),
   });
+  const stuck = new StuckFinder({
+    url: (id) => config.serviceUrls?.[id] ?? serviceUrl(id),
+    keys: async () => (await secretsStore(config.stateDir).load()).value.apiKeys,
+    canReach,
+    sitesUsable: () => {
+      const h = indexers.last();
+      return !h || h.total === 0 || h.blocked < h.total;
+    },
+    used: async () => usedServices((await stateStore(config.stateDir).load()).value),
+    autoAccept: async () =>
+      (await stateStore(config.stateDir).load()).value.searches?.autoAccept ?? false,
+    ...(logger ? { log: logger } : {}),
+  });
   return {
     lock,
     vpn,
     portSync,
     indexers,
     recheck,
+    stuck,
     wiring: wiringFor(config, lock, collect, logger),
   };
 }
@@ -248,11 +265,17 @@ export async function buildApp({
     disk: () => diskSpace(config.dataDir),
     vpnLog: () => vpnFiles.readLogTail(),
     indexerHealth: () => svc.indexers?.last() ?? null,
+    stuck: () => svc.stuck?.list() ?? [],
     ...(onUmbrel
       ? { latestVersion: () => fetchStoreVersion(), officialJellyfin: officialJellyfinInstalled }
       : {}),
   });
-  await app.register(statusRoutes, { status, stateDir: config.stateDir, lock: svc.lock });
+  await app.register(statusRoutes, {
+    status,
+    stateDir: config.stateDir,
+    lock: svc.lock,
+    ...(svc.stuck ? { stuck: svc.stuck } : {}),
+  });
 
   // License notices shipped in the image (SPEC §14.1), linked from the About page.
   if (existsSync(config.licensesDir)) {

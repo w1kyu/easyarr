@@ -27,6 +27,8 @@ export async function startServer(config: ServeConfig): Promise<void> {
   services.indexers?.start();
   // Monitored movies/episodes that never started downloading get searched again (D-067).
   services.recheck?.start();
+  // Why didn't it download? Finds out and offers a way out on the home screen (D-068).
+  services.stuck?.start();
   // Only this dashboard and the request page may connect to the VPN-side services (D-046).
   const allowlist = new ClientAllowlist({ vpnDir: config.vpnDir, log });
   allowlist.start();
@@ -45,6 +47,7 @@ export async function startServer(config: ServeConfig): Promise<void> {
     services.portSync.stop();
     services.indexers?.stop();
     services.recheck?.stop();
+    services.stuck?.stop();
     allowlist.stop();
     startup?.stop();
     await app.close();

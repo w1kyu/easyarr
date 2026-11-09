@@ -8,6 +8,7 @@ import {
   SERVICES,
   type DownloadItem,
   type LogSource,
+  type StuckItem,
   type LogView,
   type ServiceId,
   type ServiceStatus,
@@ -47,6 +48,8 @@ export interface StatusServiceOptions extends ProbeDeps {
   officialJellyfin?: () => Promise<boolean>;
   /** The search-site check's last result (IndexerHealer). */
   indexerHealth?: () => IndexerHealth | null;
+  /** Requests that need the user (StuckFinder, D-068). */
+  stuck?: () => StuckItem[];
   now?: () => number;
 }
 
@@ -216,6 +219,7 @@ export class StatusService {
       disk,
       recent,
       warnings,
+      stuck: this.opts.stuck?.() ?? [],
     };
   }
 

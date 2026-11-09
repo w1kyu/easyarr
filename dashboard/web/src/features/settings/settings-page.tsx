@@ -10,6 +10,7 @@ import {
 } from '@easyarr/shared';
 import { useIsMutating, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { SelectField } from '~/components/select-field';
+import { Switch } from '@/components/ui/switch';
 import {
   ArrowLeft,
   CircleCheckBig,
@@ -306,6 +307,35 @@ function Advanced() {
         </div>
       )}
       <RecheckSetting />
+      <AutoAcceptSetting />
+    </div>
+  );
+}
+
+/** Take the offered alternative (language/quality) without asking (D-068); off by default. */
+function AutoAcceptSetting() {
+  const { t } = useTranslation();
+  const client = useQueryClient();
+  const current = useQuery({ queryKey: ['auto-accept'], queryFn: api.autoAccept });
+  const save = useMutation({
+    mutationFn: (enabled: boolean) => api.setAutoAccept(enabled),
+    onSuccess: (data) => client.setQueryData(['auto-accept'], data),
+  });
+  return (
+    <div className="flex flex-col gap-2 border-t border-white/8 pt-4" data-testid="auto-accept">
+      <label className="flex cursor-pointer items-center justify-between gap-4 md:max-w-xl">
+        <span className="text-14 font-medium">{t('settings.autoAccept.label')}</span>
+        <Switch
+          checked={current.data?.enabled ?? false}
+          disabled={current.isPending || save.isPending}
+          onCheckedChange={(v) => save.mutate(v)}
+          aria-label={t('settings.autoAccept.label')}
+        />
+      </label>
+      <p className="text-12 leading-relaxed text-white/50 md:max-w-xl">
+        {t('settings.autoAccept.hint')}
+      </p>
+      {save.isError && <ErrorAlert description={t('settings.autoAccept.failed')} />}
     </div>
   );
 }

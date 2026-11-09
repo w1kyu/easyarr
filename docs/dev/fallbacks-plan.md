@@ -1,8 +1,9 @@
 # Plan: why didn't it download? (owner's item 11) — waiting for the owner's OK
 
-Status 2026-11-09: **planned, not built.** Items 1–10 of the owner's list are done (D-064 – D-067).
-Item 11 is much bigger than the others, so per the owner's instructions this list waits for
-their OK before anything is built.
+Status 2026-11-10: **built (D-068)** — `status/stuck.ts`, home-screen "Needs your OK",
+Settings → Advanced "Accept alternatives automatically". Cases 5–9 use the existing warnings
+banner (no new detection); Cloudflare-specific wording (6), disk < 2 GB (9) and "not released yet"
+texts (14) are not built. The table below is the original plan.
 
 Goal: for every common reason a request doesn't arrive, (a) detect it, (b) show it on the home screen
 in plain words, (c) offer a one-click alternative where one exists. Never switch language or quality

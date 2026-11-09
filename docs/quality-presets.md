@@ -85,6 +85,25 @@ in **Settings → Libraries & quality**.
   Change how often (or switch it off) in **Settings → Advanced**. It pauses while the VPN is down
   or every search site is unreachable.
 
+## When something doesn't arrive
+
+If a movie or episode you asked for still hasn't started downloading after about 12 hours, EasyArr
+asks Sonarr or Radarr why and shows it under **Needs your OK** on the home screen, in plain words,
+with a button where there's a way out:
+
+- Only available in a language you didn't mark as a must-have → **Download in English** (or
+  whichever language exists).
+- Only a lower quality exists → **Accept 720p** (cinema recordings are never offered).
+- Every version failed before → **Try the best one again**.
+- Nothing found, or nobody is sharing it → **Search now** (EasyArr also keeps looking by itself).
+- A download got stuck or couldn't be added to your library → **Try another version**.
+- Your request didn't reach Sonarr or Radarr → **Send it again**.
+
+Nothing switches to another language or quality unless you click. If you'd rather not be asked,
+turn on **Settings → Advanced → Accept alternatives automatically**: EasyArr then takes the best
+other version itself and tells you on the home screen. Problems with the whole setup (VPN down,
+search sites unreachable, disk full, an app not answering) show in the warnings at the top instead.
+
 ## Want to fine-tune?
 
 EasyArr owns the "EasyArr (…)" profiles and resets them when it updates them. To customise, open

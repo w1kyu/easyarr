@@ -1,5 +1,6 @@
 import type {
   LogSource,
+  StuckAction,
   LogView,
   StatusView,
   SystemCheckResult,
@@ -157,6 +158,15 @@ export const api = {
     request<{ reachable: boolean; count: number; torrent: number }>('/api/prowlarr/indexers'),
   status: () => request<StatusView>('/api/status'),
   recheck: () => request<{ hours: number }>('/api/settings/recheck'),
+  stuckAction: (id: string, action: StuckAction) =>
+    post<{ result: 'ok' | 'changed' }>(`/api/stuck/${encodeURIComponent(id)}`, { action }),
+  autoAccept: () => request<{ enabled: boolean }>('/api/settings/auto-accept'),
+  setAutoAccept: (enabled: boolean) =>
+    request<{ enabled: boolean }>('/api/settings/auto-accept', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ enabled }),
+    }),
   setRecheck: (hours: number) =>
     request<{ hours: number }>('/api/settings/recheck', {
       method: 'PUT',
