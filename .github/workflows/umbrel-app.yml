@@ -78,6 +78,8 @@ jobs:
           pnpm test:e2e
       - name: Wiring engine against the real services
         run: dev/stack.sh wiretest
+      - name: Backup → wipe → fresh install → restore (real services)
+        run: dev/stack.sh backuptest
       - name: Show state and logs
         if: always()
         run: |

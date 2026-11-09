@@ -6,6 +6,8 @@
 #   dev/stack.sh leaktest   kill-switch + reachability checks (SPEC §5.2)
 #   dev/stack.sh wiretest   finish the wizard through the API, run the wiring engine against the
 #                           real services, check the result and that a second run changes nothing
+#   dev/stack.sh backuptest back up the wired stack, wipe app-data, start fresh, restore, compare
+#                           (run after wiretest)
 #   dev/stack.sh ps|logs    docker compose ps / logs
 #   dev/stack.sh down       stop and remove containers (keeps dev/data)
 #   dev/stack.sh reset      down + delete dev/data (uses Docker to remove root-owned files)
@@ -373,6 +375,136 @@ wiretest() {
   echo "WIRING TEST PASSED"
 }
 
+# --- backup & restore (phase 08) -------------------------------------------------------------------
+
+# POST inside a VPN-side container with that app's API key.
+arr_post() {
+  local app=$1 port=$2 path=$3 body=$4
+  # shellcheck disable=SC2016 # expanded inside the container
+  docker exec "$(c "$app")" sh -c \
+    'k=$(sed -n "s:.*<ApiKey>\(.*\)</ApiKey>.*:\1:p" /config/config.xml); curl -fsS -m 60 -X POST -H "X-Api-Key: $k" -H "content-type: application/json" -d "$3" "http://localhost:$0/apps/$1$2"' \
+    "$port" "$app" "$path" "$body"
+}
+secret_key() { docker exec "$(c dashboard)" node -p "require('/easyarr/secrets.json').apiKeys['$1'] ?? ''"; }
+config_xml_key() {
+  docker exec "$(c "$1")" sed -n 's:.*<ApiKey>\(.*\)</ApiKey>.*:\1:p' /config/config.xml
+}
+jellyfin_get() {
+  curl -fsS -m 15 -H "Authorization: MediaBrowser Token=\"$(secret_key jellyfin)\"" "http://localhost:39096$1"
+}
+# Every provider of that kind passes the app's own connection test (keys are right).
+arr_testall_ok() {
+  local out
+  out="$(arr_post "$1" "$2" "$3/testall" '{}')"
+  python3 -c 'import json,sys; r=json.load(sys.stdin); bad=[x for x in r if not x.get("isValid")]; print(bad); sys.exit(1 if bad or not r else 0)' <<<"$out"
+}
+ledger_keys() {
+  curl -fsS -m 20 http://localhost:39000/api/wiring | python3 -c 'import json,sys; print(" ".join(sorted(e["key"] for e in json.load(sys.stdin)["ledger"])))'
+}
+restore_step_state() { # <stream file> <step>
+  python3 - "$1" "$2" <<'PY'
+import json, sys
+state = "missing"
+for line in open(sys.argv[1]):
+    if line.startswith("data: "):
+        e = json.loads(line[6:])
+        if e.get("type") == "step" and e.get("step") == sys.argv[2]:
+            state = e["state"]
+print(state)
+PY
+}
+same() { [[ "$1" == "$2" ]]; }
+
+backuptest() {
+  local api=http://localhost:39000/api dir before_ledger before_clients before_libs
+  dir="$(mktemp -d)"
+  json() { curl -fsS -m 30 -H 'content-type: application/json' -d "$2" "$api/$1"; }
+
+  echo "== A configured install"
+  # wiretest changed an answer (download method), which re-opens Finish (D-053): finish again.
+  # (CI's runs always have Recyclarr's offline failure, so "problems" is the honest answer.)
+  check "setup finished" ok json wizard/finish '{"result":"problems"}'
+  # Things only the services' own backups can bring back (state replay would not).
+  check "Sonarr: a tag made by hand" ok arr_post sonarr 8989 /api/v3/tag '{"label":"backup-marker"}'
+  check "Jellyfin: a second user made by hand" ok curl -fsS -m 15 -X POST \
+    -H "Authorization: MediaBrowser Token=\"$(secret_key jellyfin)\"" -H 'content-type: application/json' \
+    -d '{"Name":"family","Password":"Family-Pass-1"}' http://localhost:39096/Users/New
+  before_ledger="$(ledger_keys)"
+  before_clients="$(arr_get sonarr 8989 /api/v3/downloadclient | python3 -c 'import json,sys; print(sorted(c["name"] for c in json.load(sys.stdin)))')"
+  before_libs="$(jellyfin_get /Library/VirtualFolders | python3 -c 'import json,sys; print(sorted((f["Name"], tuple(f["Locations"])) for f in json.load(sys.stdin)))')"
+
+  echo "== Backup (encrypted) through the API"
+  check "download a backup" ok curl -fsS -m 900 -o "$dir/backup.easyarr" -H 'content-type: application/json' \
+    -d '{"password":"Backup-Pass-2026"}' "$api/backup"
+  ls -l "$dir/backup.easyarr" | sed 's/^/      /'
+
+  echo "== Wipe the app's data and start fresh (like uninstall + install)"
+  compose down
+  docker run --rm -v "${UMBREL_ROOT}:/umbrel" "${BUSYBOX}" rm -rf "/umbrel/app-data/${APP_ID}"
+  install_package
+  compose up -d
+  wait_healthy 900
+  check "fresh: the wizard starts over" ok url_has "$api/wizard" '"account":null'
+
+  echo "== Restore"
+  local up
+  up="$(curl -sS -m 120 -X POST -H 'content-type: application/octet-stream' -H 'x-easyarr-upload: 1' \
+    --data-binary "@$dir/backup.easyarr" "$api/backup/upload")"
+  check "upload: encrypted, locked" ok grep -q '"unlocked":false' <<<"$up"
+  local wrong
+  wrong="$(curl -sS -m 120 -H 'content-type: application/json' \
+    -d '{"source":{"kind":"upload"},"password":"wrong-password"}' "$api/backup/inspect")"
+  check "a wrong password says so" ok grep -q '"wrong_password"' <<<"$wrong"
+  curl -sS -N -m 1800 -X POST -H 'content-type: application/json' \
+    -d '{"source":{"kind":"upload"},"password":"Backup-Pass-2026"}' "$api/backup/restore" >"$dir/restore.sse"
+  python3 - "$dir/restore.sse" <<'PY'
+import json, sys
+for line in open(sys.argv[1]):
+    if line.startswith("data: "):
+        e = json.loads(line[6:])
+        if e.get("type") == "step" and e["state"] != "running":
+            err = e.get("error") or {}
+            print(f"   {e['state']:7} {e['step']:12} {e.get('note', '')} {' — '.join([err.get('message', ''), *err.get('details', [])]) if err else ''}")
+        elif e.get("type") in ("end", "error"):
+            print(f"   {e}")
+PY
+  for step in easyarr sonarr radarr lidarr prowlarr jellyfin connections; do
+    check "restore step $step" ok same "$(restore_step_state "$dir/restore.sse" "$step")" done
+  done
+  # CI has no working VPN (the leak test saved a dead end), and Recyclarr can't reach GitHub:
+  # those two may fail; the wiring check runs once more below with the usual allowance.
+  echo "      vpn: $(restore_step_state "$dir/restore.sse" vpn), wiring: $(restore_step_state "$dir/restore.sse" wiring)"
+
+  echo "== Same setup as before"
+  local again
+  again="$(mktemp)"
+  wiring_run "$again"
+  check "wiring check: every step worked (except offline: $OFFLINE_STEPS)" ok test -z "$(wiring_failed_steps "$again")"
+  check "the wizard is finished" ok url_has "$api/wizard" '"next":null'
+  check "same wiring ledger" ok same "$(ledger_keys)" "$before_ledger"
+  check "same Sonarr download clients" ok same \
+    "$(arr_get sonarr 8989 /api/v3/downloadclient | python3 -c 'import json,sys; print(sorted(c["name"] for c in json.load(sys.stdin)))')" "$before_clients"
+  check "Sonarr's download clients pass their test (SABnzbd key fixed)" ok arr_testall_ok sonarr 8989 /api/v3/downloadclient
+  check "Prowlarr knows sonarr, radarr, lidarr" ok prowlarr_has_three_apps
+  check "Prowlarr's apps pass their test (keys fixed)" ok arr_testall_ok prowlarr 9696 /api/v1/applications
+  check "Sonarr kept this install's API key" ok same "$(config_xml_key sonarr)" "$(secret_key sonarr)"
+  check "Sonarr's hand-made tag came back (native backup)" ok arr_has sonarr 8989 /api/v3/tag backup-marker
+  check "Jellyfin's second user came back (native backup)" ok grep -q '"family"' <<<"$(jellyfin_get /Users)"
+  check "same Jellyfin libraries" ok same \
+    "$(jellyfin_get /Library/VirtualFolders | python3 -c 'import json,sys; print(sorted((f["Name"], tuple(f["Locations"])) for f in json.load(sys.stdin)))')" "$before_libs"
+  check "VPN settings came back" ok url_has "$api/vpn/config" '"provider":"custom"'
+  check "the request page is set up again" ok url_has http://localhost:39055/api/v1/settings/public '"initialized":true'
+  check "qBittorrent has the tv/movies/music categories" ok qbittorrent_has_categories
+  check "init stays idempotent after a restore" ok init_is_idempotent
+
+  rm -rf "$dir" "$again"
+  if [[ $fail -ne 0 ]]; then
+    echo "BACKUP TEST FAILED"
+    return 1
+  fi
+  echo "BACKUP TEST PASSED"
+}
+
 case "${1:-}" in
   up)
     install_package
@@ -381,6 +513,7 @@ case "${1:-}" in
   wait) wait_healthy "${2:-600}" ;;
   leaktest) leaktest ;;
   wiretest) wiretest ;;
+  backuptest) backuptest ;;
   ps) compose ps -a ;;
   logs)
     shift
@@ -392,7 +525,7 @@ case "${1:-}" in
     docker run --rm -v "${ROOT}/dev:/dev-root" "${BUSYBOX}" rm -rf /dev-root/data
     ;;
   *)
-    sed -n '2,9p' "$0"
+    sed -n '2,11p' "$0"
     exit 2
     ;;
 esac

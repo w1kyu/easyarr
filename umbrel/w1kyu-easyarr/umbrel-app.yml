@@ -5,11 +5,11 @@ storage:
 category: media
 name: EasyArr
 icon: https://raw.githubusercontent.com/w1kyu/easyarr/main/assets/icon.svg
-version: '0.0.16'
+version: '0.0.17'
 tagline: Your own Netflix-style media setup, wired up for you
 description: >-
-  ⚠️ PREVIEW — not ready for everyday use yet. The setup wizard is complete and connects all the
-  apps, but the dashboard, settings and backups are still being built.
+  ⚠️ PREVIEW — not ready for everyday use yet. Setup wizard, dashboard, settings and backups work;
+  in-app help and diagnostics are still being built.
 
 
   EasyArr sets up a complete media automation stack on your Umbrel and connects everything for
@@ -28,13 +28,11 @@ description: >-
 
   Jellyfin opens on port 39096 and the request page on port 39055 of your Umbrel.
 releaseNotes: >-
-  Choose several audio and subtitle languages in order, and mark the ones you must have: Sonarr and
-  Radarr now download in your languages (dubbed versions were refused before), Bazarr fetches your
-  subtitles and the home screen tells you which are still missing. New "Needs your OK" on the home
-  screen: when something doesn't arrive, EasyArr says why and offers a one-click way out (another
-  language, a lower quality, another version). Whole seasons come as one pack when possible, and
-  missing items are searched again every 6 hours (Settings → Advanced). Plus: the logo leads home,
-  a bigger Simple/Advanced switch, and the right version number in the corner.
+  Backups: Settings → Backups downloads a password-protected backup of your setup (not your
+  movies), and EasyArr makes one automatically every night (Files → EasyArr → backups). Restore it
+  from the first setup screen after a reinstall, or from Settings: your answers, accounts and VPN
+  come back, and Sonarr, Radarr, Lidarr, Prowlarr and Jellyfin keep their history and watched
+  status.
 
 developer: w1kyu
 website: https://github.com/w1kyu/easyarr
@@ -53,6 +51,7 @@ permissions:
 backupIgnore:
   - data/jellyfin/cache/*
   - data/jellyfin/log/*
+  - data/jellyfin/data/backups/*
 
 submitter: w1kyu
 submission: https://github.com/w1kyu/easyarr

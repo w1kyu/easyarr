@@ -16,7 +16,7 @@ services:
 
   # One-shot (SPEC §7.4): /data tree, API keys, minimal service configs. Idempotent (D-031).
   init:
-    image: ghcr.io/w1kyu/easyarr:sha-dcc52b0@sha256:734c77d70a795d267b4ae45b72b46be37f7e79449fcea91b11f56bcb91a84bf2
+    image: ghcr.io/w1kyu/easyarr:sha-c51ba3a@sha256:ef8506e37b05e9f5819e210a7869f82e086c03a0b01eac280efcf22db5d6e43f
     user: '0:0'
     command: ['init']
     restart: on-failure
@@ -30,7 +30,7 @@ services:
 
   # Dashboard + setup wizard.
   dashboard:
-    image: ghcr.io/w1kyu/easyarr:sha-dcc52b0@sha256:734c77d70a795d267b4ae45b72b46be37f7e79449fcea91b11f56bcb91a84bf2
+    image: ghcr.io/w1kyu/easyarr:sha-c51ba3a@sha256:ef8506e37b05e9f5819e210a7869f82e086c03a0b01eac280efcf22db5d6e43f
     restart: on-failure
     depends_on:
       init:
@@ -52,6 +52,10 @@ services:
       # Recyclarr's config: the dashboard writes recyclarr.yml from the quality choice and asks the
       # runner below for a sync (D-048).
       - ${APP_DATA_DIR}/data/recyclarr:/recyclarr
+      # Automatic backups, visible in Files → EasyArr → backups (SPEC §11, D-069).
+      - ${UMBREL_ROOT}/data/storage/EasyArr/backups:/backups
+      # Jellyfin's own backups folder: its archives are handed over here (D-070). init creates it.
+      - ${APP_DATA_DIR}/data/jellyfin/data/backups:/jellyfin-backups
 
   # Owns the network namespace for every download/search service (SPEC §5).
   vpn:
