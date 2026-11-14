@@ -8,6 +8,8 @@ export interface JsonStoreOptions<T> {
   version: number;
   migrations: readonly Migration[];
   defaults: () => T;
+  /** Called with the document after every load and save (keeps the redactor's list current). */
+  onChange?: (value: T) => void;
 }
 
 /**
@@ -50,11 +52,13 @@ export class JsonStore<T> {
       throw new Error(`${this.opts.file} failed validation: ${result.error.message}`);
     }
     if (migrated) await this.save(result.data);
+    else this.opts.onChange?.(result.data);
     return { value: result.data, created: false, migrated };
   }
 
   async save(value: T): Promise<void> {
     const checked = this.opts.schema.parse(value);
     await writeFileAtomic(this.opts.file, `${JSON.stringify(checked, null, 2)}\n`, 0o600);
+    this.opts.onChange?.(checked);
   }
 }

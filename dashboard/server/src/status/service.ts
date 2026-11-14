@@ -5,8 +5,10 @@ import {
   DISK_WARNING_FREE_SHARE,
   GITHUB_OWNER,
   parseWizardAnswers,
+  redactText,
   SERVICES,
   type DownloadItem,
+  type LogLine,
   type LogSource,
   type StuckItem,
   type LogView,
@@ -16,7 +18,7 @@ import {
   type StatusWarning,
   type VpnStatusView,
 } from '@easyarr/shared';
-import { redactString } from '../redact.js';
+import { knownValues } from '../support/known.js';
 import type { IndexerHealth } from './indexer-health.js';
 import type { Secrets, State } from '../state/index.js';
 import {
@@ -42,6 +44,8 @@ export interface StatusServiceOptions extends ProbeDeps {
   disk(): Promise<{ freeBytes: number; totalBytes: number } | null>;
   /** Last lines of Gluetun's log. */
   vpnLog(): Promise<string[]>;
+  /** EasyArr's own recent log lines (already redacted when written). */
+  ownLog?: () => LogLine[];
   /** The store's manifest for the update check; null = unknown. */
   latestVersion?: () => Promise<string | null>;
   /** Is the official Umbrel Jellyfin app installed too? */
@@ -278,22 +282,24 @@ export class StatusService {
 
   /** Redacted log lines for the advanced mode's log viewer. */
   async log(source: LogSource): Promise<LogView> {
-    const secrets = secretValues(await this.opts.secrets());
+    const known = knownValues(await this.opts.state(), await this.opts.secrets());
     let lines =
-      source === 'vpn'
-        ? parseGluetunLog(
-            (await this.opts.vpnLog())
-              // The dashboard's own status checks every 30 s would bury everything else.
-              .filter((l) => !/\[http server\] \d{3} GET \/v1\//.test(l))
-              .join('\n'),
-          )
-        : await serviceLog(source, this.opts);
+      source === 'easyarr'
+        ? (this.opts.ownLog?.() ?? null)
+        : source === 'vpn'
+          ? parseGluetunLog(
+              (await this.opts.vpnLog())
+                // The dashboard's own status checks every 30 s would bury everything else.
+                .filter((l) => !/\[http server\] \d{3} GET \/v1\//.test(l))
+                .join('\n'),
+            )
+          : await serviceLog(source, this.opts);
     const available = lines !== null;
     lines ??= [];
     return {
       source,
       available,
-      lines: lines.map((l) => ({ ...l, message: redactString(l.message, secrets) })),
+      lines: lines.map((l) => ({ ...l, message: redactText(l.message, { known }) })),
     };
   }
 }

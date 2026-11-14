@@ -9,3 +9,5 @@ export * from './vpn-providers.js';
 export * from './vpn-servers.generated.js';
 export * from './vpn-status.js';
 export * from './backup.js';
+export * from './redact.js';
+export * from './support.js';

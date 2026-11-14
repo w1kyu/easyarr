@@ -137,12 +137,15 @@ export const DISK_WARNING_FREE_SHARE = 0.1;
 
 /** Sources the advanced mode's log viewer can show (GET /api/logs/:source). */
 export const LOG_SOURCES = [
+  'easyarr',
   'vpn',
   'qbittorrent',
+  'sabnzbd',
   'sonarr',
   'radarr',
   'lidarr',
   'prowlarr',
+  'jellyfin',
 ] as const;
 export type LogSource = (typeof LOG_SOURCES)[number];
 

@@ -349,10 +349,12 @@ function level(v: unknown): LogLine['level'] {
 
 /** The newest log lines a service shows in its own UI (Servarr log table, qBittorrent log). */
 export async function serviceLog(
-  source: Exclude<LogSource, 'vpn'>,
+  source: Exclude<LogSource, 'vpn' | 'easyarr'>,
   deps: ProbeDeps,
   limit = 200,
 ): Promise<LogLine[] | null> {
+  if (source === 'sabnzbd') return sabnzbdLog(deps, limit);
+  if (source === 'jellyfin') return jellyfinLog(deps, limit);
   if (source === 'qbittorrent') {
     const r = await get(deps, `${deps.url('qbittorrent')}/api/v2/log/main?last_known_id=-1`);
     if (!r || r.status !== 200 || !Array.isArray(r.body)) return null;
@@ -383,6 +385,85 @@ export async function serviceLog(
       message: `${String(l['message'] ?? '')}${exception ? `\n${exception}` : ''}`,
     };
   });
+}
+
+/**
+ * SABnzbd keeps its recent warnings and errors in memory for its own UI: `mode=warnings` →
+ * `{"warnings":[{type,text,time,origin}]}` (SABnzbd 5.1.3 `SABnzbd.py` GUIHandler, api.py
+ * `_api_warnings`). The full log file is not exposed in a parseable way.
+ */
+async function sabnzbdLog(deps: ProbeDeps, limit: number): Promise<LogLine[] | null> {
+  const key = (await deps.keys())['sabnzbd'] ?? '';
+  const r = await get(
+    deps,
+    `${deps.url('sabnzbd')}/api?mode=warnings&output=json&apikey=${encodeURIComponent(key)}`,
+  );
+  if (!r || r.status !== 200) return null;
+  return arr(obj(r.body)['warnings'])
+    .slice(-limit)
+    .map((raw) => {
+      const l = obj(raw);
+      const t = num(l['time']);
+      return {
+        time: t ? new Date(t * 1000).toISOString() : null,
+        level: level(String(l['type'] ?? 'WARNING')),
+        message: String(l['text'] ?? ''),
+      };
+    });
+}
+
+/**
+ * Jellyfin: `GET /System/Logs` lists the log files (newest first), `GET /System/Logs/Log?name=`
+ * returns one as text; both need an admin token (Jellyfin `SystemController.cs`). Lines look like
+ * `[2026-11-07 19:47:26.123 +00:00] [WRN] [12] Emby.Server…: message`.
+ */
+async function jellyfinLog(deps: ProbeDeps, limit: number): Promise<LogLine[] | null> {
+  const key = (await deps.keys())['jellyfin'];
+  if (!key) return null;
+  const base = deps.url('jellyfin');
+  const files = await get(deps, `${base}/System/Logs`, jellyfinAuth(key));
+  if (!files || files.status !== 200) return null;
+  const newest = arr(files.body)
+    .map((f) => str(obj(f)['Name']))
+    .find((n): n is string => n !== null && /^log_.*\.log$/.test(n));
+  if (!newest) return [];
+  const r = await get(
+    deps,
+    `${base}/System/Logs/Log?name=${encodeURIComponent(newest)}`,
+    jellyfinAuth(key),
+  );
+  if (!r || r.status !== 200) return null;
+  return parseJellyfinLog(r.text, limit);
+}
+
+const JELLYFIN_LEVELS: Record<string, LogLine['level']> = {
+  ERR: 'error',
+  FTL: 'error',
+  WRN: 'warn',
+  DBG: 'debug',
+  VRB: 'debug',
+};
+
+export function parseJellyfinLog(text: string, limit = 200): LogLine[] {
+  const out: LogLine[] = [];
+  for (const line of text.split('\n')) {
+    if (!line.trim()) continue;
+    const m =
+      /^\[(\d{4}-\d{2}-\d{2} [\d:.]+ [+-]\d{2}:\d{2})\] \[(\w{3})\] (?:\[\d+\] )?(.*)$/.exec(line);
+    const last = out.at(-1);
+    if (m) {
+      const t = new Date((m[1] ?? '').replace(' ', 'T').replace(' ', ''));
+      out.push({
+        time: Number.isNaN(t.getTime()) ? null : t.toISOString(),
+        level: JELLYFIN_LEVELS[m[2] ?? ''] ?? 'info',
+        message: m[3] ?? '',
+      });
+    } else if (last) {
+      // Stack traces continue the previous entry.
+      last.message += `\n${line}`;
+    }
+  }
+  return out.slice(-limit);
 }
 
 /** Gluetun's log as the VPN wrapper writes it: "2026-11-07T19:47:26Z INFO [vpn] …". */

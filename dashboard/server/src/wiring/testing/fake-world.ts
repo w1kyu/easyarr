@@ -367,7 +367,11 @@ export class World {
     passwords: {} as Record<string, string>,
     /** mode=queue: kbpersec + slots, as SABnzbd 5.1 answers. */
     queue: { kbpersec: '0', slots: [] as Json[] },
+    /** mode=warnings: {type, text, time, origin}, as SABnzbd's GUIHandler keeps them. */
+    warnings: [] as Json[],
   };
+  /** Jellyfin's current log file (GET /System/Logs/Log). Kept out of `jf` (backups copy that). */
+  jfLog = '';
   /** Wizard step 6 secrets, by entry id. */
   usenetSecrets = { servers: {} as Record<string, string>, indexers: {} as Record<string, string> };
   bz = {
@@ -533,6 +537,7 @@ export class World {
     const mode = q.get('mode');
     if (mode === 'version') return [200, { version: '5.1.3' }];
     if (mode === 'queue') return [200, { queue: this.sab.queue }];
+    if (mode === 'warnings') return [200, { warnings: this.sab.warnings }];
     if (mode === 'get_config' && q.get('section') === 'servers')
       return [200, { config: this.sab.servers.length ? { servers: this.sab.servers } : {} }];
     if (mode === 'get_config') {
@@ -642,6 +647,22 @@ export class World {
     }
     if (!authed) return [401, ''];
     if (path === '/System/Info') return [200, {}];
+    if (path === '/System/Logs') {
+      return [
+        200,
+        [
+          {
+            Name: 'log_20261101.log',
+            DateModified: '2026-11-01T10:00:00Z',
+            Size: this.jfLog.length,
+          },
+          { Name: 'FFmpeg.Transcode-x.log', DateModified: '2026-11-01T09:00:00Z', Size: 1 },
+        ],
+      ];
+    }
+    if (path === '/System/Logs/Log') {
+      return q.get('name') === 'log_20261101.log' ? [200, this.jfLog] : [404, ''];
+    }
     if (path === '/Backup/Create' && m === 'POST') {
       if (!this.jfBackupsDir) return [500, { message: 'Could not find a part of the path' }];
       const name = `jellyfin-backup-${Date.now()}-${this.jf.restores}.zip`;

@@ -34,6 +34,9 @@ import { backupRoutes, UPLOAD_HEADER, UPLOAD_PATH } from './backup/routes.js';
 import { BackupService } from './backup/service.js';
 import { realNativeOps } from './backup/native-ops.js';
 import { usenetRoutes } from './usenet/routes.js';
+import { DiagnosticsService } from './support/diagnostics.js';
+import { supportRoutes } from './support/routes.js';
+import type { LogBuffer } from './logger.js';
 import { UsenetService } from './usenet/service.js';
 
 export type AppConfig = Pick<
@@ -182,6 +185,8 @@ export interface BuildAppOptions {
   /** Override hardware detection (tests, e2e). */
   collectSystemInfo?: () => Promise<SystemInfo>;
   services?: Services;
+  /** EasyArr's own recent log lines (log viewer + diagnostics). */
+  logBuffer?: LogBuffer;
 }
 
 /** "::ffff:10.21.0.1" → "10.21.0.1" */
@@ -192,6 +197,7 @@ export async function buildApp({
   logger,
   collectSystemInfo: collect,
   services,
+  logBuffer,
 }: BuildAppOptions): Promise<FastifyInstance> {
   const app = Fastify({
     ...(logger ? { loggerInstance: logger as FastifyBaseLogger } : { logger: false }),
@@ -291,6 +297,7 @@ export async function buildApp({
     vpn: () => svc.vpn.status(),
     disk: () => diskSpace(config.dataDir),
     vpnLog: () => vpnFiles.readLogTail(),
+    ...(logBuffer ? { ownLog: () => logBuffer.lines() } : {}),
     indexerHealth: () => svc.indexers?.last() ?? null,
     stuck: () => svc.stuck?.list() ?? [],
     ...(onUmbrel
@@ -302,6 +309,18 @@ export async function buildApp({
     stateDir: config.stateDir,
     lock: svc.lock,
     ...(svc.stuck ? { stuck: svc.stuck } : {}),
+  });
+
+  await app.register(supportRoutes, {
+    diagnostics: new DiagnosticsService({
+      version: config.version,
+      appVersion: config.appVersion ?? null,
+      state: async () => (await stateStore(config.stateDir).load()).value,
+      secrets: async () => (await secretsStore(config.stateDir).load()).value,
+      systemInfo,
+      status: () => status.view(),
+      log: (source) => status.log(source),
+    }),
   });
 
   // License notices shipped in the image (SPEC §14.1), linked from the About page.

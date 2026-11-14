@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { noteSecrets, noteState } from '../support/known.js';
 import { JsonStore } from './json-store.js';
 import { secretsMigrations, stateMigrations } from './migrations.js';
 import {
@@ -22,6 +23,7 @@ export function stateStore(stateDir: string): JsonStore<State> {
     version: STATE_SCHEMA_VERSION,
     migrations: stateMigrations,
     defaults: () => defaultState(),
+    onChange: noteState,
   });
 }
 
@@ -32,5 +34,6 @@ export function secretsStore(stateDir: string): JsonStore<Secrets> {
     version: SECRETS_SCHEMA_VERSION,
     migrations: secretsMigrations,
     defaults: defaultSecrets,
+    onChange: noteSecrets,
   });
 }

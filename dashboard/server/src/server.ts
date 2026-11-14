@@ -1,26 +1,29 @@
 import type { ServeConfig } from './config.js';
 import { buildApp, createServices } from './app.js';
-import { createLogger, registerSecrets } from './logger.js';
+import pino from 'pino';
+import { createLogger, LogBuffer } from './logger.js';
 import { secretsStore, stateStore } from './state/index.js';
 import { ClientAllowlist } from './vpn/allowlist.js';
 import { collectSystemInfo } from './system/check.js';
 import { startupWiring } from './wiring/startup.js';
 
 export async function startServer(config: ServeConfig): Promise<void> {
-  const log = createLogger(config.logLevel);
-  // Load state early so a broken file is reported at startup, and so secrets get redacted.
+  // Lines go to stdout (docker logs) and to a small buffer for the log viewer and diagnostics.
+  const logBuffer = new LogBuffer();
+  const log = createLogger(
+    config.logLevel,
+    pino.multistream([
+      { level: config.logLevel as pino.Level, stream: process.stdout },
+      { level: config.logLevel as pino.Level, stream: logBuffer },
+    ]),
+  );
+  // Load state early so a broken file is reported at startup. Loading also hands every stored
+  // secret, username and host to the redactor (support/known.ts).
   await stateStore(config.stateDir).load();
-  const secrets = await secretsStore(config.stateDir).load();
-  registerSecrets(Object.values(secrets.value.apiKeys));
-  if (secrets.value.account) registerSecrets([secrets.value.account.password]);
-  if (secrets.value.vpn) registerSecrets(Object.values(secrets.value.vpn.fields));
-  if (secrets.value.usenet) {
-    registerSecrets(Object.values(secrets.value.usenet.servers));
-    registerSecrets(Object.values(secrets.value.usenet.indexers));
-  }
+  await secretsStore(config.stateDir).load();
 
   const services = createServices(config, log);
-  const app = await buildApp({ config, logger: log, services });
+  const app = await buildApp({ config, logger: log, services, logBuffer });
   // Keep qBittorrent's port equal to the VPN's forwarded port (SPEC §5.4).
   services.portSync.start();
   // Search sites paused after an outage come back within minutes, not hours.

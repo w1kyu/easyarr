@@ -1,6 +1,6 @@
 import type { VpnStatusView } from '@easyarr/shared';
 import { describe, expect, it } from 'vitest';
-import { REDACTED } from '../redact.js';
+import { redacted } from '@easyarr/shared';
 import { defaultSecrets, defaultState, type State } from '../state/index.js';
 import { World } from '../wiring/testing/fake-world.js';
 import { parseGluetunLog } from './collect.js';
@@ -284,11 +284,73 @@ describe('StatusService', () => {
     const sonarr = await svc.log('sonarr');
     expect(sonarr).toMatchObject({ available: true, source: 'sonarr' });
     expect(sonarr.lines).toEqual([
-      { time: '2026-11-07T18:00:00Z', level: 'warn', message: `call with apikey=${REDACTED}` },
+      {
+        time: '2026-11-07T18:00:00Z',
+        level: 'warn',
+        message: `call with apikey=${redacted('apikey')}`,
+      },
     ]);
     const vpn = await svc.log('vpn');
     expect(vpn.lines).toEqual([
-      { time: '2026-11-07T19:47:27Z', level: 'error', message: `[wireguard] bad key ${REDACTED}` },
+      {
+        time: '2026-11-07T19:47:27Z',
+        level: 'error',
+        message: `[wireguard] bad key ${redacted('key')}`,
+      },
+    ]);
+  });
+
+  it("log viewer: SABnzbd warnings, Jellyfin log file and EasyArr's own lines", async () => {
+    const { svc, world } = setup({
+      secrets: async () => ({
+        ...defaultSecrets(),
+        apiKeys: { jellyfin: 'j'.repeat(32), sabnzbd: 'a'.repeat(32) },
+      }),
+      ownLog: () => [
+        { time: '2026-11-01T10:00:00.000Z', level: 'warn', message: 'wiring: retrying' },
+      ],
+    });
+    world.sab.warnings = [
+      {
+        type: 'WARNING',
+        text: 'Server news.example.com:563 will be ignored for 1 minute',
+        time: 1793527200,
+        origin: 'x.py12',
+      },
+      { type: 'ERROR', text: 'Failed to connect', time: 1793527260, origin: 'y.py3' },
+    ];
+    world.jfLog = [
+      '[2026-11-01 10:00:00.123 +00:00] [INF] [1] Main: Jellyfin version: 10.11.2',
+      '[2026-11-01 10:00:05.000 +00:00] [ERR] [12] Emby.Server: Error processing request',
+      'System.IO.IOException: disk full',
+      '   at Something.Do()',
+    ].join('\n');
+    const sab = await svc.log('sabnzbd');
+    expect(sab.available).toBe(true);
+    expect(sab.lines).toEqual([
+      {
+        time: '2026-11-01T10:00:00.000Z',
+        level: 'warn',
+        message: 'Server [REDACTED:host]:563 will be ignored for 1 minute',
+      },
+      { time: '2026-11-01T10:01:00.000Z', level: 'error', message: 'Failed to connect' },
+    ]);
+    const jf = await svc.log('jellyfin');
+    expect(jf.lines).toEqual([
+      {
+        time: '2026-11-01T10:00:00.123Z',
+        level: 'info',
+        message: 'Main: Jellyfin version: 10.11.2',
+      },
+      {
+        time: '2026-11-01T10:00:05.000Z',
+        level: 'error',
+        message:
+          'Emby.Server: Error processing request\nSystem.IO.IOException: disk full\n   at Something.Do()',
+      },
+    ]);
+    expect((await svc.log('easyarr')).lines).toEqual([
+      { time: '2026-11-01T10:00:00.000Z', level: 'warn', message: 'wiring: retrying' },
     ]);
   });
 

@@ -22,6 +22,6 @@ describe('logger', () => {
     const out = output();
     expect(out).not.toContain(key);
     expect(out).toContain('8989');
-    expect(out).toContain('[redacted]');
+    expect(out).toContain('[REDACTED:secret]');
   });
 });
