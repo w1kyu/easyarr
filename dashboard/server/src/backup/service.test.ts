@@ -240,6 +240,8 @@ describe('creating backups', () => {
     const view = await svc.view();
     expect(view.lastAuto).toMatchObject({ ok: true, error: null });
     expect(view.files.map((f) => f.name)).toEqual(['easyarr-backup-2026-11-09-0400.easyarr']);
+    // mtime decides "newest"; pin it to the fake clock (the real clock may be later than these days).
+    await fs.utimes(path.join(a, 'backups', 'easyarr-backup-2026-11-09-0400.easyarr'), now, now);
 
     // A missed time (dashboard was down at 04:00) still runs later that day; old ones are pruned.
     for (const [i, iso] of ['2026-11-10T09:00:00Z', '2026-11-11T09:00:00Z'].entries()) {
