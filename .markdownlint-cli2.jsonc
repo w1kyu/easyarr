@@ -1,0 +1,19 @@
+// Markdown lint for the published docs (SPEC §16, D-079). Run by `pnpm lint`.
+{
+  "config": {
+    "default": true,
+    // Prose is wrapped by hand or not at all; tables and URLs can't be wrapped.
+    "MD013": false,
+    // Same heading text is fine in different sections ("What you'll need").
+    "MD024": { "siblings_only": true },
+    // Raw HTML isn't rendered by the in-app viewer, so it stays forbidden (MD033 on).
+    // Tables are written compact or aligned; both render the same.
+    "MD060": false,
+    // VPN guides start with an italic "_Last checked: <date>_" line (tested in docs.test.ts).
+    "MD036": false,
+    // Numbered steps keep counting after a note or code block in between (4., 5., …).
+    "MD029": false,
+  },
+  "globs": ["README.md", "CONTRIBUTING.md", "SECURITY.md", "docs/**/*.md"],
+  "ignores": ["**/node_modules/**", "docs/dev/research/**"],
+}

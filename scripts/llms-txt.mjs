@@ -3,7 +3,7 @@
 // The "Get help with AI" prompt links to it (LLMS_TXT_URL in dashboard/shared/src/brand.ts).
 //   node scripts/llms-txt.mjs          write llms.txt
 //   node scripts/llms-txt.mjs --check  fail when llms.txt is out of date (pnpm lint, CI)
-import { readdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -12,24 +12,10 @@ const docsDir = path.join(root, 'docs');
 const out = path.join(root, 'llms.txt');
 const BLOB = 'https://github.com/w1kyu/easyarr/blob/main';
 
-// Reading order: the big picture first, then setup topics, then VPN guides, then help.
-const FIRST = ['how-it-works', 'system-requirements', 'torrents-101', 'usenet-101', 'indexers'];
-const LAST = ['troubleshooting', 'getting-help'];
-
+// Reading order: docs/nav.json, the same order as the in-app help (D-077).
 function userDocs() {
-  const top = readdirSync(docsDir)
-    .filter((f) => f.endsWith('.md') && f !== 'README.md')
-    .map((f) => f.slice(0, -3));
-  const vpn = readdirSync(path.join(docsDir, 'vpn'))
-    .filter((f) => f.endsWith('.md'))
-    .map((f) => `vpn/${f.slice(0, -3)}`)
-    .sort((a, b) => (a === 'vpn/README' ? -1 : b === 'vpn/README' ? 1 : a.localeCompare(b)));
-  const rank = (s) =>
-    FIRST.includes(s) ? FIRST.indexOf(s) : LAST.includes(s) ? 1000 + LAST.indexOf(s) : 100;
-  const middle = top.sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
-  const before = middle.filter((s) => rank(s) < 1000);
-  const after = middle.filter((s) => rank(s) >= 1000);
-  return [...before, ...vpn, ...after];
+  const nav = JSON.parse(readFileSync(path.join(docsDir, 'nav.json'), 'utf8'));
+  return nav.sections.flatMap((s) => s.pages);
 }
 
 /** Relative links → absolute GitHub links (the file is read outside the repo). */

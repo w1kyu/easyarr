@@ -1,0 +1,48 @@
+name: Links
+
+# External links in the published docs (D-079). Internal links, anchors and images are checked
+# offline by `pnpm lint` (scripts/check-docs.mjs). This workflow doesn't gate releases: provider
+# websites change or block bots, so a red run means "look at the guides", not "stop".
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'README.md'
+      - 'CONTRIBUTING.md'
+      - 'SECURITY.md'
+      - 'docs/**'
+      - '.lycheeignore'
+      - '.github/workflows/links.yml'
+  schedule:
+    - cron: '17 6 * * 1' # Mondays
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: links-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  links:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check external links
+        uses: lycheeverse/lychee-action@v2.9.0
+        with:
+          args: >-
+            --no-progress
+            --max-retries 3
+            --retry-wait-time 5
+            --timeout 30
+            --accept 200..=299,403,429
+            --exclude-loopback
+            --exclude-private
+            --exclude-path docs/dev/research
+            README.md CONTRIBUTING.md SECURITY.md 'docs/**/*.md'
+          fail: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

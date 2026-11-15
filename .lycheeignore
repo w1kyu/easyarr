@@ -1,0 +1,6 @@
+# Addresses in the docs that are examples or only exist on the user's network (Links workflow).
+^https?://umbrel\.local
+^https?://umbrel(:\d+)?(/|$)
+^https?://100\.101\.102\.103
+^https?://(news|api)?\.?example\.(com|org)
+^https?://localhost

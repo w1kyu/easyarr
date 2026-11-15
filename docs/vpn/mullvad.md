@@ -33,7 +33,7 @@ with `=`) and an **address** (looks like `10.64.123.45/32`).
 7. Open the downloaded file with a text editor (Notepad, TextEdit…). If you got a `.zip` file,
    open it first and pick any one file inside.
 8. Find these two lines near the top:
-   - `PrivateKey = …` — copy everything after `PrivateKey = `.
+   - `PrivateKey = …` — copy everything after `PrivateKey =`.
    - `Address = …` — copy only the **first** part, before the comma. It looks like
      `10.64.123.45/32`.
 
@@ -54,7 +54,7 @@ the key and won't work.
 
 | EasyArr field         | What to paste                                                  |
 | --------------------- | -------------------------------------------------------------- |
-| WireGuard private key | The text after `PrivateKey = ` from your file                  |
+| WireGuard private key | The text after `PrivateKey =` from your file                  |
 | WireGuard address     | The first address from the `Address` line, e.g. `10.64.123.45/32` |
 
 4. **Server country** (optional): leave **Fastest / any** unless you want a specific country.

@@ -28,7 +28,7 @@ NordVPN puts it into a WireGuard file you can download.
 5. Click **Get setup configuration** (on some pages: **WireGuard** under **Available protocols**).
 6. Choose **WireGuard** and click **Download config**. You get a file ending in `.conf`.
 7. Open the file with a text editor (Notepad, TextEdit…).
-8. Find the line that starts with `PrivateKey =`. Copy everything **after** `PrivateKey = `. That
+8. Find the line that starts with `PrivateKey =`. Copy everything **after** `PrivateKey =`. That
    is your WireGuard private key.
 
 You don't need the other lines. EasyArr already knows NordVPN's servers and its standard address
@@ -57,7 +57,7 @@ You do **not** need to download any OpenVPN files — EasyArr already knows Nord
 
 | EasyArr field         | What to paste                                                       |
 | --------------------- | ------------------------------------------------------------------- |
-| WireGuard private key | WireGuard only: the text after `PrivateKey = ` from your `.conf` file |
+| WireGuard private key | WireGuard only: the text after `PrivateKey =` from your `.conf` file |
 | VPN username          | OpenVPN only: the service credentials **Username**                  |
 | VPN password          | OpenVPN only: the service credentials **Password**                  |
 

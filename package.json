@@ -9,11 +9,12 @@
   },
   "scripts": {
     "dev": "pnpm --parallel --filter \"./dashboard/*\" dev",
-    "lint": "eslint . && prettier --check . && node scripts/check-vendor.mjs && node scripts/llms-txt.mjs --check",
+    "lint": "eslint . && prettier --check . && node scripts/check-vendor.mjs && node scripts/llms-txt.mjs --check && markdownlint-cli2 && node scripts/check-docs.mjs",
     "format": "prettier --write .",
     "typecheck": "pnpm -r typecheck && tsc -p e2e/tsconfig.json",
     "test": "vitest run",
     "test:e2e": "playwright test -c e2e/playwright.config.ts",
+    "docs:shots": "DOCS_SHOTS=1 playwright test -c e2e/playwright.config.ts --project docs-shots",
     "build": "pnpm -r build",
     "check:vendor": "node scripts/check-vendor.mjs",
     "llms": "node scripts/llms-txt.mjs"
@@ -26,7 +27,9 @@
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-react-hooks": "^7.1.1",
     "fflate": "^0.8.3",
+    "github-slugger": "^2.0.0",
     "globals": "^17.13.0",
+    "markdownlint-cli2": "^0.24.1",
     "prettier": "^3.9.10",
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.72.1",

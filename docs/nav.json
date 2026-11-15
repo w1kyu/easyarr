@@ -1,0 +1,35 @@
+{
+  "$comment": "Order of the user guides in the in-app help, on the Help page and in llms.txt (D-077). Every page in docs/ and docs/vpn/ must be listed exactly once (scripts/check-docs.mjs). Section titles: docs.section.<id> in dashboard/web/src/locales/en.json.",
+  "sections": [
+    {
+      "id": "start",
+      "pages": ["getting-started", "how-it-works", "system-requirements"]
+    },
+    {
+      "id": "downloading",
+      "pages": ["torrents-101", "usenet-101", "indexers", "quality-presets"]
+    },
+    {
+      "id": "vpn",
+      "pages": [
+        "vpn/README",
+        "vpn/protonvpn",
+        "vpn/pia",
+        "vpn/airvpn",
+        "vpn/mullvad",
+        "vpn/nordvpn",
+        "vpn/surfshark",
+        "vpn/generic",
+        "vpn/custom"
+      ]
+    },
+    {
+      "id": "everyday",
+      "pages": ["family-accounts", "remote-access-tailscale", "backup-restore", "two-jellyfins"]
+    },
+    {
+      "id": "help",
+      "pages": ["troubleshooting", "faq", "getting-help"]
+    }
+  ]
+}

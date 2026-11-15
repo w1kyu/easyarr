@@ -40,7 +40,7 @@ You need one value: a **private key**. It is a secret code of 44 characters that
 7. Click **Create**. Wait a few seconds until the configuration appears.
 8. Click **Download** to save the file (it ends in `.conf`). Open it with a text editor
    (Notepad, TextEdit…).
-9. Find the line that starts with `PrivateKey =`. Copy everything **after** `PrivateKey = `. That
+9. Find the line that starts with `PrivateKey =`. Copy everything **after** `PrivateKey =`. That
    is your WireGuard private key.
 
 Keep this file private: anyone who has the key can use your VPN. If you lose it, simply create a
@@ -68,7 +68,7 @@ You do **not** need to download any OpenVPN files — EasyArr already knows Prot
 
 | EasyArr field         | What to paste                                                       |
 | --------------------- | ------------------------------------------------------------------- |
-| WireGuard private key | WireGuard only: the text after `PrivateKey = ` from your `.conf` file |
+| WireGuard private key | WireGuard only: the text after `PrivateKey =` from your `.conf` file |
 | VPN username          | OpenVPN only: your OpenVPN / IKEv2 username from the Account page   |
 | VPN password          | OpenVPN only: your OpenVPN / IKEv2 password from the Account page   |
 

@@ -15,6 +15,8 @@ usually smaller.
 
 ## Which one should I pick?
 
+![The "What do you want?" step: libraries, languages and the three quality presets](images/setup-library.jpg)
+
 - **Balanced** suits most people: sharp on a big TV, and a 4 TB disk holds a few hundred movies.
 - **Best quality** if you have a 4K TV and plenty of storage. Not every movie or show exists
   in 4K — then EasyArr takes 1080p, so nothing stays missing.
@@ -70,8 +72,8 @@ What each app does with this:
 - **Request page (Jellyseerr):** has no language setting of its own. Requests use the EasyArr
   profiles above, so they follow your languages too.
 
-If you installed EasyArr before this, your lists now read: audio "Original language, then <the
-language you chose>", subtitles "<the language you chose>", nothing marked as must-have. Change them
+If you installed EasyArr before this, your lists now read: audio "Original language, then (the
+language you chose)", subtitles "(the language you chose)", nothing marked as must-have. Change them
 in **Settings → Libraries & quality**.
 
 ## Whole seasons and trying again

@@ -13,12 +13,19 @@ on:
       - 'LICENSE'
       - 'NOTICE.md'
       - '.dockerignore'
+      # The in-app help bundles these (dashboard/web/src/features/docs/docs.ts).
       - 'docs/*.md'
+      - 'docs/nav.json'
+      - 'docs/vpn/**'
+      - 'docs/images/**'
       - '.github/workflows/image.yml'
   pull_request:
     paths:
       - 'dashboard/**'
       - 'docs/*.md'
+      - 'docs/nav.json'
+      - 'docs/vpn/**'
+      - 'docs/images/**'
       - 'pnpm-lock.yaml'
       - '.github/workflows/image.yml'
   workflow_dispatch:
