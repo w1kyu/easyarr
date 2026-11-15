@@ -368,12 +368,64 @@ wiretest() {
   check "repair puts it back" ok sonarr_has_qbittorrent
   check "... and says so" ok stream_has_note "$fourth" recreated
 
+  echo "== Diagnostics and the AI help prompt hide every stored secret (SPEC §13, D-074)"
+  check "the diagnostics zip has the summary and real service logs, and no stored secret" ok diagnostics_clean
+  check "the AI help prompt has no stored secret" ok ai_prompt_clean
+
   rm -f "$first" "$second" "$third" "$fourth"
   if [[ $fail -ne 0 ]]; then
     echo "WIRING TEST FAILED"
     return 1
   fi
   echo "WIRING TEST PASSED"
+}
+
+# Every stored secret (API keys, passwords, VPN and Usenet secrets), one per line. Never printed.
+stored_secrets() {
+  docker exec "$(c dashboard)" node -e "
+    const s = require('/easyarr/secrets.json');
+    // Whole config files: only their keys are secret (the rest is e.g. [Interface], Address = …).
+    const vpn = Object.entries(s.vpn?.fields ?? {}).flatMap(([k, x]) =>
+      k === 'wgConfig' ? [...x.matchAll(/(?:PrivateKey|PresharedKey)\\s*=\\s*(\\S+)/g)].map((m) => m[1])
+      : k === 'ovpnConfig' ? [] : [x]);
+    const v = [...Object.values(s.apiKeys), s.account?.password, ...vpn,
+      ...Object.values(s.usenet?.servers ?? {}), ...Object.values(s.usenet?.indexers ?? {})];
+    console.log(v.filter((x) => typeof x === 'string' && x.trim().length >= 6).map((x) => x.trim()).join('\\n'));"
+}
+# grep -F for each secret in a file or folder; says which *kind* of check failed, never the value.
+has_no_secret() {
+  local where="$1" n=0 s
+  while IFS= read -r s; do
+    [[ -z "$s" ]] && continue
+    n=$((n + 1))
+    if grep -rqF -- "$s" "$where"; then
+      echo "stored secret #$n found in $where" >&2
+      return 1
+    fi
+  done < <(stored_secrets)
+  [[ $n -gt 0 ]] || { echo "no stored secrets to check against" >&2; return 1; }
+}
+diagnostics_clean() {
+  local dir
+  dir="$(mktemp -d)"
+  curl -fsS -m 180 -o "$dir/diagnostics.zip" http://localhost:39000/api/diagnostics || return 1
+  python3 -m zipfile -e "$dir/diagnostics.zip" "$dir/x" || return 1
+  [[ -s "$dir/x/diagnostics.json" && -s "$dir/x/ai-prompt.txt" ]] || { echo "summary missing" >&2; return 1; }
+  # Real logs came through the services' APIs (not just "didn't answer").
+  for f in sonarr prowlarr qbittorrent; do
+    if grep -q "didn't answer" "$dir/x/logs/$f.log"; then echo "no $f log" >&2; return 1; fi
+  done
+  rm -f "$dir/diagnostics.zip"
+  has_no_secret "$dir/x" || return 1
+  rm -rf "$dir"
+}
+ai_prompt_clean() {
+  local f
+  f="$(mktemp)"
+  curl -fsS -m 120 -o "$f" 'http://localhost:39000/api/diagnostics/ai-prompt?context=finish' || return 1
+  grep -q '\[Context\]' "$f" || { echo "no prompt" >&2; return 1; }
+  has_no_secret "$f" || return 1
+  rm -f "$f"
 }
 
 # --- backup & restore (phase 08) -------------------------------------------------------------------

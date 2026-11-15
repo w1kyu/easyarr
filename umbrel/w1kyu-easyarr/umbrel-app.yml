@@ -5,7 +5,7 @@ storage:
 category: media
 name: EasyArr
 icon: https://raw.githubusercontent.com/w1kyu/easyarr/main/assets/icon.svg
-version: '0.0.17'
+version: '0.0.18'
 tagline: Your own Netflix-style media setup, wired up for you
 description: >-
   ⚠️ PREVIEW — not ready for everyday use yet. Setup wizard, dashboard, settings and backups work;
@@ -28,12 +28,11 @@ description: >-
 
   Jellyfin opens on port 39096 and the request page on port 39055 of your Umbrel.
 releaseNotes: >-
-  Backups: Settings → Backups downloads a password-protected backup of your setup (not your
-  movies), and EasyArr makes one automatically every night (Files → EasyArr → backups). Restore it
-  from the first setup screen after a reinstall, or from Settings. TV shows: when no whole-season
-  pack is found, EasyArr now searches the episodes one by one (before, such shows never
-  downloaded). "Needs your attention" on the home screen is easier to spot, and Advanced mode
-  groups the included apps by what they do.
+  Get help with AI: next to every error, on the Finish step and under Help (top right), EasyArr
+  writes a ready-made question about your setup for ChatGPT, Claude, Gemini or Le Chat. You see
+  exactly what gets copied; passwords, keys, usernames and your IP address are hidden. Help →
+  Download diagnostics saves the same details as a file for a GitHub issue. Advanced mode's log
+  viewer now also shows EasyArr's own log, SABnzbd warnings and Jellyfin's log.
 
 developer: w1kyu
 website: https://github.com/w1kyu/easyarr
