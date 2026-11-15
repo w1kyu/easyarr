@@ -20,10 +20,10 @@ import { useTranslation } from 'react-i18next';
 import { SelectField } from '~/components/select-field';
 import { WhatsThis } from '~/features/docs/whats-this';
 import { ApiError } from '~/lib/api';
-import { ErrorAlert } from '@/components/ui/alert';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 import { useIssueText, useSaveErrorText, useSaveStep, type StepFormProps } from '../wizard-api';
+import { HelpErrorAlert } from '~/features/support/ai-help';
 
 const LIBRARY_ICONS: Record<LibraryId, typeof Tv> = {
   movies: Clapperboard,
@@ -229,8 +229,15 @@ export function LibraryStep({ formId, view, onSaved }: StepFormProps) {
         <p className="text-13 text-white/55">{t('library.quality.changeLater')}</p>
       </section>
 
-      {error && <ErrorAlert description={error} />}
-      {save.isError && !error && <ErrorAlert description={errorText(save.error)} />}
+      {error && (
+        <HelpErrorAlert description={error} context={{ area: 'wizard', step: 'library' }} />
+      )}
+      {save.isError && !error && (
+        <HelpErrorAlert
+          description={errorText(save.error)}
+          context={{ area: 'wizard', step: 'library' }}
+        />
+      )}
     </form>
   );
 }

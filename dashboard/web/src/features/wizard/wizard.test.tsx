@@ -60,6 +60,13 @@ function fakeServer(info: SystemInfo) {
           : { ok: false, reason: 'auth', detail: 'Authentication failed' },
       );
     }
+    if (url.startsWith('/api/diagnostics/ai-prompt')) {
+      vpnPosts.push({ url, body: {} });
+      return json({
+        prompt: '[Context]\nI use EasyArr.\n[Question]\nWhat I was trying to do: ____',
+        truncated: false,
+      });
+    }
     if (url === '/api/wiring/run') {
       const sse = db.wiringEvents.map((e) => `event: x\ndata: ${JSON.stringify(e)}\n\n`).join('');
       return new Response(sse, { status: 200, headers: { 'content-type': 'text/event-stream' } });
@@ -500,10 +507,32 @@ describe('setup wizard', () => {
     expect(await screen.findByTestId('finish-failed')).toBeTruthy();
     expect(screen.getByText(/TRaSH guides/)).toBeTruthy();
     expect(screen.getByText(/Radarr isn't answering yet/)).toBeTruthy();
-    expect(screen.getByRole('button', { name: /Get help with AI/ })).toHaveProperty(
-      'disabled',
-      true,
+    // Get help with AI: preview, the user's own words, copy, open a chat.
+    const execCommand = vi.fn(() => true);
+    Object.defineProperty(document, 'execCommand', { value: execCommand, configurable: true });
+    const open = vi.spyOn(window, 'open').mockReturnValue(null);
+    fireEvent.click(screen.getByRole('button', { name: /Get help with AI/ }));
+    const preview = await screen.findByTestId('ai-help-preview');
+    const asked = server.vpnPosts.find((p) => p.url.startsWith('/api/diagnostics/ai-prompt'));
+    const q = new URL(asked?.url ?? '', 'http://x').searchParams;
+    expect(q.get('context')).toBe('finish');
+    expect(q.get('error')).toMatch(/Radarr.*refused/);
+    expect((preview as HTMLTextAreaElement).value).toMatch(/What I was trying to do: ____$/);
+    fireEvent.change(screen.getByLabelText('What I was trying to do'), {
+      target: { value: 'finish setup, my mail is me@example.com' },
+    });
+    expect((preview as HTMLTextAreaElement).value).toMatch(
+      /What I was trying to do: finish setup, my mail is \[REDACTED:email\]$/,
     );
+    fireEvent.click(screen.getByRole('button', { name: 'Copy' }));
+    expect(await screen.findByRole('button', { name: 'Copied' })).toBeTruthy();
+    expect(execCommand).toHaveBeenCalledWith('copy');
+    fireEvent.click(screen.getByRole('button', { name: 'Claude' }));
+    expect(open).toHaveBeenCalledWith('https://claude.ai/new', '_blank', 'noopener,noreferrer');
+    open.mockRestore();
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByTestId('ai-help-dialog')).toBeNull());
+
     fireEvent.click(screen.getByRole('button', { name: 'Finish anyway' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Finish anyway', hidden: false }));
     await waitFor(() =>

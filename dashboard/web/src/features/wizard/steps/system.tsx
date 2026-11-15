@@ -3,8 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 import { CircleAlert, CircleCheck, CircleX, RefreshCw } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { HelpErrorAlert } from '~/features/support/ai-help';
 import { api, ApiError } from '~/lib/api';
-import { ErrorAlert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Loading } from '@/components/ui/loading';
@@ -84,7 +84,12 @@ export function SystemStep({ formId, view, onSaved }: StepFormProps) {
       }}
     >
       {check.isPending && <Loading>{t('system.checking')}</Loading>}
-      {check.isError && <ErrorAlert description={t('system.failed')} />}
+      {check.isError && (
+        <HelpErrorAlert
+          description={t('system.failed')}
+          context={{ area: 'wizard', step: 'system' }}
+        />
+      )}
       {check.data && (
         <>
           <p className="text-14 font-medium text-white/80" role="status">
@@ -122,7 +127,10 @@ export function SystemStep({ formId, view, onSaved }: StepFormProps) {
         </div>
       )}
       {save.isError && !errors['acknowledgedProblems'] && (
-        <ErrorAlert description={errorText(save.error)} />
+        <HelpErrorAlert
+          description={errorText(save.error)}
+          context={{ area: 'wizard', step: 'system' }}
+        />
       )}
     </form>
   );

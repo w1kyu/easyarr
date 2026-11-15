@@ -16,7 +16,8 @@ describe('in-app docs', () => {
       const md = (await loadDoc(slug)) ?? '';
       expect(docTitle(md), slug).toBeTruthy();
       for (const [, href] of md.matchAll(/\]\(([^)]+)\)/g)) {
-        if (href && /\.md(#|$)/.test(href))
+        // External links (e.g. SECURITY.md on GitHub) open in a new tab and aren't checked here.
+        if (href && !/^[a-z][a-z0-9+.-]*:/i.test(href) && /\.md(#|$)/.test(href))
           expect(docSlugFromHref(href, slug), `${slug} → ${href}`).not.toBeNull();
       }
     }

@@ -3,7 +3,6 @@ import { BookOpen, CircleCheck, ExternalLink, RefreshCw, TriangleAlert } from 'l
 import { lazy, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { api, ApiError } from '~/lib/api';
-import { ErrorAlert } from '@/components/ui/alert';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,6 +17,7 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { Loading } from '@/components/ui/loading';
 import { cn } from '@/lib/utils';
 import { useIssueText, useSaveErrorText, useSaveStep, type StepFormProps } from '../wizard-api';
+import { HelpErrorAlert } from '~/features/support/ai-help';
 
 const DocView = lazy(() => import('~/features/docs/doc-view'));
 export const PROWLARR_INDEXERS_KEY = ['prowlarr-indexers'] as const;
@@ -140,8 +140,15 @@ export function IndexersStep({ formId, onSaved }: StepFormProps) {
             </Button>
           </div>
           <p className="text-13 leading-relaxed text-white/55">{t('indexers.vpnNote')}</p>
-          {issue && <ErrorAlert description={issue} />}
-          {save.isError && !issue && <ErrorAlert description={errorText(save.error)} />}
+          {issue && (
+            <HelpErrorAlert description={issue} context={{ area: 'wizard', step: 'indexers' }} />
+          )}
+          {save.isError && !issue && (
+            <HelpErrorAlert
+              description={errorText(save.error)}
+              context={{ area: 'wizard', step: 'indexers' }}
+            />
+          )}
         </form>
       </div>
 

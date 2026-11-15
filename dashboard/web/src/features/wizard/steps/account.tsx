@@ -2,11 +2,11 @@ import { accountInputSchema } from '@easyarr/shared';
 import { Users } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { HelpErrorAlert } from '~/features/support/ai-help';
 import { Field } from '~/components/field';
 import { PasswordStrengthMeter } from '~/components/password-strength';
 import { WhatsThis } from '~/features/docs/whats-this';
 import { ApiError } from '~/lib/api';
-import { ErrorAlert } from '@/components/ui/alert';
 import {
   issuesToFieldErrors,
   useIssueText,
@@ -118,9 +118,17 @@ export function AccountStep({ formId, view, onSaved }: StepFormProps) {
           />
         </div>
       </div>
-      {errors['form'] && <ErrorAlert description={errors['form']} />}
+      {errors['form'] && (
+        <HelpErrorAlert
+          description={errors['form']}
+          context={{ area: 'wizard', step: 'account' }}
+        />
+      )}
       {save.isError && Object.keys(errors).length === 0 && (
-        <ErrorAlert description={errorText(save.error)} />
+        <HelpErrorAlert
+          description={errorText(save.error)}
+          context={{ area: 'wizard', step: 'account' }}
+        />
       )}
     </form>
   );

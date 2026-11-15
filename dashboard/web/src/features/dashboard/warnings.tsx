@@ -2,6 +2,7 @@ import { getService, type StatusWarning } from '@easyarr/shared';
 import { TriangleAlert } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
+import { AiHelpButton } from '~/features/support/ai-help';
 import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -20,6 +21,15 @@ const ACTION: Record<
   indexersDown: { to: '/settings/vpn', label: 'dash.warning.action.vpnServer' },
   subtitlesMissing: { href: '/apps/bazarr/wanted/movies', label: 'dash.warning.action.bazarr' },
 };
+
+/** Real problems get "Get help with AI"; notices (update, second Jellyfin, subtitles) don't. */
+const AI_HELP = new Set<StatusWarning['code']>([
+  'vpnDown',
+  'serviceDown',
+  'wiringProblems',
+  'indexersDown',
+  'diskLow',
+]);
 
 function languageNames(codes: readonly string[]): string {
   let names: Intl.DisplayNames | null = null;
@@ -85,6 +95,13 @@ export function WarningsBanner({ warnings }: { warnings: StatusWarning[] }) {
               >
                 {t(action.label)}
               </a>
+            )}
+            {AI_HELP.has(w.code) && (
+              <AiHelpButton
+                context={{ area: w.code === 'vpnDown' ? 'vpn' : 'dashboard' }}
+                error={`${t(`dash.warning.${w.code}.title`, params)}. ${t(`dash.warning.${w.code}.body`, params)}`}
+                className="self-start sm:self-auto"
+              />
             )}
           </div>
         );

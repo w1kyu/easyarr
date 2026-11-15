@@ -1,8 +1,8 @@
 import { useSaveStep, useSaveErrorText, type StepFormProps } from '../wizard-api';
-import { ErrorAlert } from '@/components/ui/alert';
 import { useTranslation } from 'react-i18next';
 import { Clapperboard, Download, Search, Tv } from 'lucide-react';
 import { WhatsThis } from '~/features/docs/whats-this';
+import { HelpErrorAlert } from '~/features/support/ai-help';
 
 const FLOW = [
   { icon: Search, key: 'wizard.welcome.flow.request' },
@@ -50,7 +50,12 @@ export function WelcomeStep({ formId, onSaved }: StepFormProps) {
         <p className="font-semibold text-white/80">{t('wizard.welcome.legalTitle')}</p>
         <p className="mt-1">{t('wizard.welcome.legal')}</p>
       </div>
-      {save.isError && <ErrorAlert description={errorText(save.error)} />}
+      {save.isError && (
+        <HelpErrorAlert
+          description={errorText(save.error)}
+          context={{ area: 'wizard', step: 'welcome' }}
+        />
+      )}
     </form>
   );
 }

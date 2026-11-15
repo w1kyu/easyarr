@@ -24,7 +24,6 @@ import { useTranslation } from 'react-i18next';
 import { Field } from '~/components/field';
 import { SelectField } from '~/components/select-field';
 import { api, ApiError } from '~/lib/api';
-import { ErrorAlert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
@@ -35,6 +34,7 @@ import {
   type FieldErrors,
   type StepFormProps,
 } from '../wizard-api';
+import { HelpErrorAlert } from '~/features/support/ai-help';
 
 interface ServerForm {
   id: string;
@@ -248,9 +248,14 @@ export function UsenetStep({ formId, view, onSaved }: StepFormProps) {
       </section>
 
       <p className="text-13 text-white/55">{t('usenet.testOptional')}</p>
-      {errors['form'] && <ErrorAlert description={errors['form']} />}
+      {errors['form'] && (
+        <HelpErrorAlert description={errors['form']} context={{ area: 'wizard', step: 'usenet' }} />
+      )}
       {save.isError && Object.keys(errors).length === 0 && (
-        <ErrorAlert description={errorText(save.error)} />
+        <HelpErrorAlert
+          description={errorText(save.error)}
+          context={{ area: 'wizard', step: 'usenet' }}
+        />
       )}
     </form>
   );

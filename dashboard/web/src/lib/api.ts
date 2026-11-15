@@ -1,4 +1,5 @@
 import type {
+  AiPromptView,
   BackupSettings,
   BackupSettingsView,
   RestoreEvent,
@@ -228,6 +229,27 @@ export const backupApi = {
     }),
   inspect: (source: RestoreSource, password?: string) =>
     post<RestoreSummary>('/api/backup/inspect', { source, ...(password ? { password } : {}) }),
+};
+
+/** "Get help with AI" and the diagnostics zip (SPEC §13). */
+export const supportApi = {
+  aiPrompt: (context: string, error: string | undefined, privateIps: boolean) => {
+    const q = new URLSearchParams({ context });
+    if (error) q.set('error', error);
+    if (privateIps) q.set('privateIps', '1');
+    return request<AiPromptView>(`/api/diagnostics/ai-prompt?${q.toString()}`);
+  },
+  /** Builds the zip on the server and saves it in the browser. */
+  async downloadDiagnostics(privateIps: boolean): Promise<void> {
+    let res: Response;
+    try {
+      res = await fetch(`/api/diagnostics${privateIps ? '?privateIps=1' : ''}`);
+    } catch {
+      throw new ApiError(0, 'network');
+    }
+    if (!res.ok) throw new ApiError(res.status, await errorCode(res));
+    await saveDownload(res, 'easyarr-diagnostics.zip');
+  },
 };
 
 export const api = {

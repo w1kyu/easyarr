@@ -5,15 +5,17 @@ import { useNavigate, useParams } from 'react-router';
 import { GlassPanel } from '~/components/glass-panel';
 import { NotFound } from '~/app/not-found';
 import { Loading } from '@/components/ui/loading';
+import { HelpHome } from '~/features/support/help-home';
 import { hasDoc } from './docs';
 
 const DocView = lazy(() => import('./doc-view'));
 
-/** Full-page docs viewer at /help/:slug (polished in phase 10). */
+/** /help (help home) and the full-page docs viewer at /help/:slug (polished in phase 10). */
 export function DocsPage() {
   const { t } = useTranslation();
   const { '*': slug = '' } = useParams();
   const navigate = useNavigate();
+  if (slug === '') return <HelpHome />;
   if (!hasDoc(slug)) return <NotFound />;
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-3">

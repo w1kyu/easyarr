@@ -1,5 +1,6 @@
 import { APP_NAME } from '@easyarr/shared';
 import { useQuery } from '@tanstack/react-query';
+import { CircleHelp } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Link, Outlet } from 'react-router';
 import { Logo } from '~/components/logo';
@@ -25,6 +26,14 @@ export function Layout() {
             <h1 className="text-20 leading-tight font-bold -tracking-3 md:text-24">{APP_NAME}</h1>
             <p className="truncate text-13 text-white/60">{t('app.tagline')}</p>
           </div>
+        </Link>
+        <Link
+          to="/help"
+          data-testid="help-link"
+          className="ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-13 text-white/70 transition-colors hover:bg-white/10 hover:text-white focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-hidden"
+        >
+          <CircleHelp className="size-4" aria-hidden />
+          {t('header.help')}
         </Link>
       </header>
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 pb-10 md:px-8">

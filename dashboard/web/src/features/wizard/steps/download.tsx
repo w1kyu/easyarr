@@ -3,6 +3,7 @@ import * as RadioGroup from '@radix-ui/react-radio-group';
 import { Check, Magnet, Newspaper, Layers, Minus, Plus } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { HelpErrorAlert } from '~/features/support/ai-help';
 import { WhatsThis } from '~/features/docs/whats-this';
 import { ErrorAlert } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
@@ -129,7 +130,12 @@ export function DownloadStep({ formId, view, onSaved }: StepFormProps) {
       </RadioGroup.Root>
       <p className="text-13 text-white/55">{t('download.changeLater')}</p>
       {missing && <ErrorAlert description={t('wizard.error.downloadMethodRequired')} />}
-      {save.isError && <ErrorAlert description={errorText(save.error)} />}
+      {save.isError && (
+        <HelpErrorAlert
+          description={errorText(save.error)}
+          context={{ area: 'wizard', step: 'download' }}
+        />
+      )}
     </form>
   );
 }

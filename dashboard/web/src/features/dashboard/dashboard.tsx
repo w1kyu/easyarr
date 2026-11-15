@@ -37,6 +37,7 @@ import { SegmentedControl } from '@/components/ui/segmented-control';
 import { cn } from '@/lib/utils';
 import { formatBytes, formatEta, formatSpeed, portUrl } from './format';
 import { LogViewer } from './log-viewer';
+import { AiHelpButton } from '~/features/support/ai-help';
 import { useSetMode, useStatus } from './status-api';
 import { StuckList } from './stuck';
 import { WarningsBanner } from './warnings';
@@ -59,9 +60,12 @@ export function Dashboard() {
     return (
       <GlassPanel className="flex flex-col items-start gap-3">
         <ErrorAlert description={t('dash.loadFailed')} />
-        <Button size="md" onClick={() => void status.refetch()}>
-          {t('wizard.retry')}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button size="md" onClick={() => void status.refetch()}>
+            {t('wizard.retry')}
+          </Button>
+          <AiHelpButton context={{ area: 'dashboard' }} error={t('dash.loadFailed')} size="md" />
+        </div>
       </GlassPanel>
     );
   }

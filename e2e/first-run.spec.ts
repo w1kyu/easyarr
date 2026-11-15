@@ -1,4 +1,6 @@
+import { readFile } from 'node:fs/promises';
 import { expect, test, type Page } from '@playwright/test';
+import { strFromU8, unzipSync } from 'fflate';
 
 // A complete first run like a beginner would do it (prompts/06): every wizard step, then the
 // Finish step wires the (fake) services. Runs once per download method — see playwright.config.ts.
@@ -304,6 +306,61 @@ test('settings: a change is saved and applied with the live checklist', async ({
     await page.goto('/');
     await page.screenshot({ path: `${shots}/home-mobile.png`, fullPage: true });
   }
+});
+
+test('help: the AI prompt and the diagnostics zip contain none of the secrets typed in', async ({
+  page,
+}, info) => {
+  const method = methodOf(info);
+  const typed = ['purple-train-river-7', 'correct-horse-vpn-9', 'p1234567', PROWLARR_KEY];
+  if (method !== 'torrents') {
+    typed.push(FAKE_USENET_PASSWORD, FAKE_INDEXER_KEY, FAKE_USENET_HOST, 'me@example.com');
+  }
+  await page.goto('/');
+  await page.getByTestId('help-link').click();
+  await expect(page).toHaveURL(/\/help$/);
+  await page
+    .getByTestId('help-get-help')
+    .getByRole('button', { name: /Get help with AI/ })
+    .click();
+  const dialog = page.getByTestId('ai-help-dialog');
+  const preview = dialog.getByTestId('ai-help-preview');
+  await expect(preview).toHaveValue(/\[Context\][\s\S]*\[State\][\s\S]*\[Question\]/);
+  await dialog.getByLabel('What I was trying to do').fill('Watch a movie');
+  const prompt = await preview.inputValue();
+  expect(prompt).toContain('Setup wizard: finished');
+  expect(prompt).toContain('llms.txt');
+  expect(prompt.endsWith('What I was trying to do: Watch a movie')).toBe(true);
+  for (const secret of typed) expect(prompt, secret).not.toContain(secret);
+  const shots = process.env['E2E_SHOTS'];
+  if (shots) {
+    await page.screenshot({ path: `${shots}/ai-help.png` });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.screenshot({ path: `${shots}/ai-help-mobile.png` });
+    await page.setViewportSize({ width: 1366, height: 900 });
+  }
+
+  const [file] = await Promise.all([
+    page.waitForEvent('download', { timeout: 60_000 }),
+    dialog.getByTestId('download-diagnostics').click(),
+  ]);
+  expect(file.suggestedFilename()).toMatch(/^easyarr-diagnostics-\d{4}-\d{2}-\d{2}-\d{4}\.zip$/);
+  const saved = info.outputPath('diagnostics.zip');
+  await file.saveAs(saved);
+  const files = unzipSync(new Uint8Array(await readFile(saved)));
+  expect(Object.keys(files)).toEqual(
+    expect.arrayContaining(['diagnostics.json', 'ai-prompt.txt', 'logs/easyarr.log']),
+  );
+  for (const [name, bytes] of Object.entries(files)) {
+    const text = strFromU8(bytes);
+    for (const secret of typed) expect(text, `${name}: ${secret}`).not.toContain(secret);
+  }
+  const report = JSON.parse(strFromU8(files['diagnostics.json'] ?? new Uint8Array())) as {
+    wizard: { finished: boolean };
+    setup: { downloadMethod: string };
+  };
+  expect(report.wizard.finished).toBe(true);
+  expect(report.setup.downloadMethod).toBe(method);
 });
 
 test('backup: download an encrypted backup, change a setting, restore it', async ({

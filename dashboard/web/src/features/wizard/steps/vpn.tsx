@@ -3,10 +3,10 @@ import { useQuery } from '@tanstack/react-query';
 import { ShieldAlert } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { HelpErrorAlert } from '~/features/support/ai-help';
 import { WhatsThis } from '~/features/docs/whats-this';
 import { VPN_CONFIG_KEY, VpnSetup } from '~/features/vpn/vpn-setup';
 import { api } from '~/lib/api';
-import { ErrorAlert } from '@/components/ui/alert';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -57,7 +57,12 @@ export function VpnStep({ formId, onSaved }: StepFormProps) {
             </span>
           </p>
         )}
-        {save.isError && <ErrorAlert description={errorText(save.error)} />}
+        {save.isError && (
+          <HelpErrorAlert
+            description={errorText(save.error)}
+            context={{ area: 'wizard', step: 'vpn' }}
+          />
+        )}
       </form>
 
       <AlertDialog open={confirmSkip} onOpenChange={setConfirmSkip}>

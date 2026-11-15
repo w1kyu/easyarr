@@ -1,17 +1,17 @@
 import { SERVICES, type WizardView } from '@easyarr/shared';
 import { useEffect, useState, useSyncExternalStore } from 'react';
+import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import {
   CircleCheckBig,
   Clapperboard,
   Download,
   ExternalLink,
-  MessageCircleQuestion,
   RotateCcw,
   TriangleAlert,
 } from 'lucide-react';
-import { useWiringRun, WiringChecklist } from '~/features/wiring/checklist';
-import { ErrorAlert } from '@/components/ui/alert';
+import { AiHelpButton, HelpErrorAlert } from '~/features/support/ai-help';
+import { useWiringRun, WiringChecklist, type StepRow } from '~/features/wiring/checklist';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,7 +23,6 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button, buttonVariants } from '@/components/ui/button';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { useSaveErrorText, useSaveStep, type StepFormProps } from '../wizard-api';
 
@@ -52,7 +51,7 @@ export function portUrl(port: number): string {
 
 /**
  * Step 9 Finish (SPEC §8): connects everything with a live checklist, explains what failed with
- * Retry and "Get help with AI" (phase 09), and ends with a short "what now" tour.
+ * Retry and "Get help with AI", and ends with a short "what now" tour.
  */
 export function FinishStep({ formId, view, onSaved }: StepFormProps) {
   const { t } = useTranslation();
@@ -106,18 +105,7 @@ export function FinishStep({ formId, view, onSaved }: StepFormProps) {
               <Button type="button" size="sm" onClick={() => void start()}>
                 <RotateCcw className="size-3.5" aria-hidden /> {t('finish.retry')}
               </Button>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span tabIndex={0}>
-                    <Button type="button" size="sm" disabled>
-                      <MessageCircleQuestion className="size-3.5" aria-hidden />
-                      {t('finish.aiHelp')}
-                      <span className="text-white/60">· {t('wizard.comingSoon')}</span>
-                    </Button>
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent>{t('finish.aiHelpSoon')}</TooltipContent>
-              </Tooltip>
+              <AiHelpButton context={{ area: 'finish' }} error={failedText(run.rows, t)} />
               <Button type="button" size="sm" onClick={() => setConfirmAnyway(true)}>
                 {t('finish.anyway')}
               </Button>
@@ -136,7 +124,12 @@ export function FinishStep({ formId, view, onSaved }: StepFormProps) {
           </div>
         )}
 
-        {save.isError && <ErrorAlert description={errorText(save.error)} />}
+        {save.isError && (
+          <HelpErrorAlert
+            description={errorText(save.error)}
+            context={{ area: 'wizard', step: 'finish' }}
+          />
+        )}
       </form>
 
       <AlertDialog open={confirmAnyway} onOpenChange={setConfirmAnyway}>
@@ -160,6 +153,17 @@ export function FinishStep({ formId, view, onSaved }: StepFormProps) {
       </AlertDialog>
     </>
   );
+}
+
+/** The failed steps as plain text, for the AI help prompt's "Error shown". */
+function failedText(rows: StepRow[], t: TFunction): string {
+  return rows
+    .filter((r) => r.error)
+    .map(
+      (r) =>
+        `${t(`wiring.step.${r.id}`, { defaultValue: r.id })}: ${[r.error?.message, ...(r.error?.details ?? [])].filter(Boolean).join(' — ')}`,
+    )
+    .join('\n');
 }
 
 /** What pressing the button will do, from the answers (plain words, no app jargon). */

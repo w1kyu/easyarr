@@ -1,6 +1,7 @@
 import type { VpnStatusView, VpnTestView } from '@easyarr/shared';
 import { CircleAlert, CircleCheck, CircleX, Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { AiHelpButton } from '~/features/support/ai-help';
 import { cn } from '@/lib/utils';
 
 function Row({ ok, children }: { ok: boolean | null; children: React.ReactNode }) {
@@ -79,6 +80,11 @@ export function VpnTestResult({
             </code>
           </details>
         )}
+        <AiHelpButton
+          context={{ area: 'vpn' }}
+          error={[t(`vpn.problem.${code}.title`), result.problemLine].filter(Boolean).join(': ')}
+          className="self-start"
+        />
       </div>
     );
   }
