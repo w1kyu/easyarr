@@ -5,11 +5,15 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { DialogCloseButton } from '@/components/ui/dialog-close-button';
 import { Loading } from '@/components/ui/loading';
 import { cn } from '@/lib/utils';
+import { splitDocRef } from './docs';
 
 // The Markdown renderer is only loaded when someone opens help.
 const DocView = lazy(() => import('./doc-view'));
 
-/** "What's this?" link that opens a docs page in a dialog, without leaving the wizard. */
+/**
+ * "What's this?" link that opens a docs page in a dialog, without leaving the wizard.
+ * `slug` may point at a section: `vpn/README#port-forwarding`.
+ */
 export function WhatsThis({
   slug,
   label,
@@ -21,13 +25,13 @@ export function WhatsThis({
 }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
-  const [current, setCurrent] = useState(slug);
+  const [current, setCurrent] = useState(() => splitDocRef(slug));
   return (
     <>
       <button
         type="button"
         onClick={() => {
-          setCurrent(slug);
+          setCurrent(splitDocRef(slug));
           setOpen(true);
         }}
         className={cn(
@@ -43,7 +47,11 @@ export function WhatsThis({
           <DialogTitle className="sr-only">{t('docs.title')}</DialogTitle>
           <DialogCloseButton className="absolute top-3 right-3 z-10" />
           <Suspense fallback={<Loading />}>
-            <DocView slug={current} onNavigate={setCurrent} />
+            <DocView
+              slug={current.slug}
+              anchor={current.anchor}
+              onNavigate={(s, a) => setCurrent({ slug: s, anchor: a ?? null })}
+            />
           </Suspense>
         </DialogContent>
       </Dialog>

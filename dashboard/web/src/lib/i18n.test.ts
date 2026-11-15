@@ -46,7 +46,9 @@ import { STEP_UI } from '~/features/wizard/steps';
 import en from '~/locales/en.json';
 
 const keys = new Set(Object.keys(en));
-const missing = (list: Iterable<string>) => [...list].filter((k) => !keys.has(k));
+// A plural key (t('x', { count })) exists as x_one / x_other.
+const missing = (list: Iterable<string>) =>
+  [...list].filter((k) => !keys.has(k) && !keys.has(`${k}_other`));
 
 // Our own source (shared + web, not vendored code), to find every literal i18n key we use.
 const sources = {

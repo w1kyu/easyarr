@@ -23,3 +23,8 @@ html {
   min-height: 100%;
   background: #0b0b14;
 }
+
+/* The vendored radius scale skips 16px, which our cards and fields use (rounded-16). */
+@utility rounded-16 {
+  border-radius: 16px;
+}

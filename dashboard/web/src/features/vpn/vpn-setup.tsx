@@ -15,6 +15,7 @@ import { ArrowLeft, BookOpen, ExternalLink, FileUp, Plug } from 'lucide-react';
 import { lazy, Suspense, useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Field } from '~/components/field';
+import { WhatsThis } from '~/features/docs/whats-this';
 import { api, ApiError } from '~/lib/api';
 import { ErrorAlert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -280,9 +281,10 @@ function ProviderSetup({
         >
           {protocols.length > 1 && (
             <div className="flex flex-col gap-1.5">
-              <span className="px-[5px] text-13 font-medium text-white/70">
-                {t('vpn.protocol.label')}
-              </span>
+              <div className="flex items-center justify-between gap-3 px-[5px]">
+                <span className="text-13 font-medium text-white/70">{t('vpn.protocol.label')}</span>
+                <WhatsThis slug="vpn/README#wireguard-or-openvpn" className="text-12" />
+              </div>
               <SegmentedControl
                 value={form.protocol}
                 onValueChange={(p) => set({ protocol: p })}
@@ -339,6 +341,10 @@ function ProviderSetup({
               <p className="text-12 leading-relaxed text-white/55">
                 {t(provider.portForwarding === 'auto' ? 'vpn.pf.autoHint' : 'vpn.pf.staticHint')}
               </p>
+              <WhatsThis
+                slug="vpn/README#port-forwarding-in-plain-words"
+                className="self-start text-12"
+              />
               {form.portForwarding && provider.portForwarding === 'static' && (
                 <Field
                   label={t('vpn.pf.port')}

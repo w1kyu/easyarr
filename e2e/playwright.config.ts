@@ -12,6 +12,9 @@ const external = process.env['E2E_BASE_URL'];
 const port = 3939;
 const FLOWS = ['torrents', 'usenet', 'both'] as const;
 const flowPort = (i: number) => port + 1 + i;
+// pnpm docs:shots: one more fresh dashboard for the guide screenshots (docs-shots.spec.ts).
+const shotsPort = port + 1 + FLOWS.length;
+const shots = !!process.env['DOCS_SHOTS'];
 
 export default defineConfig({
   testDir: '.',
@@ -37,11 +40,20 @@ export default defineConfig({
           metadata: { method },
           use: { ...devices['Desktop Chrome'], baseURL: `http://localhost:${flowPort(i)}` },
         }))),
+    ...(external || !shots
+      ? []
+      : [
+          {
+            name: 'docs-shots',
+            testMatch: 'docs-shots.spec.ts',
+            use: { ...devices['Desktop Chrome'], baseURL: `http://localhost:${shotsPort}` },
+          },
+        ]),
   ],
   ...(external
     ? {}
     : {
-        webServer: [port, ...FLOWS.map((_, i) => flowPort(i))].map((p) => ({
+        webServer: (shots ? [shotsPort] : [port, ...FLOWS.map((_, i) => flowPort(i))]).map((p) => ({
           command: `node e2e/serve.mjs ${p}`,
           cwd: '..',
           url: `http://localhost:${p}/api/health`,

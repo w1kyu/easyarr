@@ -38,6 +38,28 @@ test('"How does it work?" opens the in-app help, and links inside it work', asyn
   await expect(dialog).toBeHidden();
 });
 
+test('Help: search finds a section, opens it there; guides show images and link on', async ({
+  page,
+}) => {
+  await page.goto('/help');
+  await page.getByTestId('docs-search').fill('port forwarding');
+  const results = page.getByTestId('docs-search-results');
+  await results.getByRole('link', { name: /VPN basics › Port forwarding in plain words/ }).click();
+  await expect(page).toHaveURL(/\/help\/vpn\/README#port-forwarding-in-plain-words$/);
+  await expect(page.locator('#port-forwarding-in-plain-words')).toBeInViewport();
+
+  // Screenshots are bundled into the image (docs/images/) and actually load.
+  await page.goto('/help/getting-started');
+  const img = page.getByTestId('doc-view').getByRole('img').first();
+  await img.scrollIntoViewIfNeeded();
+  await expect
+    .poll(() => img.evaluate((el) => (el as { naturalWidth: number }).naturalWidth))
+    .toBeGreaterThan(0);
+  await page.getByTestId('doc-next').click();
+  await expect(page).toHaveURL(/\/help\/how-it-works$/);
+  await expect(page.getByRole('heading', { name: 'How EasyArr works', level: 1 })).toBeVisible();
+});
+
 test('step 1 → 2: system check shows a verdict for every item', async ({ page }) => {
   await page.goto('/setup/welcome');
   await page.getByRole('button', { name: /Start setup/ }).click();
