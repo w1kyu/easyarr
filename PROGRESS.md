@@ -4,10 +4,11 @@
 > Newest session log entries go on top.
 
 ## Current phase
-**Phase 09 — 🟨 built, owner test pending (v0.0.18).** "Get help with AI" (next to every error, on
-Finish, under Help), diagnostics zip, typed redaction everywhere (D-074 – D-076).
-Owner tests of phases 06/07/08 and v0.0.16 are still open too.
-Next prompt: `prompts/10-docs.md` (after the owner's phase 09 test).
+**Phase 10 — 🟨 built, owner test pending (v0.0.19).** Every guide in SPEC §16 written (Getting
+started, FAQ, Tailscale, family accounts, how it works, architecture, release), README, screenshots,
+help search + navigation + section links, Markdown lint + link checks (D-077 – D-081).
+Owner tests of phases 06–09 and v0.0.16 are still open too.
+Next prompt: `prompts/11-release.md` (after the owner's phase 09 + 10 tests).
 
 ## Phase status
 | Phase | Title | Status | Notes |
@@ -22,7 +23,7 @@ Next prompt: `prompts/10-docs.md` (after the owner's phase 09 test).
 | 07 | Dashboard + settings | 🟨 built (owner test pending) | v0.0.12; /api/status, Simple/Advanced, warnings, Settings; e2e for mode toggle + settings change; stack test reads /api/status |
 | 08 | Backup & restore | 🟨 built (owner test pending) | v0.0.17; backuptest green (amd64 + arm64) |
 | 09 | Diagnostics + AI help | 🟨 built (owner test pending) | v0.0.18; redaction unit tests, e2e (prompt + zip after a full first run), stack test (zip with real service logs) |
-| 10 | Documentation | ⬜ todo | |
+| 10 | Documentation | 🟨 built (owner test pending) | v0.0.19; markdownlint + offline link/anchor check in lint, Links workflow; help e2e also on the stack |
 | 11 | Release v0.1.0 | ⬜ todo | |
 
 Legend: ⬜ todo · 🟨 in progress · ✅ done · ⛔ blocked
@@ -73,6 +74,11 @@ Results of SPEC **[VERIFY]** items. Format: `- YYYY-MM-DD — <fact> — <source
 - 2026-11-15 — SABnzbd 5.1.3 keeps recent warnings/errors in memory: `GET /api?mode=warnings&output=json&apikey=…` (full key) → `{"warnings":[{type,text,time,origin}]}`; the log file itself has no parseable API. — https://github.com/sabnzbd/sabnzbd/blob/a647f73426cb70ad60ae7964b96c2d5e939b4727/SABnzbd.py#L137 , `sabnzbd/api.py` `_api_warnings`
 - 2026-11-15 — Jellyfin: `GET /System/Logs` (newest first, `Name`/`DateModified`) and `GET /System/Logs/Log?name=` (text), both `RequiresElevation` (admin token). — https://github.com/jellyfin/jellyfin/blob/2953ed632c9277351483eff04f87a8276390691c/Jellyfin.Api/Controllers/SystemController.cs#L146-L212
 - 2026-11-15 — Browsers only offer `navigator.clipboard` in secure contexts; Umbrel serves apps over plain HTTP on the LAN → the AI help dialog falls back to `execCommand('copy')` (D-075). — https://developer.mozilla.org/en-US/docs/Web/API/Clipboard_API
+- 2026-11-15 — Jellyfin web 12.4 user admin: profile menu → **Dashboard** → **Users** → **Add User** (Name, Password, Library Access "Enable access to all libraries"); user page tabs Profile / Access / Parental Control ("Maximum allowed parental rating") / Password ("New password", "Save Password"); own password on the **Profile** page. — https://github.com/jellyfin/jellyfin-web/blob/0a580ce8df89282dfd120b6d5efb8e106da23bd5/src/apps/dashboard/routes/users/edit.tsx
+- 2026-11-15 — Seerr v3.5.1 defaults: `defaultPermissions: REQUEST` (others' requests wait for approval; admins auto-approve), `newPlexLogin: true` (new Jellyfin users can sign in without an import); UI "Import Jellyfin Users", "Edit", Permissions "Request"/"Auto-Approve", "Save Changes". — https://github.com/seerr-team/seerr/blob/564bfb08b54caa374bddaf820abfd226e5e69151/server/lib/settings/index.ts#L415-L425
+- 2026-11-15 — umbrelOS uninstall removes only `app-data/<id>` (and a moved data root); EasyArr's media/backups in Home stay. — https://github.com/getumbrel/umbrel/blob/c43beed964074d08865d648ca9ac3359826a14ff/packages/umbreld/source/modules/apps/app.ts#L2642
+- 2026-11-15 — Umbrel's Tailscale app runs with `network_mode: host` (tailscale0 on the host), so published ports (39096, 39055, Umbrel UI) answer on the Tailscale IP. — https://github.com/getumbrel/umbrel-apps/blob/f4c4f96a2498035f5778d29cba0a2a83be8c531b/tailscale/docker-compose.yml
+- 2026-11-15 — Servarr `AnalyticsEnabled` defaults to true and isn't written to config.xml until changed (D-081). — https://github.com/Sonarr/Sonarr/blob/cab419ade8ac7fcab5bf80394ee492abd35d5f5a/src/NzbDrone.Core/Configuration/ConfigFileProvider.cs#L227
 - 2026-11-09 — The compose restart policy isn't involved in restores: Servarr restarts in a new process, Jellyfin in-process → `restart: on-failure` stays (SPEC §11 [VERIFY]). (D-071)
 
 ## Open [VERIFY] items
@@ -95,7 +101,6 @@ Copy from SPEC as they get resolved. Highest priority first:
   not yet confirmed with a real account that its key works on every server Gluetun picks. Fallback if not:
   the access-token method from Gluetun's wiki.
 - AirVPN only hands out reserved ports ≥ 2048; EasyArr accepts 1024–65535 (the guide says so).
-- Help links with `#section` open the top of the page (anchors aren't scrolled to yet; phase 10).
 - Settings → VPN doesn't exist yet (phase 07); changing the VPN = reopening wizard step 5 (`/setup/vpn`).
 - Changing any wizard answer later = reopen that step (home → "Review your answers"), then run Finish
   again. Settings arrive in phase 07; "Repair connections" (the old /dev/wiring button) too.
@@ -144,6 +149,32 @@ Copy from SPEC as they get resolved. Highest priority first:
   via slskd/SABnzbd itself, so it would replace Lidarr, not sit on top: re-check once v3 settles.
 
 ## Session log
+### 2026-11-15 (evening) — Phase 10: documentation → v0.0.19 (Claude Code on the Mac)
+- Owner's Umbrel: updated to v0.0.18 through the MCP (Mac needed macOS Local Network permission for
+  T3 Code; ProtonVPN was not the cause).
+- Built: new guides `getting-started`, `faq`, `remote-access-tailscale`; rewritten
+  `family-accounts` (Jellyfin users, parental control, Seerr permissions, labels checked against
+  jellyfin-web v12.4 and Seerr v3.5.1 sources), `how-it-works` (SVG diagram, every app, files),
+  `troubleshooting` additions; README (features, install in 3 steps, hardware, credits + licenses);
+  `docs/dev/architecture.md`, `docs/dev/release.md`, `development.md` updated; NOTICE fixed.
+  In-app help: `docs/nav.json` order (D-077), sticky guide list, previous/next, search, GitHub
+  anchors + scrolling, images from `docs/images/`, inline code styling, "What's this?" deep links
+  to sections (D-078); screenshots from `pnpm docs:shots` (D-080). Checks: markdownlint +
+  `scripts/check-docs.mjs` in `pnpm lint`, Links workflow (lychee, weekly, not gating; D-079).
+  Image workflow now rebuilds on `docs/vpn`, `docs/images`, `nav.json` (was only `docs/*.md`).
+  init turns off Servarr usage statistics unless chosen (D-081). Fixed: missing `rounded-16`
+  utility; Settings showed "done" before Finish was saved (CI flake, 4c2f60e).
+- Verified: 342 unit tests; Playwright 42 passed locally (new Help test: search → section,
+  bundled image loads, next link); fresh clone + frozen install green; CI + Image green on
+  4c2f60e; Links workflow green; stack test green on 3ba1786 (pinned sha-4c2f60e), amd64 + arm64:
+  leak test, wizard e2e incl. the Help test, wiretest, backuptest. Store synced v0.0.19.
+- Owner test (v0.0.19) — update EasyArr in the Umbrel app store:
+  - [ ] Read the README on GitHub as if you'd never heard of EasyArr
+  - [ ] Follow `docs/getting-started.md` without your own knowledge (ideally a friend tries)
+  - [ ] Help (top right): search "port forwarding" → opens the VPN page at that section
+  - [ ] Settings → VPN: the "What's this?" next to Port forwarding opens the right section
+  - [ ] Screenshots show in the guides (getting started, backups, Get help with AI)
+
 ### 2026-11-15 — Phase 09: diagnostics, redaction, "Get help with AI" → v0.0.18 (Claude Code on the Mac)
 - Start: baseline had one red test (a backup test with a date that only worked before
   2026-11-10); fixed first (faf70f9). Owner chose to start phase 09 before testing phase 08.
