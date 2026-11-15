@@ -132,6 +132,16 @@ Copy from SPEC as they get resolved. Highest priority first:
 - umbrelOS 2.0 `folderAccess:` could let users point EasyArr's media folder at an external drive / NAS
   (v2 scope, SPEC §1 non-goals) — much easier than planned.
 - umbrelOS 2.0 `environment:` manifest settings could expose a few safe knobs (e.g. TZ) in Umbrel's app settings.
+- Music requests for family members (owner asked 2026-11-15). Seerr has none yet: its music work
+  lives on the `music` branch (only [#3109](https://github.com/seerr-team/seerr/pull/3109), Lidarr
+  settings, merged 2026-06-08; branch 174 commits behind `develop`; metadata PRs #3110/#3116/#3123/#3124
+  open; author's own estimate in [#2132](https://github.com/seerr-team/seerr/pull/2132): search +
+  Lidarr + Jellyfin "before next summer", then months of testing). **Check at the start of each
+  phase:** `gh api repos/seerr-team/seerr/compare/develop...music` and the release notes; once it
+  ships, wire Lidarr into Jellyseerr (SPEC §10 already says "and Lidarr if supported").
+  Fallbacks if needed sooner: Ombi (stable, Lidarr + Jellyfin login, GPL-2.0, but a second request
+  app); DroppedNeedle (ex-MusicSeerr, AGPL-3.0) dropped Lidarr in v3.0.0 (2026-11-14) and downloads
+  via slskd/SABnzbd itself, so it would replace Lidarr, not sit on top: re-check once v3 settles.
 
 ## Session log
 ### 2026-11-15 — Phase 09: diagnostics, redaction, "Get help with AI" → v0.0.18 (Claude Code on the Mac)
