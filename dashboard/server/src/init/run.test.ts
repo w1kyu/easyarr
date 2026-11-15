@@ -63,6 +63,7 @@ describe('init', () => {
     expect(sonarr).toContain('<UrlBase>/apps/sonarr</UrlBase>');
     expect(sonarr).toContain('<Port>8989</Port>');
     expect(sonarr).toContain(`<ApiKey>${keys['sonarr']}</ApiKey>`);
+    expect(sonarr).toContain('<AnalyticsEnabled>False</AnalyticsEnabled>');
     expect(keys['sonarr']).toMatch(/^[a-f0-9]{32}$/);
     expect(new Set(Object.values(keys)).size).toBe(Object.values(keys).length);
     const qbt = await read('qbittorrent/qBittorrent/qBittorrent.conf');
@@ -109,7 +110,7 @@ describe('init', () => {
     await fs.mkdir(path.join(cfg.appDataDir, 'radarr'), { recursive: true });
     await fs.writeFile(
       path.join(cfg.appDataDir, 'radarr/config.xml'),
-      `<Config>\n  <Port>1234</Port>\n  <ApiKey>${userKey}</ApiKey>\n  <AuthenticationMethod>Forms</AuthenticationMethod>\n  <InstanceName>Movies</InstanceName>\n</Config>\n`,
+      `<Config>\n  <Port>1234</Port>\n  <ApiKey>${userKey}</ApiKey>\n  <AuthenticationMethod>Forms</AuthenticationMethod>\n  <InstanceName>Movies</InstanceName>\n  <AnalyticsEnabled>True</AnalyticsEnabled>\n</Config>\n`,
     );
     await fs.mkdir(path.join(cfg.appDataDir, 'sabnzbd'), { recursive: true });
     await fs.writeFile(
@@ -122,6 +123,7 @@ describe('init', () => {
     expect(radarr).toContain('<Port>7878</Port>'); // owned
     expect(radarr).toContain('<AuthenticationMethod>Forms</AuthenticationMethod>'); // user's choice kept
     expect(radarr).toContain('<InstanceName>Movies</InstanceName>');
+    expect(radarr).toContain('<AnalyticsEnabled>True</AnalyticsEnabled>'); // user turned it on
     expect((await secrets()).apiKeys['radarr']).toBe(userKey);
     const sab = await read('sabnzbd/sabnzbd.ini');
     expect(sab).toContain('host_whitelist = mybox.local, w1kyu-easyarr_vpn_1');

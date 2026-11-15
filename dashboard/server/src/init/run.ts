@@ -135,6 +135,9 @@ export async function runInit(cfg: InitConfig, log: Logger): Promise<InitReport>
     xml.set('Port', String(svc.port));
     xml.set('UrlBase', svc.urlBase ?? '');
     xml.set('BindAddress', '*');
+    // No anonymous usage statistics to the Servarr developers (on by default upstream, D-081).
+    // Only while the key is absent: once the user switches it in the app, their choice stays.
+    if (!xml.has('AnalyticsEnabled')) xml.set('AnalyticsEnabled', 'False');
     // Defaults only on first creation.
     if (raw === undefined) {
       xml.set('AuthenticationMethod', 'External');
