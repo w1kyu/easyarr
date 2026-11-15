@@ -1,0 +1,39 @@
+name: VPN guide is outdated
+description: A VPN provider's setup guide in EasyArr doesn't match their website anymore.
+labels: [docs, vpn]
+body:
+  - type: markdown
+    attributes:
+      value: VPN providers change their websites often. Thanks for telling us! Never paste your VPN key or password here.
+  - type: dropdown
+    id: provider
+    attributes:
+      label: Which provider?
+      options:
+        - Proton VPN
+        - Mullvad
+        - NordVPN
+        - Surfshark
+        - Private Internet Access (PIA)
+        - AirVPN
+        - Other / config file (custom WireGuard or OpenVPN)
+        - Another provider (generic guide)
+    validations:
+      required: true
+  - type: input
+    id: step
+    attributes:
+      label: Which step is wrong?
+      placeholder: Step 3 says "Downloads → WireGuard", but the menu is now called "Manual setup".
+    validations:
+      required: true
+  - type: textarea
+    id: now
+    attributes:
+      label: What does the provider's website show now?
+      description: A screenshot helps a lot (hide your account details).
+  - type: input
+    id: checked
+    attributes:
+      label: When did you check?
+      placeholder: '2026-11-15'

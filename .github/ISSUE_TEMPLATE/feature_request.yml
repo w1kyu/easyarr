@@ -1,0 +1,22 @@
+name: Feature request
+description: An idea that would make EasyArr better.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What would you like to do?
+      description: Describe what you're trying to do, not only the solution. That helps find the simplest way.
+      placeholder: I'd like my family to get a message when a movie they asked for is ready.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: How could EasyArr help?
+      placeholder: A setting under Settings → … that …
+  - type: textarea
+    id: else
+    attributes:
+      label: Anything else?
+      description: Screenshots, links, how other apps do it.

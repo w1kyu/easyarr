@@ -14,11 +14,13 @@ lines from the apps' logs, so the AI can give an answer that fits your Umbrel.
 1. Press **Get help with AI**. You find it:
    - next to every error in the setup wizard,
    - on the Finish step when connecting the apps didn't work,
-   - in **Help** (the **?** on the home screen, or **Settings** → **About** → **Help**).
+   - in **Help**, at the top right of every EasyArr page,
+   - next to problems on the home screen.
 2. Type in a few words under **What I was trying to do**, for example "Download a movie" or
    "Connect the VPN".
 3. Read the preview. That is exactly what gets copied, nothing else.
-4. Press **Copy and open ChatGPT** (or Claude, Gemini, Le Chat), or just **Copy**.
+4. Press **Copy**, or one of the chat buttons (ChatGPT, Claude, Gemini, Le Chat): they copy the
+   text and open that chat in a new tab.
 5. Paste it into the chat (Ctrl+V, or ⌘+V on a Mac) and send it.
 
 The AI may ask you to try something. If it suggests terminal commands, ask it for a way that works
@@ -46,7 +48,7 @@ preview instead of risking it. Please [report that](#open-an-issue-on-github).
 The diagnostics file is a `.zip` with the same information in more detail. It's useful for a
 GitHub issue or for someone who helps you.
 
-1. Open **Help** and press **Download diagnostics** (also in the **Get help with AI** window).
+1. Open **Help** (top right) and press **Download diagnostics** (also in the **Get help with AI** window).
 2. The file is called something like `easyarr-diagnostics-2026-11-15-1030.zip`.
 
 Inside are:

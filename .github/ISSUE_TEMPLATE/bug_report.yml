@@ -1,0 +1,65 @@
+name: Bug report
+description: Something in EasyArr doesn't work as it should.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time! Issues are **public**: never paste a password, API key or VPN key here.
+        EasyArr's diagnostics file and AI prompt already hide them for you.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+      placeholder: I pressed "Connect everything" and the Radarr line stayed red with "Radarr isn't answering yet".
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to make it happen again
+      placeholder: |
+        1. Open EasyArr → Settings → VPN
+        2. …
+  - type: input
+    id: version
+    attributes:
+      label: EasyArr version
+      description: Shown at the bottom of every EasyArr page.
+      placeholder: '0.0.17'
+    validations:
+      required: true
+  - type: dropdown
+    id: hardware
+    attributes:
+      label: Hardware
+      options:
+        - Umbrel Home
+        - Raspberry Pi 5
+        - Raspberry Pi 4
+        - Other PC / mini PC (x86)
+        - Other ARM device
+        - I don't know
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: |
+        In EasyArr, open **Help** (top right) → **Download diagnostics** and drag the .zip file here.
+        Or press **Get help with AI** and paste the text from the preview.
+        Please have a quick look first: passwords, keys, usernames, your IP and server names should show as `[REDACTED:…]`.
+      placeholder: Drag the easyarr-diagnostics-….zip here, or paste the AI prompt.
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before you send it
+      options:
+        - label: I looked at the [troubleshooting page](https://github.com/w1kyu/easyarr/blob/main/docs/troubleshooting.md).
+          required: true
+        - label: There is no password, API key or VPN key in this issue.
+          required: true

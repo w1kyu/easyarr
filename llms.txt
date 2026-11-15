@@ -1,0 +1,1727 @@
+# EasyArr
+
+> EasyArr is a free, open-source app for umbrelOS (a home server operating system). It bundles
+> a media automation stack — Jellyfin (watch), Jellyseerr (request), Sonarr/Radarr/Lidarr
+> (TV, movies, music), Prowlarr (search sites), qBittorrent and/or SABnzbd (downloads), Bazarr
+> (subtitles), Recyclarr, Unpackerr, Cleanuparr and FlareSolverr — behind a VPN with a kill
+> switch (Gluetun), and connects everything automatically through a setup wizard and a dashboard.
+
+Notes for AI assistants helping an EasyArr user:
+- Users are usually beginners. Answer step by step in plain words.
+- EasyArr is meant to be used from its dashboard only. Avoid terminal commands unless there is
+  no other way; prefer EasyArr settings ("Settings → …", "Repair connections").
+- The apps run as containers of one Umbrel app (w1kyu-easyarr). Their web UIs open from the
+  EasyArr dashboard (http://umbrel.local:39000, apps under /apps/<name>/); Jellyfin is on port
+  39096, Jellyseerr on 39055.
+- Text like [REDACTED:password] in a user's message was hidden on purpose by EasyArr.
+- Source code and issues: https://github.com/w1kyu/easyarr
+
+This file contains every user guide, generated from docs/ by scripts/llms-txt.mjs.
+
+---
+
+<!-- source: https://github.com/w1kyu/easyarr/blob/main/docs/how-it-works.md -->
+
+# How EasyArr works
+
+EasyArr puts a complete home media setup on your Umbrel and connects all the parts for you.
+
+## The idea in one picture
+
+1. **You ask for something** — a movie, a show, an album — in **Jellyseerr**.
+2. **EasyArr's helpers look for it**: Sonarr (TV), Radarr (movies) and Lidarr (music) ask your
+   search sources (**Prowlarr**) where to get it.
+3. **It gets downloaded** with qBittorrent ([torrents](https://github.com/w1kyu/easyarr/blob/main/docs/torrents-101.md)) and/or SABnzbd
+   ([Usenet](https://github.com/w1kyu/easyarr/blob/main/docs/usenet-101.md)) — always through a **VPN**.
+4. **It gets sorted** into your library, with nice names, posters and subtitles (Bazarr).
+5. **You watch it** in **Jellyfin**, on your TV, phone or browser.
+
+## The apps inside
+
+| App                    | What it does for you                         |
+| ---------------------- | -------------------------------------------- |
+| Jellyfin               | Watch movies, shows and music                |
+| Jellyseerr             | Request new movies and shows                 |
+| Sonarr / Radarr / Lidarr | Find and organise TV, movies and music     |
+| Prowlarr               | Manages your search sources (indexers)       |
+| qBittorrent / SABnzbd  | Download torrents / from Usenet              |
+| Bazarr                 | Adds subtitles                               |
+| Recyclarr              | Keeps quality settings up to date            |
+| Unpackerr / Cleanuparr | Unpack downloads and remove stuck ones       |
+| FlareSolverr           | Helps with search sites that block bots      |
+
+You don't have to learn any of them. The setup asks a few simple questions and wires them
+together. If you're curious, you can still open every app from EasyArr's dashboard.
+
+## Safety
+
+- **VPN with a kill switch.** All downloading goes through a VPN. If the VPN drops, downloads
+  stop instead of using your normal connection.
+- **Your Umbrel login protects EasyArr.** Jellyfin and Jellyseerr have their own login (the
+  account you create during setup).
+
+## Be responsible
+
+Only download content you have the right to download and share. Laws differ between countries
+— you are responsible for following yours.
+
+---
+
+<!-- source: https://github.com/w1kyu/easyarr/blob/main/docs/system-requirements.md -->
+
+# System requirements
+
+EasyArr checks your Umbrel during setup. Here's what the results mean.
+
+## Processor (architecture)
+
+EasyArr runs on the two kinds of processors Umbrel supports:
+
+- **amd64** — Intel and AMD computers (Umbrel Home, most mini PCs and old laptops).
+- **arm64** — for example a Raspberry Pi 5.
+
+## Memory (RAM)
+
+EasyArr runs about a dozen apps at the same time.
+
+| RAM          | Result                                                            |
+| ------------ | ----------------------------------------------------------------- |
+| 8 GB or more | ✅ Good                                                           |
+| 4–8 GB       | ⚠️ Works, but other Umbrel apps may get slower                    |
+| Below 4 GB   | ❌ Not enough. You can continue, but expect apps to crash or stall |
+
+## Free disk space
+
+Movies and shows are big. A movie is often 2–10 GB, a TV season 5–30 GB.
+With less than **50 GB** free, EasyArr warns you. Downloads stop when the disk is full.
+
+All your media is stored in **Files → Home → EasyArr** on your Umbrel.
+
+## Graphics (GPU)
+
+Jellyfin sometimes has to convert a video so it plays on a phone or TV (**transcoding**).
+A graphics chip (for example Intel Quick Sync) does that quickly.
+
+- **Found** ✅ — Jellyfin can use it for fast transcoding.
+- **Not found** ⚠️ — Jellyfin still works. Converting high-quality video will be slow, so pick
+  devices that can play your files directly when you can.
+
+Umbrel gives EasyArr access to the graphics chip automatically when your computer has one.
+
+---
+
+<!-- source: https://github.com/w1kyu/easyarr/blob/main/docs/torrents-101.md -->
+
+# Torrents 101
+
+Torrents are one of two ways EasyArr can download things. The other one is
+[Usenet](https://github.com/w1kyu/easyarr/blob/main/docs/usenet-101.md). You can use both.
+
+## How torrents work
+
+1. A file is split into many small pieces.
+2. People who have the file share those pieces with each other.
+3. Your download client (qBittorrent) collects the pieces from many people at once.
+4. While you download, you also share pieces with others. That's called **seeding**.
+
+Nobody runs a central server. That's why torrents cost nothing.
+
+## Where torrents come from
+
+Websites that list torrents are called **indexers** or **trackers**. EasyArr asks them for you
+through Prowlarr. You add the indexers yourself later in the setup. EasyArr doesn't recommend
+any specific site.
+
+- **Public trackers** are open to everyone. They are easy to start with, but files are
+  sometimes fake or slow.
+- **Private trackers** need an invite. They are usually faster and cleaner, but have rules
+  (for example: share back as much as you download).
+
+## Pros and cons
+
+| 👍 Good                              | 👎 Not so good                                       |
+| ------------------------------------ | ---------------------------------------------------- |
+| Free                                 | Speed depends on how many people share a file        |
+| Huge choice, also old or rare things | Old or rare things can take a long time              |
+| No account needed to start           | Everyone sharing a file can see your IP address      |
+|                                      | Needs a VPN (EasyArr makes that the default, see below) |
+
+## Why EasyArr needs a VPN for torrents
+
+When you share a file, everyone else sharing it can see your internet address (IP).
+A **VPN** hides it. EasyArr sends all download traffic through a VPN and blocks it completely
+when the VPN is down (a **kill switch**). You set the VPN up in the next part of the setup.
+
+A VPN with **port forwarding** makes torrents faster, because other people can connect to you
+directly.
+
+## Be responsible
+
+Only download content you have the right to download and share. Laws differ between countries
+— you are responsible for following yours.
+
+---
+
+<!-- source: https://github.com/w1kyu/easyarr/blob/main/docs/usenet-101.md -->
+
+# Usenet 101
+
+Usenet is one of two ways EasyArr can download things. The other one is
+[torrents](https://github.com/w1kyu/easyarr/blob/main/docs/torrents-101.md). You can use both.
+
+## How Usenet works
+
+Usenet is a very old network of servers (from 1980) that store posted files. You don't share
+anything with other people — you simply download from a server, like from a normal website.
+
+To use it you need two things:
+
+1. **A Usenet provider** (paid). That's the server you download from. You get a username,
+   a password and a server address. Prices are usually a few euros/dollars per month.
+2. **An indexer** (often free or a small yearly fee). That's a search engine that tells EasyArr
+   *what* to download from the provider. You get a website address and an **API key**.
+
+SABnzbd is the app in EasyArr that does the actual downloading. You enter both in the setup
+(step 6), and EasyArr connects everything for you.
+
+## Setting it up in EasyArr
+
+### Your provider
+
+1. Pick your provider from the list. EasyArr fills in the **server address**, the **port** and
+   the number of **connections** for you. (The list just saves typing — it isn't a
+   recommendation.) Not in the list? Choose *Other provider* and copy the server address from
+   your provider's website (look for "setup", "server settings" or "newsreader").
+2. Enter the **username** and **password** of your provider account. Some providers use your
+   e-mail address as the username, others give you a separate one — the provider's welcome
+   e-mail says which.
+3. Keep **SSL** on. It encrypts the connection, so your internet provider can't see what you
+   download. The SSL port is almost always **563**.
+4. **Connections** is how many parts SABnzbd downloads at the same time. Use what your plan
+   allows (the preset does). Too many and the provider refuses you; fewer is just slower.
+5. Press **Test this provider**. "It works" means SABnzbd could sign in.
+
+Got a second provider as a backup (a "block account")? Press **Add another provider**.
+SABnzbd uses it when the first one is missing something.
+
+### Your indexer
+
+1. Pick your indexer from the list (it comes from Prowlarr) or choose *Other indexer* and enter
+   its address, for example `https://indexer.example`.
+2. Copy your **API key** from the indexer's website. It's usually on your profile page or a page
+   called "API" or "RSS". It's a long code that lets EasyArr search on your behalf.
+3. Press **Test this indexer**.
+
+You can add several indexers — more indexers find more.
+
+### Tests fail?
+
+| What EasyArr says | What to do |
+| --- | --- |
+| The username, password or API key was refused | Copy it again from your account. Watch out for spaces at the start or end. |
+| Couldn't reach this address | Check the server address for typos. Only the name, like `news.example.com` — no `https://`. |
+| No answer in time | Check the port (563 with SSL). Some providers also offer 443. |
+| Your VPN isn't connected | Tests and downloads go through the VPN. Set it up in step 5 first. |
+
+Passwords and API keys are stored only on your Umbrel. EasyArr never shows them again — leave
+the field empty to keep the saved one.
+
+## Pros and cons
+
+| 👍 Good                                             | 👎 Not so good                                 |
+| --------------------------------------------------- | ---------------------------------------------- |
+| Very fast — often as fast as your internet line     | Costs money (provider)                         |
+| You don't share anything with others                | You need two accounts (provider + indexer)     |
+| Your IP address isn't visible to other people       | Very old or rare things may be missing          |
+| Reliable: no waiting for other people to come online | A little more to set up at the start          |
+
+## Torrents or Usenet?
+
+- **Just trying things out?** Start with **torrents**. They cost nothing.
+- **Want fast and reliable downloads, and don't mind paying a little?** Choose **Usenet**.
+- **Want the best of both?** Choose **both**. EasyArr then searches both and takes whichever
+  has what you asked for.
+
+You can change your choice later in Settings.
+
+## Be responsible
+
+Only download content you have the right to download. Laws differ between countries — you are
+responsible for following yours.
+
+---
+
+<!-- source: https://github.com/w1kyu/easyarr/blob/main/docs/indexers.md -->
+
+# Adding search sites (indexers) in Prowlarr
+
+EasyArr finds torrents through **Prowlarr**. Prowlarr asks the search sites you choose, and shares
+them with Sonarr (shows), Radarr (movies) and Lidarr (music) by itself — you add each site only
+once, in Prowlarr.
+
+EasyArr doesn't choose, rank or recommend sites. Which sites you use — and what you download —
+is up to you. Only download content you have the right to download and share.
+
+**Needs the VPN:** Prowlarr checks every site when you add it, through the VPN. If you skipped the
+VPN, set it up first (setup step 5) or add your sites later.
+
+## Step by step
+
+1. In the setup, press **Open Prowlarr**. Prowlarr opens in a new tab — you're already signed in.
+2. On the **Indexers** page, press **Add Indexer** (or **Add New Indexer** when the list is still
+   empty).
+3. A long list of sites appears. Type the name of a site you use into the search box, or narrow
+   the list with the filters:
+   - **Protocol**: `torrent` for torrent sites.
+   - **Privacy**: **Public** sites are open to everyone; **Private** and **Semi-Private** sites
+     need an account (often by invite).
+   - **Language**: sites in your language.
+4. Click the site. A form opens.
+   - **Public site**: usually nothing to fill in.
+   - **Private site**: enter what the form asks for — usually your **Username** and **Password**,
+     an **API Key**, or a **Cookie** from that site. The site's own help pages say where to find it.
+5. Press **Test**. A green check means Prowlarr can reach the site.
+6. Press **Save**.
+7. Want more? Add another one the same way. Two or three sites are a good start.
+8. Come back to EasyArr. It notices the new sites by itself (or press **Check again**).
+
+That's it: Prowlarr hands the sites to Sonarr, Radarr and Lidarr within a minute.
+
+## "Blocked by CloudFlare Protection"
+
+Some sites sit behind Cloudflare's bot check. Prowlarr then says
+*"Unable to access …, blocked by CloudFlare Protection."* EasyArr includes **FlareSolverr**,
+which solves that check for Prowlarr:
+
+1. In the site's form, find **Tags**.
+2. Type `flaresolverr` and pick it from the list.
+3. Press **Test** again, then **Save**.
+
+Only sites with that tag go through FlareSolverr (it's slower, so not all of them do).
+
+## Something doesn't work?
+
+| Prowlarr says                              | What to do                                                                 |
+| ------------------------------------------ | -------------------------------------------------------------------------- |
+| "Unable to connect" or a time-out          | Check that the VPN is connected (EasyArr home screen). Try again later — sites go down sometimes. |
+| "blocked by CloudFlare Protection"         | Add the `flaresolverr` tag (see above).                                   |
+| Login / API key / cookie refused            | Copy it again from the site. Cookies expire — get a fresh one.            |
+| The site isn't in the list                  | Prowlarr only lists sites it supports. Pick another one.                  |
+
+## Usenet indexers
+
+Using Usenet? You enter your Usenet indexers in EasyArr's setup (step 6) instead, and EasyArr adds
+them to Prowlarr for you. See [Usenet 101](https://github.com/w1kyu/easyarr/blob/main/docs/usenet-101.md).
+
+---
+
+<!-- source: https://github.com/w1kyu/easyarr/blob/main/docs/backup-restore.md -->
+
+# Backups: keep your setup safe
+
+An EasyArr backup holds **your setup, not your movies**. If your Umbrel breaks, or you reinstall
+EasyArr, a backup brings everything back in a few minutes: your answers from the setup, your
+account, your VPN, the connections between the apps, and what Sonarr, Radarr, Lidarr, Prowlarr
+and Jellyfin remember.
+
+## What's in a backup
+
+| Comes back exactly as it was | Set up again from your answers | Never in a backup |
+|---|---|---|
+| Your answers, account and VPN settings | qBittorrent | Your movies, shows and music |
+| Sonarr, Radarr, Lidarr: your shows, movies and artists, history, settings | SABnzbd | Downloads that aren't finished |
+| Prowlarr: your search sites | Bazarr | |
+| Jellyfin: users, what you watched, libraries, settings | Jellyseerr (past requests are not kept) | |
+| | Cleanuparr, Recyclarr, Unpackerr | |
+
+"Set up again" means EasyArr connects those apps the same way the setup did. Changes you made by
+hand inside them are not kept.
+
+Your media files stay in **Files → EasyArr → media** on your Umbrel. They are not touched by a
+backup or a restore. To keep a copy of them, copy that folder to another drive.
+
+## Download a backup
+
+1. Open EasyArr → **Settings** → **Backups**.
+2. Leave **Protect with a password** on and pick a password. Write it down somewhere safe:
+   without it, the backup can't be opened, not even by EasyArr.
+3. Press **Download backup**. It takes about a minute: each app makes its own backup first.
+4. Keep the file (it ends in `.easyarr`) somewhere other than your Umbrel, for example on your
+   computer or a USB stick.
+
+Why a password? The backup contains your VPN key and your passwords. With a password, the file is
+encrypted (AES-256), so anyone who finds it can't read them.
+
+## Automatic backups
+
+EasyArr makes a backup every day at 04:00 (your time) and keeps the newest 7. You can change the
+time and how many to keep in **Settings → Backups**, or turn them off.
+
+Automatic backups stay on your Umbrel, without a password, in **Files → EasyArr → backups**. That
+protects you from mistakes and broken apps, but not from a broken Umbrel. To keep a copy somewhere
+else:
+
+1. Open **Files** on your Umbrel → **EasyArr** → **backups**.
+2. Select the newest file → **Download**.
+3. Store it somewhere other than your Umbrel.
+
+Or download a password-protected backup from **Settings → Backups** (above).
+
+## Restore a backup
+
+You can restore at any time: from the first setup screen (**Restore from backup**) after a fresh
+install, or later from **Settings → Backups**.
+
+1. Press **Restore from backup** and choose your `.easyarr` file. (An automatic backup: press
+   **Restore** next to it in **Settings → Backups**.)
+2. If the backup has a password, enter it.
+3. EasyArr shows what's in the backup. Check it, then press **Restore this backup**.
+4. Keep the page open. You'll see each step: the apps restart while their data comes back, then
+   EasyArr tests the VPN and connects all apps again. This takes a few minutes.
+5. When it says **Your setup is back**, you're done.
+
+Restoring replaces EasyArr's current settings with the ones in the backup.
+
+### If something didn't work
+
+- **"That password doesn't open this backup"**: check the password (upper and lower case count).
+- **"This backup file is damaged"**: the file was cut off or changed, for example by an
+  incomplete download. Try another copy.
+- **"Made by a newer version of EasyArr"**: update EasyArr in the Umbrel App Store first.
+- **An app couldn't take its own backup**: EasyArr set it up again from your answers instead.
+  It works, but its history from the backup is missing.
+- **The VPN didn't connect**: open **Settings → VPN** and test it. Your VPN account may have
+  changed since the backup was made.
+- **Some connections need attention**: open **Settings → Advanced** → **Repair connections**.
+
+---
+
+<!-- source: https://github.com/w1kyu/easyarr/blob/main/docs/family-accounts.md -->
+
+# Family accounts
+
+The account you create during setup is **your** account. It's the admin account for:
+
+- **Jellyfin** — where you watch movies, shows and music.
+- **Jellyseerr** — where you request new things (it logs in with your Jellyfin account).
+
+The other apps inside EasyArr don't need a login of their own: they are protected by your
+Umbrel login.
+
+## Accounts for family and friends
+
+Everyone in your home can get their own Jellyfin account. Then everybody has their own
+"continue watching" list, and you can choose what each person may watch or request.
+
+You create those accounts in Jellyfin after the setup is finished. A step-by-step guide will
+appear here in a later version of EasyArr.
+
+## Forgot your password?
+
+You can set a new one in EasyArr's Settings (coming in a later version).
+
+---
+
+<!-- source: https://github.com/w1kyu/easyarr/blob/main/docs/quality-presets.md -->
+
+# Quality presets
+
+In the setup's "What do you want?" step you pick one of three presets. It decides which versions
+EasyArr looks for and how much disk space your library takes. You can switch later; files you
+already have stay as they are.
+
+| Preset | Movies and shows | Music | Roughly per movie | per hour of TV | per album |
+| --- | --- | --- | --- | --- | --- |
+| **Best quality** | 4K (2160p) from streaming services when it exists, otherwise 1080p | Lossless (FLAC) | 15–30 GB | 4–12 GB | 300–600 MB |
+| **Balanced** (default) | 1080p from Blu-ray or streaming services | High-quality MP3/AAC, upgraded to lossless when available | 6–15 GB | 1.5–4 GB | 100–600 MB |
+| **Save space** | 1080p, preferring smaller files | High-quality MP3/AAC | 3–8 GB | 1–2 GB | 80–150 MB |
+
+Sizes are rough averages — a three-hour film is bigger than a short one, and animation is
+usually smaller.
+
+## Which one should I pick?
+
+- **Balanced** suits most people: sharp on a big TV, and a 4 TB disk holds a few hundred movies.
+- **Best quality** if you have a 4K TV and plenty of storage. Not every movie or show exists
+  in 4K — then EasyArr takes 1080p, so nothing stays missing.
+- **Save space** for phones, tablets, laptops or a small disk.
+
+Your Umbrel's home screen and Settings show how much space is free.
+
+## What EasyArr sets up
+
+- **Shows and movies:** EasyArr uses [Recyclarr](https://recyclarr.dev) to create a quality
+  profile in Sonarr and Radarr from the [TRaSH guides](https://trash-guides.info) — a community
+  guide to good releases. The profile is called **"EasyArr (Best quality)"**, **"EasyArr
+  (Balanced)"** or **"EasyArr (Save space)"**.
+  - Best quality: TRaSH profiles *WEB-2160p* (shows) and *WEBDL 2160p* (movies), both with a
+    1080p fallback.
+  - Balanced: *WEB-1080p* (shows) and *HD Bluray + WEB* (movies).
+  - Save space: *WEB-1080p* (shows) and *WEB 1080p* (movies), with sizes leaning to the small end.
+- **Two changes to the TRaSH profiles:**
+  - Releases from groups the guide calls low quality (for example YTS) aren't blocked. They're a
+    last resort: EasyArr takes one only when nothing better exists at the same resolution, and
+    replaces it automatically when a better version shows up. On public torrent sites they're often
+    the only releases there are, and without them your request would just stay "Missing".
+  - Balanced movies: 1080p from Blu-ray and from streaming services count as the same quality, so
+    the release's score decides. Otherwise a low-quality "Blu-ray" would beat a good streaming
+    release.
+- **Music:** EasyArr creates its own Lidarr profile with the same name.
+
+## Languages
+
+In the setup you pick two lists, each best first:
+
+- **Audio** (what you hear), for example 1. German, 2. Original language, 3. English. "Original
+  language" means the language the film or show was made in.
+- **Subtitles** (what you read), for example 1. German, 2. English. The list may be empty.
+
+Any language can be marked **Must have**:
+
+- **Audio must-haves:** a file needs at least one of them. If none of them is available, EasyArr
+  doesn't download anything else without asking you. Without must-haves any language is fine and
+  the order only says what you prefer.
+- **Subtitle must-haves:** downloads don't wait for subtitles. Bazarr keeps looking, and the home
+  screen shows which movies and episodes are still missing them.
+
+What each app does with this:
+
+- **Sonarr and Radarr:** EasyArr adds its own "EasyArr – Language: …" rules. A release in your first
+  audio language scores highest, the next one a bit less, and so on. Quality still comes first: a
+  1080p release in your second language beats a 720p one in your first. When a better-ranked language
+  shows up at the same quality, it replaces the file automatically.
+- **Bazarr:** looks for subtitles in your subtitle languages, in that order.
+- **Jellyfin:** plays your first audio language when a file has several, shows your first subtitle
+  language when the audio is in another language, and uses that language for titles and descriptions.
+- **Request page (Jellyseerr):** has no language setting of its own. Requests use the EasyArr
+  profiles above, so they follow your languages too.
+
+If you installed EasyArr before this, your lists now read: audio "Original language, then <the
+language you chose>", subtitles "<the language you chose>", nothing marked as must-have. Change them
+in **Settings → Libraries & quality**.
+
+## Whole seasons and trying again
+
+- **Whole seasons:** when you ask for a show or a season that's already finished, Sonarr searches
+  season by season, and EasyArr's profile gives a whole-season pack a bonus over single episodes.
+  Seasons that are still airing come episode by episode. A season pack alone never makes EasyArr
+  download episodes you already have again.
+- **Trying again:** if nothing was found when you asked for something, EasyArr asks Sonarr and
+  Radarr to search again every 6 hours, a few items at a time so your search sites don't block you.
+  Change how often (or switch it off) in **Settings → Advanced**. It pauses while the VPN is down
+  or every search site is unreachable.
+
+## When something doesn't arrive
+
+If a movie or episode you asked for still hasn't started downloading after about 12 hours, EasyArr
+asks Sonarr or Radarr why and shows it under **Needs your OK** on the home screen, in plain words,
+with a button where there's a way out:
+
+- Only available in a language you didn't mark as a must-have → **Download in English** (or
+  whichever language exists).
+- Only a lower quality exists → **Accept 720p** (cinema recordings are never offered).
+- Every version failed before → **Try the best one again**.
+- Nothing found, or nobody is sharing it → **Search now** (EasyArr also keeps looking by itself).
+- A download got stuck or couldn't be added to your library → **Try another version**.
+- Your request didn't reach Sonarr or Radarr → **Send it again**.
+
+Nothing switches to another language or quality unless you click. If you'd rather not be asked,
+turn on **Settings → Advanced → Accept alternatives automatically**: EasyArr then takes the best
+other version itself and tells you on the home screen. Problems with the whole setup (VPN down,
+search sites unreachable, disk full, an app not answering) show in the warnings at the top instead.
+
+## Want to fine-tune?
+
+EasyArr owns the "EasyArr (…)" profiles and resets them when it updates them. To customise, open
+Sonarr or Radarr → **Settings → Profiles**, clone the EasyArr profile, edit the copy and use that
+one instead.
+
+---
+
+<!-- source: https://github.com/w1kyu/easyarr/blob/main/docs/two-jellyfins.md -->
+
+# Two Jellyfins on one Umbrel
+
+EasyArr brings its own Jellyfin (port **39096**). If the **Jellyfin app from the Umbrel App Store**
+is installed too, you have two separate media servers:
+
+- each has its own users, libraries and watch history;
+- EasyArr's downloads only show up in **EasyArr's** Jellyfin;
+- both use the processor and the disk, which slows things down when they scan or play.
+
+## What to do
+
+Most people only need one. If you don't use the other Jellyfin for anything else:
+
+1. Open the Umbrel App Store → **Jellyfin** → **Uninstall**.
+2. On your TV, phone or tablet, connect the Jellyfin app to `http://umbrel.local:39096`
+   (EasyArr's Jellyfin) and sign in with your EasyArr account.
+
+If you want to keep both, that's fine too. EasyArr keeps working. Just remember which one has
+which movies, and use port **39096** for the ones EasyArr downloads.
+
+The warning on the EasyArr home screen goes away a few minutes after the other app is uninstalled.
+
+---
+
+<!-- source: https://github.com/w1kyu/easyarr/blob/main/docs/vpn/README.md -->
+
+# VPN basics
+
+_Last checked: 31 October 2026_
+
+EasyArr only downloads through a **VPN**. This page explains what that means, why it matters, and
+how to choose a provider. Each provider has its own step-by-step guide (links below).
+
+## What is a VPN?
+
+Normally, every website and every person you exchange data with sees your **IP address**. That's
+the internet address of your home. Your internet provider can see what you connect to.
+
+A **VPN** (virtual private network) is a service you pay for (a few euros/dollars per month).
+It creates a locked tunnel from your Umbrel to one of the VPN's servers. Your traffic leaves the
+internet from **there**, not from your home. So:
+
+- other people see the **VPN server's address**, not yours,
+- your internet provider only sees that you talk to a VPN — not what you download.
+
+## Why EasyArr needs one
+
+With [torrents](https://github.com/w1kyu/easyarr/blob/main/docs/torrents-101.md), everyone who shares the same file can see the address of
+everyone else. Copyright companies watch torrents and collect these addresses. Without a VPN,
+that would be your home address — and your internet provider could send you a letter or a fine.
+
+With [Usenet](https://github.com/w1kyu/easyarr/blob/main/docs/usenet-101.md), nobody else sees you, but your internet provider still sees what
+you download. A VPN hides that too.
+
+That's why EasyArr sends **all** download traffic through the VPN: Sonarr, Radarr, Lidarr,
+Prowlarr, qBittorrent and SABnzbd. Jellyfin and Jellyseerr (watching and requesting) don't use the
+VPN, so streaming at home stays fast.
+
+## The kill switch
+
+A VPN connection can drop — for example when the VPN server restarts. Many apps then quietly carry
+on over your normal connection. EasyArr doesn't.
+
+The **kill switch** blocks **all** internet traffic of the download apps whenever the VPN isn't
+connected. Downloads simply pause, and they continue by themselves once the VPN is back. Your home
+address is never used for downloading, not even for a second.
+
+## "Your home IP is hidden"
+
+After you connect, EasyArr runs a **connection test** and shows:
+
+- **The VPN's address and country** — that's where your downloads appear to come from.
+- **"Your home IP is hidden"** — EasyArr also looks up your real home address (outside the VPN)
+  and compares the two. If they're different, the VPN is protecting you. If they're the same,
+  EasyArr warns you and keeps downloads blocked.
+- **Port forwarding** — on or off, and which port (see below).
+
+Sometimes EasyArr can't look up your home address (that check needs the internet outside the VPN).
+It then says so. The VPN itself is still connected and the kill switch still works.
+
+## Port forwarding in plain words
+
+With a VPN, other people can't start a connection **to** you — only you can connect to them.
+For torrents, that means you can only exchange data with people who accept incoming connections.
+You find fewer people to share with, and downloads are slower. Rare files may not finish at all.
+
+**Port forwarding** opens one "door" (a **port**) on the VPN server that leads to you. Now other
+people can connect to you too: more people to share with, faster torrents, better ratios on
+private trackers.
+
+- **Automatic:** some providers hand out a port when you connect. EasyArr picks it up and sets it
+  in qBittorrent for you.
+- **Reserved:** with AirVPN you reserve a port in your account once and enter it in EasyArr.
+  EasyArr sets it in qBittorrent.
+- **Usenet doesn't need port forwarding at all.** If you only use Usenet, any provider is fine.
+
+Without port forwarding, torrents still work — just slower.
+
+## Which provider?
+
+This isn't a ranking. Every provider below works with EasyArr. If you use torrents, port
+forwarding is the one feature that really makes a difference.
+
+| Provider                      | Port forwarding                          | Guide                           |
+| ----------------------------- | ---------------------------------------- | ------------------------------- |
+| Proton VPN                    | Yes, automatic (paid plans only)         | [Proton VPN](https://github.com/w1kyu/easyarr/blob/main/docs/vpn/protonvpn.md)      |
+| Private Internet Access (PIA) | Yes, automatic                           | [PIA](https://github.com/w1kyu/easyarr/blob/main/docs/vpn/pia.md)                   |
+| AirVPN                        | Yes, a port you reserve yourself         | [AirVPN](https://github.com/w1kyu/easyarr/blob/main/docs/vpn/airvpn.md)             |
+| PrivateVPN                    | Yes, automatic                           | [Other providers](https://github.com/w1kyu/easyarr/blob/main/docs/vpn/generic.md)   |
+| Perfect Privacy               | Yes, automatic                           | [Other providers](https://github.com/w1kyu/easyarr/blob/main/docs/vpn/generic.md)   |
+| Mullvad                       | No                                       | [Mullvad](https://github.com/w1kyu/easyarr/blob/main/docs/vpn/mullvad.md)           |
+| NordVPN                       | No                                       | [NordVPN](https://github.com/w1kyu/easyarr/blob/main/docs/vpn/nordvpn.md)           |
+| Surfshark                     | No                                       | [Surfshark](https://github.com/w1kyu/easyarr/blob/main/docs/vpn/surfshark.md)       |
+| Other providers in the list   | No                                       | [Other providers](https://github.com/w1kyu/easyarr/blob/main/docs/vpn/generic.md)   |
+| Not in the list               | Only a fixed port your provider gave you | [Custom config file](https://github.com/w1kyu/easyarr/blob/main/docs/vpn/custom.md) |
+
+Already have a VPN? Use the one you have. Prices, server locations and features change often —
+check the provider's website before you buy.
+
+## WireGuard or OpenVPN?
+
+These are two ways to build the VPN tunnel. Some providers offer both, some only one. If you can
+choose, pick **WireGuard**: it's faster, connects in seconds, and usually needs just one key
+instead of a username and password. **OpenVPN** is older and works everywhere; it's the fallback
+when your provider has no WireGuard option. Both are equally safe with EasyArr's kill switch.
+
+## Free plans
+
+**Proton VPN** has a free plan, and EasyArr supports it ("I use the free plan"). It works, with
+limits:
+
+- no port forwarding,
+- only a few server countries, and they're often busy,
+- Proton doesn't allow torrent (P2P) traffic on free servers.
+
+So the free plan is good for **Usenet** or for trying EasyArr out. For torrents you need a paid
+plan. EasyArr's free-plan option is only for Proton VPN; free tiers of other providers usually have
+data limits that make downloading impractical.
+
+## "Skip for now"
+
+You can skip the VPN step in the setup. Nothing leaks: the kill switch is already on. But until you
+connect a VPN, the download apps can't reach the internet at all, so **nothing downloads**.
+Jellyfin, Jellyseerr and everything already in your library keep working.
+
+Add the VPN later in **Settings → VPN**.
+
+## Changing provider later
+
+Open **Settings → VPN**, pick the new provider, fill in the fields and press **Connect**. EasyArr
+runs the connection test again. No reinstall, and your library and settings stay as they are.
+Keys and passwords are stored only on your Umbrel and are never shown again. If you keep the same
+provider and only change, say, the server location, you can leave the saved fields empty.
+
+## Be responsible
+
+A VPN protects your privacy. It doesn't make downloading things you have no right to legal. Only
+download content you have the right to download and share. Laws differ between countries — you are
+responsible for following yours.
+
+---
+
+<!-- source: https://github.com/w1kyu/easyarr/blob/main/docs/vpn/airvpn.md -->
+
+# AirVPN — set up in EasyArr
+
+_Last checked: 31 October 2026_
+
+AirVPN is in EasyArr's **Best for torrents** group. Its port forwarding works a little
+differently: you **reserve a port once** in your AirVPN account and type it into EasyArr. EasyArr
+then sets it in qBittorrent for you. You can connect with **WireGuard** (recommended — faster and
+simpler) or **OpenVPN**. You only need one of them.
+
+## What you need
+
+- An active, paid AirVPN subscription.
+- A computer with a web browser and a simple text editor (Notepad on Windows, TextEdit on Mac).
+- About 10 minutes.
+
+All steps below happen on **airvpn.org** after you **Sign In**, in the **Client Area** (top menu).
+
+## Step 1: Create a "device" for EasyArr (recommended)
+
+AirVPN calls each set of keys a **device**. Giving EasyArr its own device avoids clashes with your
+computer or phone: two connections with the same key can't use the same AirVPN server at once.
+
+1. Open **Client Area → Devices**.
+2. Click **Add a new device**. Give it a name you'll recognise, like `EasyArr` (click the pencil
+   icon to edit the name).
+
+## Step 2a: WireGuard values (recommended)
+
+1. Open **Client Area → Config Generator**.
+2. As the operating system, choose **Linux** (that's what EasyArr runs on).
+3. Under the protocols, tick a **WireGuard** entry.
+4. Choose your **EasyArr** device.
+5. Pick any one server or country. It doesn't matter — you choose the server country in EasyArr.
+6. Accept the Terms of Service and click **Generate**. Download the `.conf` file.
+7. Open the file with your text editor. You need three lines:
+
+| Line in the file                   | What it is                                 |
+| ---------------------------------- | ------------------------------------------ |
+| `PrivateKey = …` (near the top)    | Your private key (44 characters, ends in `=`) |
+| `PresharedKey = …` (further down)  | An extra shared secret (also ends in `=`)  |
+| `Address = 10.x.x.x/32, …`         | Your VPN-internal address                  |
+
+Don't use the `PublicKey` line — that belongs to the AirVPN server. On the `Address` line, you
+only need the first part, like `10.128.45.67/32`. The longer part after the comma is IPv6 (a newer
+kind of internet address); EasyArr ignores it.
+
+## Step 2b: OpenVPN values
+
+1. Open **Client Area → Config Generator**.
+2. Choose **Linux**, tick an **OpenVPN** entry (UDP is fine), and choose your **EasyArr** device.
+3. Pick any one server or country, accept the Terms of Service and click **Generate**. Download
+   the `.ovpn` file. Leave the advanced options as they are.
+4. Open the file with your text editor. It contains several blocks. Ignore the `<ca>` and
+   `<tls-crypt>` blocks. You need two:
+   - everything between `<cert>` and `</cert>` — your **client certificate**,
+   - everything between `<key>` and `</key>` — your **client key**.
+
+## Step 3: Reserve a port (for torrents)
+
+1. Open **Client Area → Ports** (the page is called **Forwarded ports**).
+2. Add a new port. Leave the port number empty to let AirVPN pick a free one, or type one
+   (AirVPN uses ports from 2048 upwards).
+3. Choose **TCP & UDP**. Leave the **Local** field **empty** — torrent ports must not be mapped
+   to a different number.
+4. Under **Device**, choose **All Devices** or your **EasyArr** device. If you choose a device,
+   it must be the same one you generated the file with, or the port won't reach EasyArr.
+5. Save it and write down the port number.
+
+The port stays yours as long as your subscription is active. Don't also open this port on your
+home router — AirVPN warns that this can leak traffic outside the VPN. Only use Usenet? You can
+skip this step.
+
+## Fill in EasyArr
+
+1. In the VPN step of the setup (or later in **Settings → VPN**), choose **AirVPN** in the **Best
+   for torrents** group.
+2. Under **Connection type**, choose **WireGuard** or **OpenVPN** — the same one you prepared.
+3. Fill in the fields:
+
+| Connection type | EasyArr field               | What to paste                                   |
+| --------------- | --------------------------- | ----------------------------------------------- |
+| WireGuard       | **WireGuard private key**   | The value after `PrivateKey =`                  |
+| WireGuard       | **WireGuard preshared key** | The value after `PresharedKey =`                |
+| WireGuard       | **WireGuard address**       | The first part of the `Address` line, e.g. `10.128.45.67/32` |
+| OpenVPN         | **Client certificate**      | The text between `<cert>` and `</cert>`         |
+| OpenVPN         | **Client key**              | The text between `<key>` and `</key>`           |
+
+4. Turn **Port forwarding** on and type your port into **Your reserved port** (EasyArr accepts
+   1024–65535).
+5. **Server country** (optional): pick one close to you, or leave **Fastest / any**.
+6. Press **Connect**. You should see **Connected to AirVPN**, **Your home IP is hidden** and
+   **Port forwarding is on (port …)**.
+
+## If the test fails
+
+- **"The key isn't right" or "Couldn't reach the VPN server" (WireGuard):** a key was pasted into
+  the wrong field (private and preshared mixed up, or the server's `PublicKey` used). Also, if you
+  renewed or deleted the device under **Devices**, its old keys stop working — generate a new file.
+- **"The certificate or key wasn't accepted" (OpenVPN):** you probably copied the `<ca>` or
+  `<tls-crypt>` block. Copy the `<cert>` and `<key>` blocks again from a freshly generated file.
+- **Connected, but torrents stay slow:** check the port on the **Forwarded ports** page — same
+  number as in EasyArr, **Local** empty, and **Device** set to **All Devices** or your EasyArr
+  device.
+- **Connection drops when your computer uses AirVPN too:** both use the same device. Create a
+  separate EasyArr device (Step 1) and generate new values with it.
+
+Back to [VPN basics](https://github.com/w1kyu/easyarr/blob/main/docs/vpn/README.md).
+
+---
+
+<!-- source: https://github.com/w1kyu/easyarr/blob/main/docs/vpn/custom.md -->
+
+# Custom: use a config file
+
+_Last checked: 31 October 2026_
+
+Your VPN provider isn't in EasyArr's list? Almost every provider lets you download a **config file**
+for "manual setup". EasyArr can use that file directly. Choose **Other / config file** (under
+"Custom") in the provider list.
+
+This also works if you run your own VPN server, or if your provider is in the list but EasyArr
+only offers OpenVPN for it and you'd rather use WireGuard (see [Other providers](https://github.com/w1kyu/easyarr/blob/main/docs/vpn/generic.md)).
+
+## Before you start
+
+- Log in on your provider's website and find the **manual setup** page (sometimes called "Router",
+  "Linux", "Other devices", "OpenVPN" or "WireGuard").
+- Download **one** config file. Prefer **WireGuard** (`.conf`) if offered: it's faster and simpler
+  (see [VPN basics](https://github.com/w1kyu/easyarr/blob/main/docs/vpn/README.md)). Otherwise take **OpenVPN** (`.ovpn`).
+- A config file connects to **one server**. If you want another country, download the file for
+  that server and save it in EasyArr again.
+
+## WireGuard (.conf)
+
+Paste the whole file into **WireGuard file (.conf)**, or press **Choose a file instead** and pick
+it. Then press **Connect**.
+
+The file must contain these lines. EasyArr checks them when you save:
+
+| Section       | Line           | What it is                         |
+| ------------- | -------------- | ---------------------------------- |
+| `[Interface]` | `PrivateKey`   | Your personal key (keep it secret) |
+| `[Interface]` | `Address`      | Your address inside the VPN        |
+| `[Peer]`      | `PublicKey`    | The server's key                   |
+| `[Peer]`      | `Endpoint`     | The server's address and port      |
+| `[Peer]`      | `PresharedKey` | Optional — used if it's there      |
+
+Good to know:
+
+- **IPv6 is ignored.** EasyArr's VPN uses IPv4 only. If `Address` lists an IPv4 and an IPv6
+  address, only the IPv4 one is used. If the file has no IPv4 address at all, it won't work.
+- **Only the first `[Peer]` is used.** Lines like `DNS`, `AllowedIPs` or `MTU` are ignored —
+  EasyArr sends all download traffic through the VPN anyway.
+- **Server names are looked up once.** If `Endpoint` is a name (like `nl1.example.com:51820`)
+  rather than numbers, EasyArr looks up its IP address **once, when you save**. If the provider
+  later moves that server to a new IP address, the VPN stops connecting (the kill switch keeps you
+  safe — downloads just stop). Fix: open **Settings → VPN** and save again.
+- If EasyArr says "The server name in your file couldn't be found", check your Umbrel's internet
+  connection, or download a file that has an IP address in `Endpoint`.
+
+## OpenVPN (.ovpn)
+
+Paste the whole file into **OpenVPN file (.ovpn)**, or press **Choose a file instead** and pick
+it.
+
+If your provider needs a login for OpenVPN (the file then usually contains a line
+`auth-user-pass`), also fill in **VPN username** and **VPN password**. Many providers use special
+"service credentials" for this, not your website login — check the manual setup page. If your
+provider needs no login, leave both empty.
+
+Then press **Connect**.
+
+### Limits of OpenVPN files
+
+The VPN software inside EasyArr (Gluetun) reads your file and changes a few things. Most files work
+as they are, but check these points if the connection fails:
+
+- **Server names are looked up once, when you save.** Gluetun needs an IP address in the `remote`
+  line, because the kill switch blocks name lookups before the VPN is up. If your file has a name
+  (like `remote nl1.example.com 1194`), EasyArr replaces it with that server's current IP address
+  when you press Connect. If the provider later moves the server, press Connect again (or download a
+  file "with IP addresses", if your provider offers one).
+- **Only the first `remote` line is used.** Files with a list of backup servers just use the first
+  one.
+- **Everything must be inside the one file.** EasyArr only stores this one file. Lines that point
+  to other files — like `ca ca.crt`, `cert client.crt` or `auth-user-pass login.txt` — won't work.
+  Most providers offer "all-in-one" (inline) files, where certificates are inside blocks like
+  `<ca>…</ca>`. Use those. Usernames and passwords go into EasyArr's fields, not into a file.
+- **Some options are replaced.** Gluetun sets its own values for things like the login handling
+  (`auth-user-pass`), the network device (`dev`) and logging (`verb`). You don't need to change
+  anything for this.
+- **No scripts.** Lines starting with `up` or `down` point to script files that don't exist on
+  your Umbrel, so the connection fails. Delete those lines, or download the provider's file for
+  "router" or "other devices", which usually has none.
+
+## Port forwarding
+
+Automatic port forwarding (where EasyArr asks the provider for a port) isn't possible with a config
+file. What works: a **fixed port** your provider gave you — for example one you reserved in your
+account, or one that comes with a static IP address.
+
+1. Turn on **Port forwarding**.
+2. Enter the port in **Your reserved port** (1024–65535).
+3. Press **Connect**.
+
+EasyArr lets incoming connections on that port through the VPN and sets it in qBittorrent for you.
+No fixed port? Leave port forwarding off. Torrents still work, just slower — and Usenet doesn't need
+it at all (see [VPN basics](https://github.com/w1kyu/easyarr/blob/main/docs/vpn/README.md#port-forwarding-in-plain-words)).
+
+## Where your file is stored
+
+Your config file contains secrets (keys, sometimes passwords). EasyArr stores it **only on your
+Umbrel**, in files only EasyArr can read. It's never sent anywhere else and never shown again in
+the browser. To change it, paste or choose a new file and save. If you switch to a provider from
+the list, the old OpenVPN file is deleted.
+
+## Still not connecting?
+
+- Download a fresh file from your provider — files can expire, and keys can be revoked.
+- Try a different server's file.
+- Check that your subscription is active.
+- Open **Technical details** under the error message. It usually names the line or setting that
+  failed.
+
+---
+
+<!-- source: https://github.com/w1kyu/easyarr/blob/main/docs/vpn/generic.md -->
+
+# Other providers
+
+_Last checked: 31 October 2026_
+
+EasyArr works with many VPN providers. The most common ones have their own step-by-step guide (see
+[VPN basics](https://github.com/w1kyu/easyarr/blob/main/docs/vpn/README.md)). This page is for all the others:
+
+Windscribe, IVPN, FastestVPN, ExpressVPN, IPVanish, HideMyAss, Privado, PureVPN, TorGuard,
+VyprVPN, SlickVPN, Giganews, CyberGhost, VPN Unlimited, VPNSecure, PrivateVPN and Perfect Privacy.
+
+Every provider's website looks different, but the steps are almost always the same.
+
+## Step 1: Find the "manual setup" page
+
+EasyArr isn't an app from your provider, so you need the details for setting up a VPN "by hand".
+Log in on your provider's website and look for a page called something like:
+
+- **Manual setup** or **Manual configuration**
+- **Router** or **Other devices**
+- **Linux**
+- **OpenVPN** or **WireGuard** (often under "Downloads" or "Config generator")
+
+If you can't find it, search the provider's help pages for "manual setup" or "OpenVPN". That's also
+the best place to check when something below doesn't match what you see.
+
+## Step 2: WireGuard or OpenVPN?
+
+When you pick your provider in EasyArr, it shows which **connection types** it supports. If you can
+choose, use **WireGuard** — it's faster and simpler (see [VPN basics](https://github.com/w1kyu/easyarr/blob/main/docs/vpn/README.md)).
+
+## WireGuard: copy three lines from a file
+
+On the manual setup page, generate a **WireGuard configuration** (pick any server — EasyArr only
+needs your personal key, and it chooses servers itself). You get a small text file ending in
+`.conf`. Open it with any text editor. It looks roughly like this:
+
+```ini
+[Interface]
+PrivateKey = wOEI9rqqbDwnN8/Bpp22sVz48T71vJ4fYmFWujulwUU=
+Address = 10.64.222.21/32
+DNS = 10.255.255.1
+
+[Peer]
+PublicKey = ...
+PresharedKey = ...
+Endpoint = ...
+```
+
+Copy these values into EasyArr:
+
+| Line in the file | Field in EasyArr        | Notes                                                      |
+| ---------------- | ----------------------- | ---------------------------------------------------------- |
+| `PrivateKey =`   | WireGuard private key   | 44 characters ending in `=`. Keep it secret.               |
+| `Address =`      | WireGuard address       | Something like `10.64.222.21/32`. An IPv6 part is ignored. |
+| `PresharedKey =` | WireGuard preshared key | Only if EasyArr asks for it and the line exists.           |
+
+Copy only the value after `=` — not the word `PrivateKey` itself. The other lines (DNS, PublicKey,
+Endpoint, AllowedIPs) aren't needed: EasyArr already knows your provider's servers.
+
+## OpenVPN: special "service credentials"
+
+Most providers use a **separate username and password for OpenVPN**. They are **not** the email and
+password you use on the website. On the manual setup page they're often called "service
+credentials", "OpenVPN credentials" or "manual setup credentials". Enter them as **VPN username**
+and **VPN password**.
+
+If EasyArr says "Username or password was refused", this mix-up is the most common reason. Also
+check that your subscription is active.
+
+### Certificates and keys
+
+A few providers (see the table below) also need a **certificate** and a **key**. You find them in
+the OpenVPN file (`.ovpn`) you download from the manual setup page. Open it with a text editor:
+
+- **Client certificate** = everything between `<cert>` and `</cert>`
+- **Client key** = everything between `<key>` and `</key>`
+
+Some providers give these as separate files instead (for example `client.crt` and `client.key`).
+Then paste the whole content of each file. It's fine to include the `-----BEGIN ...-----` and
+`-----END ...-----` lines; EasyArr removes them.
+
+## Hints per provider
+
+"PF" = port forwarding (see [VPN basics](https://github.com/w1kyu/easyarr/blob/main/docs/vpn/README.md#port-forwarding-in-plain-words)). If a hint
+doesn't match what you see, your provider's manual setup page is always right.
+
+**Windscribe** — WireGuard or OpenVPN. PF: no.
+
+- WireGuard: private key, address **and** preshared key — all three are required. Use Windscribe's
+  WireGuard config generator.
+- OpenVPN: the username and password shown by Windscribe's OpenVPN config generator, not your login.
+- "Build a Plan" subscription: choose one of the locations you paid for as the server location.
+  "Fastest / any" may pick one your plan doesn't include.
+
+**IVPN** — WireGuard or OpenVPN. PF: no.
+
+- WireGuard: private key + address.
+- OpenVPN: enter your **account ID** (`i-XXXX-XXXX-XXXX`) as username and leave the password empty.
+  Your email + password also work.
+
+**FastestVPN** — WireGuard or OpenVPN. PF: no.
+
+- WireGuard: private key + address. You have to ask FastestVPN's support for the WireGuard file.
+- OpenVPN: username + password.
+
+**PrivateVPN** — OpenVPN. PF: **yes, automatic**.
+
+- Your PrivateVPN account login and password — **not** the "Proxy login" in the control panel.
+
+**Perfect Privacy** — OpenVPN. PF: **yes, automatic**.
+
+- Username + password.
+- If the VPN connects but nothing works, turn off the "TrackStop" filter for fraud in your account.
+
+**CyberGhost** and **VPN Unlimited** — OpenVPN. PF: no.
+
+- Username + password **plus** a client certificate and a client key, all from the provider's
+  manual (OpenVPN) setup. See [Certificates and keys](#certificates-and-keys).
+
+**VPNSecure** — OpenVPN. PF: no.
+
+- No username. You need three things instead:
+  - **Client certificate** — usually in the file `yourusername.crt`,
+  - **Encrypted client key** — usually in the file `yourusername.key`,
+  - **Key passphrase** — your VPNSecure account password.
+
+**ExpressVPN, IPVanish, HideMyAss, Privado, PureVPN, TorGuard, VyprVPN, Giganews, SlickVPN** —
+OpenVPN. PF: no.
+
+- Username + password. Check the provider's manual setup page to see whether it uses special
+  OpenVPN credentials or your normal login.
+
+## Your provider has WireGuard, but EasyArr only offers OpenVPN?
+
+EasyArr can only use WireGuard with a provider when the VPN software inside EasyArr (Gluetun)
+supports it. For some providers — for example PureVPN, TorGuard, CyberGhost, VyprVPN, PrivateVPN and
+VPN Unlimited — you can still use a WireGuard file through
+[Custom: use a config file](https://github.com/w1kyu/easyarr/blob/main/docs/vpn/custom.md). The downside: you then use one fixed server, and automatic
+port forwarding isn't available (for PrivateVPN it only works over OpenVPN anyway).
+
+## Step 3: Connect and check
+
+Pick a server location (or "Fastest / any"), turn on port forwarding if your provider has it and
+you use torrents, then press **Connect**. EasyArr tests the connection and shows whether your home
+IP is hidden. If something goes wrong, EasyArr says what it thinks the problem is — most of the time
+it's a credential copied from the wrong place.
+
+Your provider not listed at all? Use [Custom: use a config file](https://github.com/w1kyu/easyarr/blob/main/docs/vpn/custom.md).
+
+---
+
+<!-- source: https://github.com/w1kyu/easyarr/blob/main/docs/vpn/mullvad.md -->
+
+# Mullvad — set up in EasyArr
+
+_Last checked: 31 October 2026_
+
+Mullvad is in the **Also works** group. It is safe and simple, but it has **no port forwarding**
+(Mullvad removed it in 2023). Torrents still work, just slower. For Usenet that makes no
+difference.
+
+## What you need
+
+- A Mullvad account with time on it (Mullvad has no free plan). Your login is a 16-digit
+  **account number** — there is no email or password.
+- A free **device slot**: Mullvad allows **5 devices** per account, and EasyArr counts as one.
+  If all 5 are used, remove an old one on the **Devices** page of your Mullvad account first.
+- A web browser to sign in at [mullvad.net](https://mullvad.net/en/account/login).
+
+Mullvad only supports **WireGuard** (a modern, fast way to connect to a VPN). It switched off
+OpenVPN on 15 January 2026, so EasyArr only offers WireGuard for Mullvad.
+
+## Get your key and address
+
+You need two values from one small file: a **private key** (a secret code of 44 characters ending
+with `=`) and an **address** (looks like `10.64.123.45/32`).
+
+1. Open Mullvad's [WireGuard configuration generator](https://mullvad.net/en/account/wireguard-config).
+2. Log in by entering your Mullvad **account number**.
+3. Under **Platform**, pick any option (for example **Linux** or **Router**). It doesn't matter for
+   EasyArr.
+4. Click **Generate key**. This creates a new key just for EasyArr and uses one device slot.
+5. Pick any country, city or server. EasyArr chooses its own server later — the key works for all
+   of them.
+6. Leave everything else as it is. Click **Download file** and wait a few seconds.
+7. Open the downloaded file with a text editor (Notepad, TextEdit…). If you got a `.zip` file,
+   open it first and pick any one file inside.
+8. Find these two lines near the top:
+   - `PrivateKey = …` — copy everything after `PrivateKey = `.
+   - `Address = …` — copy only the **first** part, before the comma. It looks like
+     `10.64.123.45/32`.
+
+The `Address` line usually also has a second, longer address with colons (`fc00:…`). That's
+IPv6, a newer kind of address. EasyArr doesn't use it, so you can leave it out — or paste the
+whole line, EasyArr ignores the IPv6 part.
+
+Keep the file private: anyone who has the key can use your Mullvad account.
+
+**Don't** use the "WireGuard key" shown on Mullvad's **Devices** page. That is the public half of
+the key and won't work.
+
+## Fill in EasyArr
+
+1. In the VPN step, pick **Mullvad** (group **Also works**).
+2. **Connection type** is WireGuard — there is nothing else to choose.
+3. Fill in the fields:
+
+| EasyArr field         | What to paste                                                  |
+| --------------------- | -------------------------------------------------------------- |
+| WireGuard private key | The text after `PrivateKey = ` from your file                  |
+| WireGuard address     | The first address from the `Address` line, e.g. `10.64.123.45/32` |
+
+4. **Server country** (optional): leave **Fastest / any** unless you want a specific country.
+5. Press **Connect** and wait for the test.
+
+The key and address belong together. If you generate a new key, copy the new address too.
+
+## If the test fails
+
+- **"The key isn't right" or "Couldn't reach the VPN server":** copy the key again — all 44
+  characters, with the `=` at the end and no spaces. Make sure key and address come from the
+  **same** file.
+- **The device was removed:** if you (or Mullvad, when you hit the 5-device limit) removed this
+  device on the **Devices** page, its key stops working. Generate a new key and paste both new
+  values.
+- **No time left on the account:** check your account page. Mullvad stops connecting as soon as
+  the paid time runs out.
+- **"Enter an IPv4 address like 10.64.222.21/32":** you pasted only the IPv6 part. Use the part
+  that starts with `10.`.
+
+Back to [VPN basics](https://github.com/w1kyu/easyarr/blob/main/docs/vpn/README.md).
+
+---
+
+<!-- source: https://github.com/w1kyu/easyarr/blob/main/docs/vpn/nordvpn.md -->
+
+# NordVPN — set up in EasyArr
+
+_Last checked: 31 October 2026_
+
+NordVPN is in the **Also works** group. It is safe and fast, but it has **no port forwarding**.
+Torrents still work, just slower. For Usenet that makes no difference.
+
+## What you need
+
+- An active NordVPN subscription (any plan).
+- Access to the email address of your Nord Account: Nord sends you a **verification code** before
+  it shows the manual setup details.
+- A web browser to sign in at [my.nordaccount.com](https://my.nordaccount.com/).
+
+**WireGuard** and **OpenVPN** are two ways of connecting to a VPN. WireGuard is newer and faster,
+so EasyArr recommends it. NordVPN calls its WireGuard version **NordLynx**.
+
+## Option A: WireGuard (recommended)
+
+You need one value: a **private key**. It is a secret code of 44 characters that ends with `=`.
+NordVPN puts it into a WireGuard file you can download.
+
+1. Sign in at [my.nordaccount.com](https://my.nordaccount.com/) and click **NordVPN**.
+2. Scroll down to **Advanced settings** and click **Set up NordVPN manually**.
+3. If asked, click **Verify email** and enter the code Nord sends you.
+4. Open the **Server recommendation** tab. Take the recommended server or pick any other one —
+   EasyArr chooses its own server later. If you can, pick one with a **Verified** badge.
+5. Click **Get setup configuration** (on some pages: **WireGuard** under **Available protocols**).
+6. Choose **WireGuard** and click **Download config**. You get a file ending in `.conf`.
+7. Open the file with a text editor (Notepad, TextEdit…).
+8. Find the line that starts with `PrivateKey =`. Copy everything **after** `PrivateKey = `. That
+   is your WireGuard private key.
+
+You don't need the other lines. EasyArr already knows NordVPN's servers and its standard address
+(`10.5.0.2/32`).
+
+Keep this file private: anyone who has the key can use your NordVPN account.
+
+## Option B: OpenVPN
+
+You need a **VPN username** and **VPN password**. NordVPN calls them **service credentials**.
+They are **not** your Nord Account email and password.
+
+1. Sign in at [my.nordaccount.com](https://my.nordaccount.com/) and click **NordVPN**.
+2. Scroll down to **Advanced settings** and click **Set up NordVPN manually**.
+3. Open the **Service credentials** tab.
+4. Click **Verify email** and enter the code Nord sends you.
+5. Copy the **Username** and the **Password** with the **Copy** buttons next to them.
+
+You do **not** need to download any OpenVPN files — EasyArr already knows NordVPN's servers.
+
+## Fill in EasyArr
+
+1. In the VPN step, pick **NordVPN** (group **Also works**).
+2. **Connection type:** choose **WireGuard** (if you did Option A) or **OpenVPN** (Option B).
+3. Fill in the fields:
+
+| EasyArr field         | What to paste                                                       |
+| --------------------- | ------------------------------------------------------------------- |
+| WireGuard private key | WireGuard only: the text after `PrivateKey = ` from your `.conf` file |
+| VPN username          | OpenVPN only: the service credentials **Username**                  |
+| VPN password          | OpenVPN only: the service credentials **Password**                  |
+
+4. **Server country** (optional): leave **Fastest / any** unless you want a specific country.
+5. Press **Connect** and wait for the test.
+
+## If the test fails
+
+- **"The key isn't right" or "Couldn't reach the VPN server" (WireGuard):** copy the key again —
+  all 44 characters, with the `=` at the end and no spaces. Still failing? Download a fresh
+  WireGuard file from the **Set up NordVPN manually** page and use its key.
+- **"Username or password was refused" (OpenVPN):** you probably used your Nord Account email and
+  password. Use the **service credentials** instead. Copy them with the **Copy** buttons so no
+  space sneaks in.
+- **Subscription ended:** check in your Nord Account that your NordVPN plan is still active.
+- **"No server matches your choice":** choose **Fastest / any** as server country, or try another
+  country.
+
+Back to [VPN basics](https://github.com/w1kyu/easyarr/blob/main/docs/vpn/README.md).
+
+---
+
+<!-- source: https://github.com/w1kyu/easyarr/blob/main/docs/vpn/pia.md -->
+
+# Private Internet Access (PIA) — set up in EasyArr
+
+_Last checked: 31 October 2026_
+
+PIA is in EasyArr's **Best for torrents** group: it has **automatic port forwarding**, which
+makes torrents faster. EasyArr connects to PIA with **OpenVPN**. (PIA's WireGuard needs an extra
+login step that EasyArr's VPN part doesn't support yet. OpenVPN is just as safe.)
+
+PIA is one of the easiest providers to set up: you only need your normal PIA login. No keys, no
+files.
+
+## What you need
+
+- An active, paid PIA subscription.
+- Your **PIA username**. It's the letter `p` followed by 7 digits, like `p1234567`. It is **not**
+  your email address.
+- Your **PIA password** (the one you also use in the PIA app).
+
+## Find your username and password
+
+1. Search your email inbox for the message PIA sent when you bought your subscription. It
+   contains your username and password.
+2. Can't find it? Your username is also shown in the PIA app under **Settings → Account**.
+3. Forgot your password? Reset it on PIA's website at
+   `privateinternetaccess.com/account/reset-password`.
+4. To double-check both, log in to your account on **privateinternetaccess.com** with them. If
+   that works, EasyArr will accept them too.
+
+PIA's help pages sometimes call these your "VPN service credentials". For OpenVPN that's the same
+`p1234567` username and your account password. (A username starting with `x` is PIA's separate
+proxy login — don't use it here.)
+
+## Port forwarding — what to know
+
+- In EasyArr, **Port forwarding** is **on** by default for PIA. You don't need to change anything
+  in your PIA account.
+- Each time EasyArr connects, it asks PIA for a port and puts it into qBittorrent for you. If PIA
+  hands out a new port later, EasyArr updates qBittorrent automatically.
+- **PIA doesn't offer port forwarding on its US server locations** (PIA's help pages, checked
+  31 October 2026). While the switch is on, EasyArr only lists regions that support port
+  forwarding, and **Fastest / any** only uses those. Right now that's every region outside the US.
+- Need a US server? Turn **Port forwarding** off. Torrents still work, just slower.
+- Only use Usenet? Port forwarding doesn't matter for you. You can leave it on or off.
+
+## Fill in EasyArr
+
+1. In the VPN step of the setup (or later in **Settings → VPN**), choose **Private Internet
+   Access (PIA)** in the **Best for torrents** group. The connection type is **OpenVPN**.
+2. Fill in the fields:
+
+| EasyArr field       | What to enter                                             |
+| ------------------- | --------------------------------------------------------- |
+| **VPN username**    | Your PIA username, like `p1234567`                        |
+| **VPN password**    | Your PIA password                                         |
+| **Port forwarding** | Leave it **on** (recommended for torrents)                |
+| **Server region**   | Optional: a region close to you, or **Fastest / any**     |
+
+3. Press **Connect**. EasyArr tests the connection. You should see **Connected to Private Internet
+   Access (PIA)**, **Your home IP is hidden** and **Port forwarding is on (port …)**.
+4. If it says **Waiting for your VPN to hand out a port…**, give it a minute. PIA usually sends
+   the port within a few seconds of connecting.
+
+## If the test fails
+
+- **"Username or password was refused":** you entered your email address instead of the
+  `p1234567` username, or there's a typo in the password. Check both by logging in on
+  privateinternetaccess.com, and make sure your subscription is active.
+- **"No server matches your choice" or "Pick a location from the list":** the region you picked
+  has no port forwarding (all US regions, for example). Choose **Fastest / any** or another
+  region, or turn port forwarding off.
+- **Port forwarding keeps waiting:** pick another region and press **Connect** again. Some
+  regions are busy now and then.
+- **"Couldn't reach the VPN server":** that PIA region may be down for a moment. Try another
+  region or **Fastest / any**.
+
+Back to [VPN basics](https://github.com/w1kyu/easyarr/blob/main/docs/vpn/README.md).
+
+---
+
+<!-- source: https://github.com/w1kyu/easyarr/blob/main/docs/vpn/protonvpn.md -->
+
+# Proton VPN — set up in EasyArr
+
+_Last checked: 31 October 2026_
+
+Proton VPN is in the **Best for torrents** group: with a paid plan, EasyArr gets a forwarded port
+from Proton automatically and puts it into qBittorrent for you.
+
+## What you need
+
+- A Proton VPN account. The **free plan connects**, but it only uses Proton's free servers, has
+  **no port forwarding**, and Proton **doesn't allow torrents (P2P) on free servers**. It's fine
+  for Usenet. The free plan also covers only one device at a time.
+- For **port forwarding** (faster, more reliable torrents): **any paid Proton VPN plan**, for
+  example VPN Plus. EasyArr then only uses Proton's **P2P servers** (servers that allow file
+  sharing) — it picks them for you.
+- A web browser to sign in at [account.protonvpn.com](https://account.protonvpn.com/login).
+
+**Port forwarding** means other people sharing a file can connect to you directly, not only you
+to them. **WireGuard** and **OpenVPN** are two ways of connecting to a VPN. WireGuard is newer
+and faster, so EasyArr recommends it.
+
+## Option A: WireGuard (recommended)
+
+You need one value: a **private key**. It is a secret code of 44 characters that ends with `=`.
+
+1. Sign in at [account.protonvpn.com](https://account.protonvpn.com/login) with your normal
+   Proton login.
+2. In the menu, open **Downloads**, then the **WireGuard configuration** section.
+3. Type any name for the configuration, for example `EasyArr`.
+4. Under **Platform**, pick any option (for example **Router** or **GNU/Linux**). It doesn't
+   matter for EasyArr.
+5. Under the **VPN options**:
+   - **Paid plan:** switch **NAT-PMP (Port Forwarding)** **on**. Without it, port forwarding
+     can't work later.
+   - Leave **Moderate NAT** **off** — Proton says it can't be used together with port forwarding.
+   - **Free plan:** you only see **VPN Accelerator**. That's fine, leave it as it is.
+6. Pick any server. EasyArr chooses its own server later — the key works for all of them. (Proton
+   suggests a P2P server, shown with a double-arrow icon ⇄, if you want to follow its guide
+   exactly.)
+7. Click **Create**. Wait a few seconds until the configuration appears.
+8. Click **Download** to save the file (it ends in `.conf`). Open it with a text editor
+   (Notepad, TextEdit…).
+9. Find the line that starts with `PrivateKey =`. Copy everything **after** `PrivateKey = `. That
+   is your WireGuard private key.
+
+Keep this file private: anyone who has the key can use your VPN. If you lose it, simply create a
+new configuration.
+
+## Option B: OpenVPN
+
+You need a **VPN username** and **VPN password**. These are special OpenVPN credentials that
+Proton creates for you. They are **not** your normal Proton login (email + password).
+
+1. Sign in at [account.protonvpn.com](https://account.protonvpn.com/login) with your normal
+   Proton login.
+2. In the menu on the left, open **Account**.
+3. Find the section **OpenVPN / IKEv2 username** (Proton sometimes just calls it "OpenVPN
+   username").
+4. Copy the **username** and the **password** shown there.
+
+You do **not** need to download any OpenVPN files — EasyArr already knows Proton's servers.
+
+## Fill in EasyArr
+
+1. In the VPN step, pick **Proton VPN** (group **Best for torrents**).
+2. **Connection type:** choose **WireGuard** (if you did Option A) or **OpenVPN** (Option B).
+3. Fill in the fields:
+
+| EasyArr field         | What to paste                                                       |
+| --------------------- | ------------------------------------------------------------------- |
+| WireGuard private key | WireGuard only: the text after `PrivateKey = ` from your `.conf` file |
+| VPN username          | OpenVPN only: your OpenVPN / IKEv2 username from the Account page   |
+| VPN password          | OpenVPN only: your OpenVPN / IKEv2 password from the Account page   |
+
+4. **I use the free plan:** tick it **only** if you have the free plan. EasyArr then uses only
+   free servers and turns port forwarding off.
+5. **Server country** (optional): leave **Fastest / any** unless you want a specific country.
+6. **Port forwarding:** leave it **on** (the default) if you have a paid plan.
+7. Press **Connect** and wait for the test.
+
+Good to know:
+
+- With WireGuard you don't need an address — EasyArr uses Proton's standard one (`10.2.0.2/32`).
+- With OpenVPN and port forwarding on, Proton wants `+pmp` added to the end of the username.
+  **EasyArr adds it for you.** Paste the username exactly as Proton shows it.
+
+## If the test fails
+
+- **"The key isn't right" or "Couldn't reach the VPN server" (WireGuard):** copy the key again —
+  all 44 characters, with the `=` at the end and no spaces. Still failing? Create a new
+  configuration in your Proton account and use its key.
+- **"Username or password was refused" (OpenVPN):** you probably used your normal Proton login.
+  Use the OpenVPN / IKEv2 username and password from the **Account** page instead. Also check
+  your plan is still active.
+- **Connected, but no forwarded port appears:** your WireGuard key was made without **NAT-PMP
+  (Port Forwarding)**, or you're on the free plan. Create a new configuration with NAT-PMP
+  switched on (paid plan only) and paste the new key.
+- **"No server matches your choice":** choose **Fastest / any** as server country. Free plans
+  only have servers in a few countries.
+
+Back to [VPN basics](https://github.com/w1kyu/easyarr/blob/main/docs/vpn/README.md).
+
+---
+
+<!-- source: https://github.com/w1kyu/easyarr/blob/main/docs/vpn/surfshark.md -->
+
+# Surfshark — set up in EasyArr
+
+_Last checked: 31 October 2026_
+
+Surfshark works well with EasyArr. It has **no port forwarding**, so torrents work but can be a
+bit slower. Usenet isn't affected at all. You can connect in two ways: **WireGuard**
+(recommended — faster and simpler) or **OpenVPN**. You only need one of them.
+
+## What you need
+
+- An active, paid Surfshark subscription.
+- A computer or phone with a web browser.
+- For WireGuard: a simple text editor to open a small file (Notepad on Windows, TextEdit on Mac).
+- About 5 minutes.
+
+## WireGuard (recommended): get your key and address
+
+WireGuard needs two values: a **private key** (a secret password-like code, 44 characters ending
+in `=`) and an **address** (your VPN-internal address, looks like `10.14.0.2/16`).
+
+1. Go to **surfshark.com** and log in to your account.
+2. Open **VPN → Manual setup**. (On some screens it's **Products → VPN → Manual setup**.)
+3. Choose **Desktop or mobile**, then **WireGuard**.
+4. Choose **I don't have a key pair**. Type a name you'll recognise, like `EasyArr`, and continue.
+5. Click **Generate a new key pair**. Surfshark now shows a **Public key** and a **Private key**.
+6. Copy the **Private key** and keep it somewhere safe, for example in your password manager.
+   Surfshark shows it only this once.
+7. Click **Choose a location**, pick any location and press **Download**. You get a small file
+   ending in `.conf` (for example `de-fra.conf`).
+   - Always create the key pair **before** you download. Otherwise the file is missing your key.
+   - The location doesn't matter. You pick the server country in EasyArr later.
+8. Open the `.conf` file with your text editor. Find the line that starts with `Address`, for
+   example `Address = 10.14.0.2/16`. Copy the part that looks like `10.14.0.2/16`.
+   - If the line also has a second, longer address after a comma (that's IPv6, a newer kind of
+     internet address), you can ignore it. EasyArr only uses the first one.
+   - Lost the private key? The same file has it on the `PrivateKey` line.
+
+Your address is the same for every Surfshark server, so you only do this once.
+
+## OpenVPN: get your service credentials
+
+OpenVPN needs a username and password. These are Surfshark **service credentials** — **not** the
+email address and password you log in to the website with.
+
+1. Go to **surfshark.com** and log in.
+2. Open **VPN → Manual setup → Desktop or mobile → OpenVPN**.
+3. Open the **Credentials** tab. If you don't see a username and password yet, click
+   **Generate credentials**.
+4. Copy the **username** and the **password** (each has a copy icon next to it).
+
+You don't need to download any OpenVPN files. EasyArr already knows Surfshark's servers.
+
+## Fill in EasyArr
+
+1. In the VPN step of the setup (or later in **Settings → VPN**), choose **Surfshark** in the
+   **Also works** group.
+2. Under **Connection type**, choose **WireGuard** or **OpenVPN** — the same one you prepared
+   above.
+3. Fill in the fields:
+
+| Connection type | EasyArr field             | What to paste                                        |
+| --------------- | ------------------------- | ---------------------------------------------------- |
+| WireGuard       | **WireGuard private key** | The **Private key** from step 6 (ends in `=`)        |
+| WireGuard       | **WireGuard address**     | The address from the `Address` line, e.g. `10.14.0.2/16` |
+| OpenVPN         | **VPN username**          | The service **username** from the Credentials tab    |
+| OpenVPN         | **VPN password**          | The service **password** from the Credentials tab    |
+
+4. **Server country** (optional): pick a country close to you for the best speed, or leave it on
+   **Fastest / any**.
+5. Press **Connect**. EasyArr tests the connection. You should see **Connected to Surfshark** and
+   **Your home IP is hidden**.
+
+There's no port forwarding switch for Surfshark, because Surfshark doesn't offer it. That's
+expected.
+
+## If the test fails
+
+- **"The key isn't right" or "Couldn't reach the VPN server" (WireGuard):** you probably copied
+  the **Public key** instead of the **Private key**, or missed a character. Copy the private key
+  again (44 characters, ending in `=`). Lost it? Make a new key pair (steps 4–8) and use the new
+  file.
+- **"Username or password was refused" (OpenVPN):** you used your website email and password.
+  Use the service credentials from the **Credentials** tab instead. Also check that your
+  subscription is still active.
+- **"Enter an IPv4 address like …":** the address field only got the long IPv6 part, or the whole
+  file. Paste just the part like `10.14.0.2/16` from the `Address` line.
+- **"No server matches your choice":** choose **Fastest / any** or another country and press
+  **Connect** again.
+
+Back to [VPN basics](https://github.com/w1kyu/easyarr/blob/main/docs/vpn/README.md).
+
+---
+
+<!-- source: https://github.com/w1kyu/easyarr/blob/main/docs/troubleshooting.md -->
+
+# Troubleshooting
+
+The most common problems and how to fix them, all from the EasyArr dashboard. Can't find yours?
+Use **Get help with AI** (see [Getting help](https://github.com/w1kyu/easyarr/blob/main/docs/getting-help.md)).
+
+## Setup
+
+### The VPN doesn't connect
+
+EasyArr shows what went wrong under **Connect** in the VPN step (or **Settings** → **VPN**). The
+most common messages:
+
+- **The key isn't right** or **Username or password was refused**: copy the key or login again
+  from your VPN provider's website. For most providers this is *not* your normal account password
+  but a separate VPN login. The [VPN guide](https://github.com/w1kyu/easyarr/blob/main/docs/vpn/README.md) for your provider shows where to find it.
+- **No server matches your choice**: pick another country, or turn off **Port forwarding** or
+  **Free plan** if you don't need them.
+- **Couldn't reach the VPN server**: try again in a few minutes, or pick another country.
+- **Your home IP is NOT hidden**: don't use EasyArr for downloads until this is fixed. Check the
+  settings against the guide and connect again.
+
+While the VPN is down, downloads stop. That's on purpose: the kill switch makes sure nothing goes
+out without the VPN.
+
+### Connecting the apps (Finish step) didn't work
+
+1. Wait two minutes and press **Try again**. Right after an install or update, some apps need a moment
+   before they answer.
+2. If the same line keeps failing, press **Get help with AI** next to it.
+3. If you need to, press **Finish anyway**. You can repair the connections later in
+   **Settings** → **Advanced** → **Repair connections**.
+
+## On the home screen
+
+### "Not answering: …"
+
+An app isn't responding. Most of the time it's still starting (right after an update or a restart
+of your Umbrel, this can take a few minutes).
+
+1. Wait five minutes.
+2. Still there? Restart EasyArr: on your Umbrel's home screen, right-click (or long-press) the
+   EasyArr icon → **Restart**.
+3. Still there after a restart? Use **Get help with AI**.
+
+### "Some connections didn't work"
+
+Press **Repair connections**. It runs the setup's connection step again and explains what's wrong.
+Repairing never changes settings you made yourself in the apps.
+
+### "Search sites can't be reached"
+
+Your search sites (indexers) aren't answering through the VPN. Often it's the site itself, or the
+VPN server is blocked by that site.
+
+1. Wait 15 minutes: EasyArr tries the sites again by itself.
+2. If it stays: pick another VPN country in **Settings** → **VPN**.
+3. Some sites block VPNs or bots. Add another site in Prowlarr (see [Search sites](https://github.com/w1kyu/easyarr/blob/main/docs/indexers.md)).
+
+### "Storage is almost full"
+
+Your Umbrel's disk has less than 10 % free. Delete movies or shows you've watched (in Jellyfin, or
+in Sonarr/Radarr with **Delete files**), or move them to another drive.
+
+## Downloads
+
+### A request never starts downloading
+
+Look at **Needs your attention** on the home screen. EasyArr explains there why something hasn't
+arrived:
+
+- **Nothing found yet**: your search sites don't have it (yet). EasyArr keeps searching by itself;
+  **Search now** searches right away. Adding more search sites helps most.
+- **Only in another language or a lower quality**: press the button (for example **Download that
+  version**) to take it anyway.
+- **A download is stuck**: press **Try another version**. EasyArr removes it and looks for another
+  one.
+
+### A torrent is stuck on "Downloading metadata"
+
+Nobody shares this torrent at the moment. EasyArr removes torrents that are stuck for too long by
+itself and searches for another one, usually within 15–30 minutes.
+
+### Usenet downloads fail
+
+Check your Usenet provider in **Settings** → **Usenet** and press **Test this provider**. "Server requires
+username and password" means the login is wrong. "Timed out" usually means the server name or port
+is wrong. See [Usenet explained](https://github.com/w1kyu/easyarr/blob/main/docs/usenet-101.md).
+
+## Watching
+
+### I can't sign in to Jellyfin or Jellyseerr
+
+Use the username and password you chose in the setup's **Account** step. Family members get their
+own accounts, see [Family accounts](https://github.com/w1kyu/easyarr/blob/main/docs/family-accounts.md).
+
+### There are two Jellyfins
+
+If the official Umbrel Jellyfin app is installed too, you have two separate libraries. See
+[Two Jellyfins](https://github.com/w1kyu/easyarr/blob/main/docs/two-jellyfins.md).
+
+## Backups
+
+### A restore asks for a password
+
+The backup was made with **Protect with a password** on. Without that password the file can't be
+opened. See [Backups](https://github.com/w1kyu/easyarr/blob/main/docs/backup-restore.md).
+
+---
+
+<!-- source: https://github.com/w1kyu/easyarr/blob/main/docs/getting-help.md -->
+
+# Getting help
+
+Something doesn't work? There are three ways to get help, from fastest to slowest:
+
+1. Look for your problem in [Troubleshooting](https://github.com/w1kyu/easyarr/blob/main/docs/troubleshooting.md).
+2. Ask an AI chat (ChatGPT, Claude, Gemini, …) with **Get help with AI**.
+3. Open an issue on GitHub.
+
+## Get help with AI
+
+EasyArr can write the question for you. It describes your setup, what went wrong and the newest
+lines from the apps' logs, so the AI can give an answer that fits your Umbrel.
+
+1. Press **Get help with AI**. You find it:
+   - next to every error in the setup wizard,
+   - on the Finish step when connecting the apps didn't work,
+   - in **Help**, at the top right of every EasyArr page,
+   - next to problems on the home screen.
+2. Type in a few words under **What I was trying to do**, for example "Download a movie" or
+   "Connect the VPN".
+3. Read the preview. That is exactly what gets copied, nothing else.
+4. Press **Copy**, or one of the chat buttons (ChatGPT, Claude, Gemini, Le Chat): they copy the
+   text and open that chat in a new tab.
+5. Paste it into the chat (Ctrl+V, or ⌘+V on a Mac) and send it.
+
+The AI may ask you to try something. If it suggests terminal commands, ask it for a way that works
+from the EasyArr dashboard: EasyArr is built so you never need a terminal.
+
+### What EasyArr hides before you copy
+
+Before anything leaves EasyArr, these are replaced with `[REDACTED:…]`:
+
+- passwords, API keys, tokens and VPN keys (`[REDACTED:password]`, `[REDACTED:apikey]`,
+  `[REDACTED:key]`, `[REDACTED:token]`),
+- usernames and e-mail addresses,
+- your public IP address (`[REDACTED:ip]`),
+- the names of your Usenet servers, VPN servers and search sites (`[REDACTED:host]`).
+
+Addresses inside your home network (like `192.168.1.20`) stay visible, because they often help to
+find a problem and don't identify you on the internet. Tick **Also hide addresses in my home
+network** if you want them hidden too.
+
+If EasyArr ever finds one of your passwords or keys still in the text, it refuses to show the
+preview instead of risking it. Please [report that](#open-an-issue-on-github).
+
+## Download diagnostics
+
+The diagnostics file is a `.zip` with the same information in more detail. It's useful for a
+GitHub issue or for someone who helps you.
+
+1. Open **Help** (top right) and press **Download diagnostics** (also in the **Get help with AI** window).
+2. The file is called something like `easyarr-diagnostics-2026-11-15-1030.zip`.
+
+Inside are:
+
+| File | What it says |
+|---|---|
+| `diagnostics.json` | EasyArr version, hardware, your setup choices, which apps answer, the VPN's state (no IP addresses) |
+| `ai-prompt.txt` | The same text as **Get help with AI** |
+| `logs/` | The newest lines from EasyArr, the VPN and each app's log |
+| `README.txt` | What the file is and what was hidden |
+
+The same things are hidden as in the AI prompt. It's still a good idea to open the zip and have a
+look before you share it.
+
+## Open an issue on GitHub
+
+If neither the docs nor an AI could help, or you think you found a bug:
+
+1. Go to [github.com/w1kyu/easyarr/issues](https://github.com/w1kyu/easyarr/issues) and press
+   **New issue**. You need a free GitHub account.
+2. Pick **Bug report**, **Feature request** or **VPN guide is outdated**.
+3. Fill in the form. For a bug, attach the diagnostics zip or paste the AI prompt from the preview.
+
+Never paste a password or key into an issue: issues are public. If you did by accident, change
+that password right away.
+
+Found a security problem? Don't open a public issue. See
+[SECURITY.md](https://github.com/w1kyu/easyarr/blob/main/SECURITY.md) for how to report it
+privately.

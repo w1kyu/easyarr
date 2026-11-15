@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Ask an AI first (fastest)
+    url: https://github.com/w1kyu/easyarr/blob/main/docs/getting-help.md
+    about: In EasyArr, press "Get help with AI" (top right → Help). It writes a question about your setup with passwords and keys hidden.
+  - name: Report a security problem privately
+    url: https://github.com/w1kyu/easyarr/security/policy
+    about: Please don't open a public issue for security problems.
