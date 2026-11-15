@@ -13,7 +13,7 @@ pnpm lint && pnpm typecheck && pnpm test && pnpm build
 pnpm dev     # server on :3000 (tsx watch) + web on :5173 (Vite, proxies /api to :3000)
 ```
 
-Open http://localhost:5173. In dev builds, http://localhost:5173/dev/ui shows every UI component.
+Open <http://localhost:5173>. In dev builds, <http://localhost:5173/dev/ui> shows every UI component.
 The dev server keeps its state in `dev/data/dashboard-state/`. To try `init` against throwaway
 folders:
 
@@ -23,20 +23,21 @@ EASYARR_DATA_ROOT=/tmp/ea/data EASYARR_APPDATA_DIR=/tmp/ea/appdata node dist/ind
 ```
 
 The setup wizard lives at `/setup/<step>`. To start it over, stop the server and delete
-`dev/data/dashboard-state/`. Help pages are the Markdown files in `docs/` (top level only); a
-"What's this?" link opens them in a dialog, and `/help/<name>` shows them as a page.
+`dev/data/dashboard-state/`. The architecture is explained in [architecture.md](architecture.md).
 
-### Wizard e2e tests (Playwright)
+### Browser tests (Playwright)
 
 ```sh
-pnpm exec playwright install chromium   # once
-pnpm build && pnpm test:e2e             # starts a dashboard with fresh, temporary state
-E2E_BASE_URL=http://localhost:39000 pnpm test:e2e   # against the stack (dev/stack.sh up)
+pnpm exec playwright install chromium-headless-shell   # once
+pnpm build && pnpm test:e2e                            # local dashboards with fresh state + fakes
+E2E_BASE_URL=http://localhost:39000 pnpm test:e2e      # wizard only, against the stack
 ```
 
-The tests walk through the wizard like one user would, so they need a fresh install
-(`dev/stack.sh reset` before running them against the stack again). CI runs them on every push and,
-for changes under `umbrel/`, `dev/` or `e2e/`, also against the full stack.
+Locally, `first-run.spec.ts` runs a complete first run three times (torrents, Usenet, both), each
+against its own dashboard with fake services (`e2e/fake-services.mjs`) and a fake VPN
+(`e2e/fake-vpn.mjs`). The tests walk through the wizard like one user would, so against the stack
+they need a fresh install (`dev/stack.sh reset` first). CI runs them on every push and, for changes
+under `umbrel/`, `dev/` or `e2e/`, also against the full stack.
 
 UI code copied from umbrelOS lives in `dashboard/web/src/vendor/umbrel/` and is imported as `@/…`.
 Our own code is imported as `~/…`. If you vendor another file, add it to `PROVENANCE.md`.
@@ -52,8 +53,10 @@ Everything is stored in `dev/data/` (git-ignored).
 
 ```sh
 dev/stack.sh up         # start
-dev/stack.sh wait       # wait until all healthchecks pass (vpn is expected to stay unhealthy)
+dev/stack.sh wait       # wait until all healthchecks pass
 dev/stack.sh leaktest   # kill switch + reachability checks
+dev/stack.sh wiretest   # wizard via the API, wiring against the real services, idempotency
+dev/stack.sh backuptest # backup, change, restore
 dev/stack.sh logs -f sonarr
 dev/stack.sh down       # stop (keeps dev/data)
 dev/stack.sh reset      # stop and delete dev/data
@@ -63,16 +66,17 @@ Then open:
 
 | What | URL |
 |---|---|
-| Dashboard | http://localhost:39000 |
-| Jellyfin | http://localhost:39096 |
-| Jellyseerr | http://localhost:39055 |
+| Dashboard | <http://localhost:39000> |
+| Jellyfin | <http://localhost:39096> |
+| Jellyseerr | <http://localhost:39055> |
 
-The *arr apps, qBittorrent and SABnzbd aren't published. They'll be reachable through the
-dashboard proxy (`/apps/<service>/`) from phase 05 onwards.
+The *arr apps, qBittorrent and SABnzbd aren't published. Open them through the dashboard proxy,
+for example <http://localhost:39000/apps/sonarr/>.
 
 CI (`.github/workflows/umbrel-app.yml`) runs Umbrel's official app linter, plus
-`up → wait → leaktest → wizard e2e` on both amd64 and arm64 for every change under `umbrel/`,
-`dev/` or `e2e/`.
+`up → wait → leaktest → wizard e2e → wiretest → backuptest` on both amd64 and arm64 for every
+change under `umbrel/`, `dev/` or `e2e/`. CI has no working VPN, so only steps that need the
+internet (the Recyclarr sync) may fail there.
 
 ## 4. Test on a real Umbrel
 
@@ -112,9 +116,10 @@ an agent check app state and logs. Copying files onto the device still needs SSH
 
 ### Checks on the device
 
-- `docker ps --filter name=w1kyu-easyarr` lists every service as running or healthy. `vpn` stays
-  unhealthy until a VPN is configured (phase 04).
-- Kill switch: `docker exec w1kyu-easyarr_qbittorrent_1 curl -m 8 https://1.1.1.1` must fail.
+- `docker ps --filter name=w1kyu-easyarr` lists every service as running or healthy. `vpn` is
+  healthy as soon as its kill switch is in place, even before a VPN is configured.
+- Kill switch: with no VPN configured (or the VPN skipped),
+  `docker exec w1kyu-easyarr_qbittorrent_1 curl -m 8 https://1.1.1.1` must fail.
 - Files app: **Home → EasyArr** contains `downloads`, `media` and `backups`.
 
 ## 5. Where things live on umbrelOS
@@ -128,3 +133,22 @@ an agent check app state and logs. Copying files onto the device still needs SSH
 The compose file uses the legacy `${UMBREL_ROOT}/data/storage/...` form on purpose. umbrelOS 2.0
 rewrites it to `${UMBREL_ROOT}/home/...` when it installs the app, and older versions expect the
 legacy path. This is the same convention the official apps use (D-023).
+
+## 6. Writing docs
+
+User guides live in `docs/` (top level and `docs/vpn/`). They're shown on GitHub, inside EasyArr
+under **Help**, and collected in `llms.txt` for AI assistants.
+
+- **Style:** short sentences, numbered steps, one action per step, a "What you'll need" box where it
+  helps. Use the exact button and field names from the app (`dashboard/web/src/locales/en.json`).
+  VPN guides start with `_Last checked: <date>_`.
+- **Order:** every guide must be listed in `docs/nav.json` (section ids → `docs.section.<id>` in
+  `en.json`). The Help page, the in-app navigation and `llms.txt` follow it.
+- **Links** between guides are relative (`usenet-101.md`, `vpn/README.md#port-forwarding-in-plain-words`).
+  Section anchors are GitHub's, so they work on GitHub and in the app.
+- **Images** go in `docs/images/` and nothing else is shown in the app. Screenshots are made by
+  `pnpm build && pnpm docs:shots` (fake services, no real accounts), so they can be redone after UI
+  changes.
+- **Checks:** `pnpm lint` runs markdownlint, checks every relative link, anchor and image
+  (`scripts/check-docs.mjs`) and that `llms.txt` is current. Run `pnpm llms` after editing a guide.
+  External links are checked weekly by the `Links` workflow.

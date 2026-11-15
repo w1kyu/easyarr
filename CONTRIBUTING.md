@@ -18,7 +18,7 @@ You need Node 26 (see `.nvmrc`) and pnpm 12. Docker is only needed for the full 
 ```sh
 pnpm install
 pnpm dev          # dashboard (web + server) with hot reload
-pnpm lint         # eslint + prettier + vendored-code check + llms.txt check
+pnpm lint         # eslint + prettier + vendored-code check + llms.txt + docs checks
 pnpm typecheck
 pnpm test         # unit tests
 pnpm build

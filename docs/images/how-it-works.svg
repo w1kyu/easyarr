@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 400" width="960" height="400" role="img" aria-labelledby="t d">
+  <title id="t">How EasyArr works</title>
+  <desc id="d">You request a movie in Jellyseerr. Sonarr, Radarr or Lidarr search your sites through Prowlarr, qBittorrent or SABnzbd download it, all through the VPN tunnel with a kill switch. The file is sorted into your library with subtitles, and you watch it in Jellyfin.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#c4b5fd"/>
+    </marker>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1e1446"/>
+      <stop offset="1" stop-color="#0f1d3d"/>
+    </linearGradient>
+  </defs>
+  <style>
+    text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, Helvetica, Arial, sans-serif; fill: #f4f4f8; }
+    .num { font-size: 13px; font-weight: 700; fill: #c4b5fd; }
+    .title { font-size: 17px; font-weight: 700; }
+    .app { font-size: 13px; fill: #d6d6e4; }
+    .note { font-size: 13px; fill: #c4b5fd; font-weight: 600; }
+    .small { font-size: 12px; fill: #a9a9c2; }
+    .box { fill: #ffffff; fill-opacity: 0.07; stroke: #ffffff; stroke-opacity: 0.22; }
+    .flow { stroke: #c4b5fd; stroke-width: 2; fill: none; }
+  </style>
+
+  <rect x="0" y="0" width="960" height="400" rx="24" fill="url(#bg)"/>
+
+  <!-- Internet -->
+  <rect x="300" y="24" width="360" height="52" rx="14" class="box"/>
+  <text x="480" y="47" text-anchor="middle" class="title">Internet</text>
+  <text x="480" y="66" text-anchor="middle" class="small">search sites · torrents · Usenet servers</text>
+
+  <!-- VPN tunnel around steps 2 and 3 -->
+  <rect x="200" y="112" width="380" height="196" rx="20" fill="#8b5cf6" fill-opacity="0.12" stroke="#a78bfa" stroke-width="2" stroke-dasharray="7 6"/>
+  <text x="390" y="134" text-anchor="middle" class="note">VPN tunnel with kill switch</text>
+  <path d="M390 112 L390 78" class="flow" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
+
+  <!-- 1 Request -->
+  <rect x="24" y="150" width="160" height="140" rx="16" class="box"/>
+  <text x="44" y="178" class="num">1</text>
+  <text x="44" y="204" class="title">Request</text>
+  <text x="44" y="230" class="app">Jellyseerr</text>
+  <text x="44" y="268" class="small">You pick a movie</text>
+  <text x="44" y="284" class="small">or a show</text>
+
+  <!-- 2 Find -->
+  <rect x="216" y="150" width="166" height="140" rx="16" class="box"/>
+  <text x="236" y="178" class="num">2</text>
+  <text x="236" y="204" class="title">Find</text>
+  <text x="236" y="230" class="app">Sonarr · Radarr</text>
+  <text x="236" y="248" class="app">Lidarr</text>
+  <text x="236" y="276" class="small">asks Prowlarr and</text>
+  <text x="236" y="292" class="small" dy="-0">your search sites</text>
+
+  <!-- 3 Download -->
+  <rect x="398" y="150" width="166" height="140" rx="16" class="box"/>
+  <text x="418" y="178" class="num">3</text>
+  <text x="418" y="204" class="title">Download</text>
+  <text x="418" y="230" class="app">qBittorrent</text>
+  <text x="418" y="248" class="app">SABnzbd</text>
+  <text x="418" y="276" class="small">torrents and/or</text>
+  <text x="418" y="292" class="small">Usenet</text>
+
+  <!-- 4 Sort -->
+  <rect x="596" y="150" width="160" height="140" rx="16" class="box"/>
+  <text x="616" y="178" class="num">4</text>
+  <text x="616" y="204" class="title">Sort</text>
+  <text x="616" y="230" class="app">your library</text>
+  <text x="616" y="248" class="app">Bazarr</text>
+  <text x="616" y="276" class="small">names, posters,</text>
+  <text x="616" y="292" class="small">subtitles</text>
+
+  <!-- 5 Watch -->
+  <rect x="776" y="150" width="160" height="140" rx="16" class="box"/>
+  <text x="796" y="178" class="num">5</text>
+  <text x="796" y="204" class="title">Watch</text>
+  <text x="796" y="230" class="app">Jellyfin</text>
+  <text x="796" y="268" class="small">on your TV, phone</text>
+  <text x="796" y="284" class="small">or browser</text>
+
+  <!-- arrows between steps -->
+  <path d="M184 220 L212 220" class="flow" marker-end="url(#arrow)"/>
+  <path d="M382 220 L394 220" class="flow" marker-end="url(#arrow)"/>
+  <path d="M564 220 L592 220" class="flow" marker-end="url(#arrow)"/>
+  <path d="M756 220 L772 220" class="flow" marker-end="url(#arrow)"/>
+
+  <!-- dashboard underneath -->
+  <rect x="24" y="328" width="912" height="48" rx="14" class="box"/>
+  <text x="480" y="349" text-anchor="middle" class="title" style="font-size:15px">EasyArr dashboard</text>
+  <text x="480" y="367" text-anchor="middle" class="small">sets up and connects every app · shows downloads and problems · Settings, backups, help</text>
+</svg>

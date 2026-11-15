@@ -80,6 +80,14 @@ arrived:
 Nobody shares this torrent at the moment. EasyArr removes torrents that are stuck for too long by
 itself and searches for another one, usually within 15–30 minutes.
 
+### Torrents download slowly
+
+1. Check how many people share the file: in **Advanced** mode, open **qBittorrent** and look at
+   **Seeds**. Few seeds means slow, whatever you do.
+2. Use a VPN with **port forwarding** if you can. It lets other people connect to you, which often
+   makes torrents much faster. See [Port forwarding](vpn/README.md#port-forwarding-in-plain-words).
+3. Try another VPN country in **Settings** → **VPN**. A server close to you is usually faster.
+
 ### Usenet downloads fail
 
 Check your Usenet provider in **Settings** → **Usenet** and press **Test this provider**. "Server requires
@@ -92,6 +100,23 @@ is wrong. See [Usenet explained](usenet-101.md).
 
 Use the username and password you chose in the setup's **Account** step. Family members get their
 own accounts, see [Family accounts](family-accounts.md).
+
+### My TV or phone can't find the Jellyfin server
+
+Some devices don't understand `umbrel.local`. Use your Umbrel's IP address instead, for example
+`http://192.168.1.20:39096`. Your router's list of connected devices shows the IP address.
+
+Away from home, Jellyfin only works through Tailscale, see
+[Remote access with Tailscale](remote-access-tailscale.md).
+
+### Videos stop and buffer
+
+Your Umbrel may have to convert the video while it plays (**transcoding**), which needs a lot of
+power without a graphics chip, see [System requirements](system-requirements.md#graphics-gpu).
+
+1. In the Jellyfin app, choose a lower quality while the video plays (the ⚙ button).
+2. Pick the **Save space** quality in **Settings** → **Libraries & quality**, so future downloads
+   are smaller and play directly on more devices.
 
 ### There are two Jellyfins
 

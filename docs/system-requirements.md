@@ -2,6 +2,8 @@
 
 EasyArr checks your Umbrel during setup. Here's what the results mean.
 
+![The system check in the setup, with a result for each part](images/setup-system.jpg)
+
 ## Processor (architecture)
 
 EasyArr runs on the two kinds of processors Umbrel supports:

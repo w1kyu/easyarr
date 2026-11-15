@@ -8,6 +8,8 @@ Something doesn't work? There are three ways to get help, from fastest to slowes
 
 ## Get help with AI
 
+![The Get help with AI window: a box for your goal, the preview of the text, and the copy buttons](images/ai-help.jpg)
+
 EasyArr can write the question for you. It describes your setup, what went wrong and the newest
 lines from the apps' logs, so the AI can give an answer that fits your Umbrel.
 

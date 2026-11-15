@@ -547,6 +547,8 @@ docs/backup-restore.md
 docs/troubleshooting.md
 docs/faq.md
 docs/getting-help.md          # diagnostics, AI help, GitHub issues
+docs/nav.json                 # order + sections of the user guides (in-app help, llms.txt), D-077
+docs/images/                  # screenshots (pnpm docs:shots) and diagrams; the only images the app shows
 docs/dev/architecture.md
 docs/dev/development.md       # local dev, testing on a real Umbrel
 docs/dev/release.md
@@ -556,6 +558,7 @@ llms.txt                      # generated
 ```
 Style: short sentences, numbered steps, one action per step, screenshots where helpful,
 "Last checked: <date>" on provider tutorials.
+Checks: markdownlint + offline link/anchor/image check in `pnpm lint`; external links weekly (D-079).
 
 ---
 

@@ -69,7 +69,9 @@ Everything technical: decide yourself, log it in DECISIONS.md.
 pnpm install
 pnpm dev            # web + server with hot reload (against dev/docker-compose.dev.yml)
 pnpm lint           # eslint + prettier --check + vendored-code license check + llms.txt up to date
+                    #   + markdownlint + docs links/anchors/images/nav.json (D-079)
 pnpm llms           # regenerate llms.txt after editing docs/ (D-076)
+pnpm docs:shots     # regenerate docs/images/ screenshots (after pnpm build, D-080)
 pnpm format         # prettier --write
 pnpm typecheck
 pnpm test           # unit tests (vitest, all dashboard/* packages)

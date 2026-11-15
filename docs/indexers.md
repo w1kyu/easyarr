@@ -12,6 +12,8 @@ VPN, set it up first (setup step 5) or add your sites later.
 
 ## Step by step
 
+![The search-sites step in the setup: the steps on the left, Open Prowlarr and Check again](images/setup-indexers.jpg)
+
 1. In the setup, press **Open Prowlarr**. Prowlarr opens in a new tab — you're already signed in.
 2. On the **Indexers** page, press **Add Indexer** (or **Add New Indexer** when the list is still
    empty).

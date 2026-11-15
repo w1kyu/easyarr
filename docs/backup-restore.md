@@ -18,10 +18,12 @@ and Jellyfin remember.
 "Set up again" means EasyArr connects those apps the same way the setup did. Changes you made by
 hand inside them are not kept.
 
-Your media files stay in **Files → EasyArr → media** on your Umbrel. They are not touched by a
+Your media files stay in **Files → Home → EasyArr → media** on your Umbrel. They are not touched by a
 backup or a restore. To keep a copy of them, copy that folder to another drive.
 
 ## Download a backup
+
+![Settings → Backups: download a backup, automatic backups and the list of saved backups](images/settings-backups.jpg)
 
 1. Open EasyArr → **Settings** → **Backups**.
 2. Leave **Protect with a password** on and pick a password. Write it down somewhere safe:
@@ -38,7 +40,7 @@ encrypted (AES-256), so anyone who finds it can't read them.
 EasyArr makes a backup every day at 04:00 (your time) and keeps the newest 7. You can change the
 time and how many to keep in **Settings → Backups**, or turn them off.
 
-Automatic backups stay on your Umbrel, without a password, in **Files → EasyArr → backups**. That
+Automatic backups stay on your Umbrel, without a password, in **Files → Home → EasyArr → backups**. That
 protects you from mistakes and broken apps, but not from a broken Umbrel. To keep a copy somewhere
 else:
 

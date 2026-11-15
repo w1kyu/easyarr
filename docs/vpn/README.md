@@ -43,6 +43,8 @@ address is never used for downloading, not even for a second.
 
 After you connect, EasyArr runs a **connection test** and shows:
 
+![A passed connection test: the VPN's address and country, home IP hidden, port forwarding on](../images/setup-vpn-connected.jpg)
+
 - **The VPN's address and country** — that's where your downloads appear to come from.
 - **"Your home IP is hidden"** — EasyArr also looks up your real home address (outside the VPN)
   and compares the two. If they're different, the VPN is protecting you. If they're the same,

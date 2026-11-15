@@ -404,3 +404,23 @@ Sources: Sonarr v4.0.20.3012 / Radarr v6.4.4.10685 `CustomFormats/Specifications
 ### D-076 — llms.txt now, minimal, checked by lint (2026-11-15)
 **Decision:** `scripts/llms-txt.mjs` concatenates the user docs (relative links made absolute, a short system description for AI assistants on top) into a committed `llms.txt`; `pnpm lint` runs it with `--check`. The prompt links to `https://raw.githubusercontent.com/w1kyu/easyarr/main/llms.txt` (`LLMS_TXT_URL` in brand.ts).
 **Why:** The AI prompt (phase 09) links to it, so it has to exist now; phase 10 (docs) polishes the content. Committing the file keeps the URL stable without a release workflow.
+
+### D-077 — One reading order for every place the guides appear: docs/nav.json (2026-11-15)
+**Decision:** `docs/nav.json` lists the user guides in sections (`start`, `downloading`, `vpn`, `everyday`, `help`; titles are i18n keys `docs.section.<id>`). The in-app navigation, the Help page and `llms.txt` all follow it. `scripts/check-docs.mjs` (in `pnpm lint`) fails when a guide is missing from the list or listed twice; the viewer still shows an unlisted guide, after the listed ones.
+**Why:** Three hand-kept orders would drift apart. A beginner should meet "Getting started" first everywhere, and an AI reading `llms.txt` gets the same big-picture-first order.
+
+### D-078 — In-app help: GitHub anchors, bundled images, search without a library (2026-11-15)
+**Decision:** Headings get GitHub's ids (`rehype-slug`, `github-slugger`), so `page.md#section` links and "What's this?" deep links (`slug="vpn/README#port-forwarding-in-plain-words"`) work the same on GitHub and in the app; the viewer scrolls to the section. Images are only shown from `docs/images/` (bundled by Vite; the CSP stays `img-src 'self'`). Search loads all guides once (~110 KB of text) and matches every query word within one section (title > heading > text, at most 3 hits per guide) instead of shipping a search index library. Desktop gets a sticky guide list, every page gets previous/next links.
+**Why:** Same links everywhere means one set of docs and no special syntax. A full-text library would add more code than the guides weigh, for ~35 pages a plain scan is instant.
+
+### D-079 — Doc checks: markdownlint + offline link check gate; external links don't (2026-11-15)
+**Decision:** `pnpm lint` runs `markdownlint-cli2` (published docs; research notes excluded; no line-length rule; raw HTML forbidden because the viewer doesn't render it) and `scripts/check-docs.mjs` (every relative link, `#anchor` and image, plus nav.json). External links are checked by a separate `Links` workflow (lychee) on docs changes and weekly; it doesn't block a release.
+**Why:** Broken internal links are our bugs and must never ship. External sites (VPN providers, indexers) change, rate-limit or block bots at random; letting them fail the main CI would block unrelated releases.
+
+### D-080 — Guide screenshots are generated from the fake-services run (2026-11-15)
+**Decision:** `pnpm docs:shots` (Playwright project `docs-shots`, only with `DOCS_SHOTS=1`) walks a torrents first run against the e2e fakes and a fake VPN and saves 1280×800 JPEGs (quality 78, ~60–90 KB each) into `docs/images/`. Only screenshots a guide uses are taken.
+**Why:** Docker isn't available on the dev Mac, and the fakes give stable, private data (no real accounts, keys or addresses). Re-running one command after a UI change keeps the guides honest; JPEG keeps the image (and the dashboard image that bundles them) small.
+
+### D-081 — Servarr usage statistics off unless the user chose (2026-11-15)
+**Decision:** `init` writes `<AnalyticsEnabled>False</AnalyticsEnabled>` into Sonarr/Radarr/Lidarr/Prowlarr's `config.xml` when the key is missing. A value the user set in the app (Settings → General → Analytics) is kept. Bazarr's analytics were already off (`init/bazarr-config.ts`).
+**Why:** Servarr apps send anonymous usage data by default (`ConfigFileProvider.AnalyticsEnabled`, default `true`, not persisted: [Sonarr](https://github.com/Sonarr/Sonarr/blob/cab419ade8ac7fcab5bf80394ee492abd35d5f5a/src/NzbDrone.Core/Configuration/ConfigFileProvider.cs#L227), [Prowlarr](https://github.com/Prowlarr/Prowlarr/blob/0dc20d8495bad9951c3fafe53f32b6e1c70fcf3b/src/NzbDrone.Core/Configuration/ConfigFileProvider.cs#L244)). The FAQ promises that nothing is collected about the user; a missing key means nobody chose, so existing installs get it too, and `init` stays idempotent.
