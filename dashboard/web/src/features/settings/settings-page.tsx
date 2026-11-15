@@ -188,7 +188,13 @@ function StepSection({ step, view }: { step: WizardStepId; view: WizardView }) {
     const end = await run.start('run');
     const ok = end?.ok === true;
     // A run happened either way; "problems" keeps the dashboard's warning until a repair works.
-    finish.mutate({ result: ok ? 'ok' : 'problems' });
+    // "Done" only once that's saved, or Home could still open the wizard's Finish step.
+    try {
+      await finish.mutateAsync({ result: ok ? 'ok' : 'problems' });
+    } catch {
+      setPhase('failed');
+      return;
+    }
     setPhase(ok ? 'done' : 'failed');
   };
 
