@@ -4,10 +4,10 @@
 > Newest session log entries go on top.
 
 ## Current phase
-**Phase 08 — 🟨 built, owner test pending (v0.0.17).** Backups (download, nightly, restore incl.
-Sonarr/Radarr/Lidarr/Prowlarr/Jellyfin native backups) proven against real services in CI.
-Owner tests of phases 06/07 and v0.0.16 are still open too.
-Next prompt: `prompts/09-support.md` (after the owner's phase 08 test).
+**Phase 09 — 🟨 built, owner test pending (v0.0.18).** "Get help with AI" (next to every error, on
+Finish, under Help), diagnostics zip, typed redaction everywhere (D-074 – D-076).
+Owner tests of phases 06/07/08 and v0.0.16 are still open too.
+Next prompt: `prompts/10-docs.md` (after the owner's phase 09 test).
 
 ## Phase status
 | Phase | Title | Status | Notes |
@@ -21,7 +21,7 @@ Next prompt: `prompts/09-support.md` (after the owner's phase 08 test).
 | 06 | Wizard steps 6–9 | 🟨 owner test in progress | v0.0.8 → v0.0.10 (LQ last resort, wiring on start, Cleanuparr cleans up); e2e torrents/usenet/both + stack wizard e2e through Finish |
 | 07 | Dashboard + settings | 🟨 built (owner test pending) | v0.0.12; /api/status, Simple/Advanced, warnings, Settings; e2e for mode toggle + settings change; stack test reads /api/status |
 | 08 | Backup & restore | 🟨 built (owner test pending) | v0.0.17; backuptest green (amd64 + arm64) |
-| 09 | Diagnostics + AI help | ⬜ todo | |
+| 09 | Diagnostics + AI help | 🟨 built (owner test pending) | v0.0.18; redaction unit tests, e2e (prompt + zip after a full first run), stack test (zip with real service logs) |
 | 10 | Documentation | ⬜ todo | |
 | 11 | Release v0.1.0 | ⬜ todo | |
 
@@ -70,6 +70,9 @@ Results of SPEC **[VERIFY]** items. Format: `- YYYY-MM-DD — <fact> — <source
 - 2026-11-09 — Servarr backup API (Sonarr 4.0.20 / Radarr 6.4.4 / Lidarr 3.1.6 / Prowlarr 2.7.0): `POST /command {"name":"Backup"}` (manual), `GET /system/backup` (path `/backup/manual/<name>`, served by BackupFileMapper), `POST /system/backup/restore/upload` (multipart .zip, moves config.xml + DB, `RestartRequired`), `POST /system/restart` = new process inside the container (`AppLifetime.OnAppStopped` → `SpawnNewProcess`), `/system/status.startTime` tells old and new process apart. — https://github.com/Sonarr/Sonarr/blob/cab419ade8ac7fcab5bf80394ee492abd35d5f5a/src/Sonarr.Api.V3/System/Backup/BackupController.cs (D-070)
 - 2026-11-09 — Jellyfin 12.4 has the 10.11 backup API: `POST /Backup/Create` (Database/Metadata/Trickplay/Subtitles flags), `POST /Backup/Restore {ArchiveFileName}` (restores on an in-process restart), files in `DataPath/backups`, DataPath = `<datadir>/data` → `/config/data/data/backups` in the linuxserver image; no download/upload endpoint. — https://github.com/jellyfin/jellyfin/blob/83d0d0e7f76e23e2e085c8ff67d28b772d35967d/Jellyfin.Api/Controllers/BackupController.cs (D-070)
 - 2026-11-09 — SABnzbd 5.1.3: `mode=config&name=create_backup` writes a zip into the complete folder; restore only through the web form (`interface.py` `config_backup_file`) → not used, state replay instead. — https://github.com/sabnzbd/sabnzbd/blob/a647f73426cb70ad60ae7964b96c2d5e939b4727/sabnzbd/config.py#L1013
+- 2026-11-15 — SABnzbd 5.1.3 keeps recent warnings/errors in memory: `GET /api?mode=warnings&output=json&apikey=…` (full key) → `{"warnings":[{type,text,time,origin}]}`; the log file itself has no parseable API. — https://github.com/sabnzbd/sabnzbd/blob/a647f73426cb70ad60ae7964b96c2d5e939b4727/SABnzbd.py#L137 , `sabnzbd/api.py` `_api_warnings`
+- 2026-11-15 — Jellyfin: `GET /System/Logs` (newest first, `Name`/`DateModified`) and `GET /System/Logs/Log?name=` (text), both `RequiresElevation` (admin token). — https://github.com/jellyfin/jellyfin/blob/2953ed632c9277351483eff04f87a8276390691c/Jellyfin.Api/Controllers/SystemController.cs#L146-L212
+- 2026-11-15 — Browsers only offer `navigator.clipboard` in secure contexts; Umbrel serves apps over plain HTTP on the LAN → the AI help dialog falls back to `execCommand('copy')` (D-075). — https://developer.mozilla.org/en-US/docs/Web/API/Clipboard_API
 - 2026-11-09 — The compose restart policy isn't involved in restores: Servarr restarts in a new process, Jellyfin in-process → `restart: on-failure` stays (SPEC §11 [VERIFY]). (D-071)
 
 ## Open [VERIFY] items
@@ -103,7 +106,10 @@ Copy from SPEC as they get resolved. Highest priority first:
 - "Needs your OK" is only proven against fakes; the real interactive-search/grab path needs an owner
   test (request something only available in another language).
 - Usenet servers/indexers removed from the wizard later are not removed from SABnzbd/Prowlarr.
-- "Get help with AI" on the Finish step is a disabled placeholder (phase 09).
+- umbrelOS doesn't tell apps its version, so diagnostics and the AI prompt say "not visible to apps".
+- The log viewer/diagnostics have no Bazarr, Seerr or Cleanuparr logs yet (APIs not researched).
+- `SECURITY.md` points to GitHub's private vulnerability reporting, which is still **off** for the
+  repo (owner: Settings → Code security → Private vulnerability reporting → Enable).
 - Bazarr, Recyclarr, Unpackerr and Cleanuparr configs plus sub-path settings (SABnzbd `url_base`, qBittorrent
   reverse proxy) are not seeded yet (phase 05, D-031).
 - Service tiles on the home screen show static status pills (no live status until phase 07).
@@ -128,6 +134,36 @@ Copy from SPEC as they get resolved. Highest priority first:
 - umbrelOS 2.0 `environment:` manifest settings could expose a few safe knobs (e.g. TZ) in Umbrel's app settings.
 
 ## Session log
+### 2026-11-15 — Phase 09: diagnostics, redaction, "Get help with AI" → v0.0.18 (Claude Code on the Mac)
+- Start: baseline had one red test (a backup test with a date that only worked before
+  2026-11-10); fixed first (faf70f9). Owner chose to start phase 09 before testing phase 08.
+- Built: shared redactor with `[REDACTED:type]` markers (stored values + patterns, LAN IPs
+  optional, fail closed; D-074); logger redacts with the stores' live values and keeps a 1000-line
+  buffer; log viewer + diagnostics read EasyArr's own log, SABnzbd warnings and Jellyfin's log;
+  `GET /api/diagnostics` (zip: diagnostics.json, ai-prompt.txt, logs/*) and
+  `GET /api/diagnostics/ai-prompt` (SPEC §13 template, context-picked logs and docs, llms.txt
+  link, 12k cap; D-075); dialog with live preview, LAN toggle, Copy (HTTP fallback),
+  copy-and-open ChatGPT/Claude/Gemini/Le Chat, Download diagnostics — next to every wizard error,
+  failed Finish, failed VPN test, dashboard problems, and a new /help page (Help link in the
+  header); `docs/getting-help.md`, `docs/troubleshooting.md`; issue templates (bug, feature,
+  VPN guide outdated), `SECURITY.md`, `CONTRIBUTING.md`; `llms.txt` + generator checked by lint
+  (D-076).
+- Verified: 335 unit tests (redaction samples from Sonarr/Prowlarr/qBittorrent/SABnzbd/Gluetun/
+  Jellyfin/Seerr logs; zip + prompt with every kind of planted secret; fail-closed path);
+  Playwright 41 passed locally (new: after a full first run, prompt and zip contain none of the
+  typed secrets, for torrents/usenet/both); fresh clone + frozen install green; CI + Image green on
+  6824395; stack test on the pinned image: see below.
+- Owner test (v0.0.18) — update EasyArr in the Umbrel app store:
+  - [ ] Break something on purpose (Settings → VPN → change one letter of the key → Connect) →
+        "Get help with AI" under the error → type what you wanted → Copy → paste into Claude →
+        helpful answer?
+  - [ ] Check the preview: no passwords, keys, your username or your home IP
+  - [ ] Help (top right) → Download diagnostics → open the zip, look through `logs/` and
+        `diagnostics.json` for anything private
+  - [ ] On your phone: the dialog fits and Copy works (it falls back on plain HTTP)
+  - [ ] GitHub → repo Settings → Code security → enable "Private vulnerability reporting"
+        (SECURITY.md points there)
+
 ### 2026-11-09 (afternoon) — Phase 08: backup & restore + owner's list → v0.0.17 (Claude Code on the Mac)
 - Built: `.easyarr` format (D-069), native backups for Sonarr/Radarr/Lidarr/Prowlarr + Jellyfin
   (D-070; Jellyfin's backups are in `/config/data/data/backups`, mounted into the dashboard),
