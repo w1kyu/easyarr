@@ -7,7 +7,7 @@
 **Phase 10 — 🟨 built, owner test pending (v0.0.19).** Every guide in SPEC §16 written (Getting
 started, FAQ, Tailscale, family accounts, how it works, architecture, release), README, screenshots,
 help search + navigation + section links, Markdown lint + link checks (D-077 – D-081).
-Owner tests of phases 06–09 and v0.0.16 are still open too.
+Owner tests of phases 06–09 and v0.0.16 are still open too. 2026-11-16: log viewer fix (D-082).
 Next prompt: `prompts/11-release.md` (after the owner's phase 09 + 10 tests).
 
 ## Phase status
@@ -77,6 +77,7 @@ Results of SPEC **[VERIFY]** items. Format: `- YYYY-MM-DD — <fact> — <source
 - 2026-11-15 — Jellyfin web 12.4 user admin: profile menu → **Dashboard** → **Users** → **Add User** (Name, Password, Library Access "Enable access to all libraries"); user page tabs Profile / Access / Parental Control ("Maximum allowed parental rating") / Password ("New password", "Save Password"); own password on the **Profile** page. — https://github.com/jellyfin/jellyfin-web/blob/0a580ce8df89282dfd120b6d5efb8e106da23bd5/src/apps/dashboard/routes/users/edit.tsx
 - 2026-11-15 — Seerr v3.5.1 defaults: `defaultPermissions: REQUEST` (others' requests wait for approval; admins auto-approve), `newPlexLogin: true` (new Jellyfin users can sign in without an import); UI "Import Jellyfin Users", "Edit", Permissions "Request"/"Auto-Approve", "Save Changes". — https://github.com/seerr-team/seerr/blob/564bfb08b54caa374bddaf820abfd226e5e69151/server/lib/settings/index.ts#L415-L425
 - 2026-11-15 — umbrelOS uninstall removes only `app-data/<id>` (and a moved data root); EasyArr's media/backups in Home stay. — https://github.com/getumbrel/umbrel/blob/c43beed964074d08865d648ca9ac3359826a14ff/packages/umbreld/source/modules/apps/app.ts#L2642
+- 2026-11-16 — Only Prowlarr has `GET /api/v1/indexerstatus`; Sonarr 4.0.20 / Radarr 6.4.4 / Lidarr 3.1.6 answer 404 and report back-offs only in `GET /health` (source `IndexerStatusCheck` / `IndexerLongTermStatusCheck`, message "Indexers unavailable due to failures: A, B" or "All indexers are unavailable due to failures"). — https://github.com/Sonarr/Sonarr/blob/v4.0.20.3012/src/NzbDrone.Core/HealthCheck/Checks/IndexerStatusCheck.cs , https://github.com/Prowlarr/Prowlarr/tree/v2.7.0.5723/src/Prowlarr.Api.V1/Indexers
 - 2026-11-15 — Umbrel's Tailscale app runs with `network_mode: host` (tailscale0 on the host), so published ports (39096, 39055, Umbrel UI) answer on the Tailscale IP. — https://github.com/getumbrel/umbrel-apps/blob/f4c4f96a2498035f5778d29cba0a2a83be8c531b/tailscale/docker-compose.yml
 - 2026-11-15 — Servarr `AnalyticsEnabled` defaults to true and isn't written to config.xml until changed (D-081). — https://github.com/Sonarr/Sonarr/blob/cab419ade8ac7fcab5bf80394ee492abd35d5f5a/src/NzbDrone.Core/Configuration/ConfigFileProvider.cs#L227
 - 2026-11-09 — The compose restart policy isn't involved in restores: Servarr restarts in a new process, Jellyfin in-process → `restart: on-failure` stays (SPEC §11 [VERIFY]). (D-071)
@@ -149,6 +150,21 @@ Copy from SPEC as they get resolved. Highest priority first:
   via slskd/SABnzbd itself, so it would replace Lidarr, not sit on top: re-check once v3 settles.
 
 ## Session log
+### 2026-11-16 — Fix: log viewer (VPN log empty, Servarr search-site check 404) (Claude Code on the Mac)
+- Owner report: "the logs don't work". Checked the live install (v0.0.19) through SSH: every log
+  source answered, but **VPN** (the viewer's default) was always empty and **EasyArr**'s own log
+  was mostly `search site check failed … /apps/sonarr/api/v3/indexerstatus → HTTP 404`.
+- Causes: (1) the viewer read the last 64 KB of `gluetun.log`, which held only the dashboard's
+  status-check lines (1 other line), and those are filtered out; (2) Sonarr/Radarr/Lidarr have no
+  `/indexerstatus` route (only Prowlarr), so the paused-search-site check (D-062) failed every
+  5 min after Prowlarr's part. The fake world had invented that route.
+- Fixed (D-082): viewer reads the whole current Gluetun log; healer uses `/health` in the apps;
+  fake world mirrors the real apps; log box scrolls to the newest line. 3 new unit tests.
+- Owner test (next version) — update EasyArr, then Advanced → Logs:
+  - [ ] VPN shows Gluetun's start lines (connecting, public IP), not "The log is empty"
+  - [ ] EasyArr no longer shows "search site check failed … HTTP 404" every 5 minutes
+  - [ ] The box opens at the newest line (bottom)
+
 ### 2026-11-15 (evening) — Phase 10: documentation → v0.0.19 (Claude Code on the Mac)
 - Owner's Umbrel: updated to v0.0.18 through the MCP (Mac needed macOS Local Network permission for
   T3 Code; ProtonVPN was not the cause).
