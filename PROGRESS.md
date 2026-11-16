@@ -160,6 +160,10 @@ Copy from SPEC as they get resolved. Highest priority first:
   5 min after Prowlarr's part. The fake world had invented that route.
 - Fixed (D-082): viewer reads the whole current Gluetun log; healer uses `/health` in the apps;
   fake world mirrors the real apps; log box scrolls to the newest line. 3 new unit tests.
+- Verified: lint, typecheck, 345 unit tests, Playwright 42 passed locally; fresh clone + frozen
+  install green on 86980e5. CI/Image runs for 86980e5 were still running at session end.
+- **Next (owner: "do that tomorrow"):** release v0.0.20 — check CI + Image green on 86980e5, pin
+  `easyarr:sha-86980e5@<digest>` (init + dashboard), stack test, `scripts/sync-store.sh`.
 - Owner test (next version) — update EasyArr, then Advanced → Logs:
   - [ ] VPN shows Gluetun's start lines (connecting, public IP), not "The log is empty"
   - [ ] EasyArr no longer shows "search site check failed … HTTP 404" every 5 minutes
