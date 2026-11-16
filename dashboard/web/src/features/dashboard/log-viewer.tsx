@@ -1,5 +1,5 @@
 import { LOG_SOURCES, type LogLine, type LogSource } from '@easyarr/shared';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GlassPanel } from '~/components/glass-panel';
 import { SelectField } from '~/components/select-field';
@@ -20,6 +20,11 @@ export function LogViewer() {
   const { t } = useTranslation();
   const [source, setSource] = useState<LogSource>('vpn');
   const log = useLog(source);
+  const box = useRef<HTMLDivElement>(null);
+  // Lines are oldest first: start at the bottom, where the newest ones are.
+  useEffect(() => {
+    if (box.current) box.current.scrollTop = box.current.scrollHeight;
+  }, [log.data]);
   return (
     <section aria-labelledby="logs-title" data-testid="logs">
       <SectionTitle id="logs-title">{t('dash.logs.title')}</SectionTitle>
@@ -40,6 +45,7 @@ export function LogViewer() {
           <p className="text-12 text-white/45 sm:pb-2.5">{t('dash.logs.redacted')}</p>
         </div>
         <div
+          ref={box}
           className="max-h-96 overflow-auto rounded-12 bg-black/35 p-3 font-mono text-12 leading-relaxed"
           tabIndex={0}
           aria-label={t('dash.logs.title')}

@@ -20,6 +20,13 @@ export const wrapperStatusSchema = z.object({
 });
 export type WrapperStatus = z.infer<typeof wrapperStatusSchema>;
 
+/**
+ * The wrapper truncates gluetun.log above 5 MB (LOG_MAX_BYTES in wrapper.sh). The log viewer reads
+ * all of it: once connected, Gluetun logs one line per status check of the dashboard (several every
+ * 30 s), so any small tail holds nothing else (seen on a real install: 1 other line in 64 KB).
+ */
+export const VPN_LOG_MAX_BYTES = 6 * 1024 * 1024;
+
 export class VpnFiles {
   constructor(private readonly vpnDir: string) {}
 

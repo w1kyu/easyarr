@@ -20,7 +20,7 @@ import {
 } from './status/service.js';
 import { Mutex } from './state/mutex.js';
 import { collectSystemInfo, diskSpace } from './system/check.js';
-import { VpnFiles } from './vpn/files.js';
+import { VPN_LOG_MAX_BYTES, VpnFiles } from './vpn/files.js';
 import { GluetunClient } from './vpn/gluetun.js';
 import { proxyRoutes } from './proxy/routes.js';
 import { PortSync, QbittorrentClient } from './vpn/port-sync.js';
@@ -296,7 +296,7 @@ export async function buildApp({
     secrets: async () => (await secretsStore(config.stateDir).load()).value,
     vpn: () => svc.vpn.status(),
     disk: () => diskSpace(config.dataDir),
-    vpnLog: () => vpnFiles.readLogTail(),
+    vpnLog: () => vpnFiles.readLogTail(VPN_LOG_MAX_BYTES),
     ...(logBuffer ? { ownLog: () => logBuffer.lines() } : {}),
     indexerHealth: () => svc.indexers?.last() ?? null,
     stuck: () => svc.stuck?.list() ?? [],

@@ -1,9 +1,13 @@
 import type { VpnStatusView } from '@easyarr/shared';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { redacted } from '@easyarr/shared';
 import { defaultSecrets, defaultState, type State } from '../state/index.js';
 import { World } from '../wiring/testing/fake-world.js';
 import { parseGluetunLog } from './collect.js';
+import { VPN_LOG_MAX_BYTES, VpnFiles } from '../vpn/files.js';
 import { StatusService, usedServices, type StatusServiceOptions } from './service.js';
 
 const connected: VpnStatusView = {
@@ -260,6 +264,34 @@ describe('StatusService', () => {
     tick(5_000);
     await svc.view();
     expect(probes()).toBe(first * 2);
+  });
+
+  it("log viewer: VPN log still shows Gluetun's lines after hours of status checks", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'easyarr-vpnlog-'));
+    try {
+      const files = new VpnFiles(dir);
+      await mkdir(files.dir, { recursive: true });
+      const check = (i: number) =>
+        `2026-11-16T01:47:41Z INFO [http server] 200 GET /v1/vpn/status wrote 21B to 10.21.0.8:${String(i)} in 15µs`;
+      // ~6 h of the dashboard's checks (real install: 1 other line in the last 64 KB).
+      const noise = Array.from({ length: 3000 }, (_, i) => check(i));
+      await writeFile(
+        path.join(files.dir, 'gluetun.log'),
+        [
+          '2026-11-15T19:44:10Z INFO [wireguard] Connecting to 1.2.3.4:51820',
+          '2026-11-15T19:44:12Z INFO [ip getter] Public IP address is 1.2.3.4',
+          ...noise,
+        ].join('\n') + '\n',
+      );
+      const { svc } = setup({ vpnLog: () => files.readLogTail(VPN_LOG_MAX_BYTES) });
+      const vpn = await svc.log('vpn');
+      expect(vpn.lines.map((l) => l.message)).toEqual([
+        expect.stringContaining('[wireguard] Connecting to'),
+        expect.stringContaining('[ip getter] Public IP address is'),
+      ]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 
   it("log viewer: masks secrets and hides the dashboard's own VPN status checks", async () => {
