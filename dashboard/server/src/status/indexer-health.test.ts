@@ -69,6 +69,34 @@ describe('IndexerHealer', () => {
     expect(healer.last()).toMatchObject({ blocked: 0 });
   });
 
+  it('finds paused Sonarr indexers by name in /health (Sonarr has no /indexerstatus)', async () => {
+    const { w, healer, ids } = setup();
+    const other = w.arr.sonarr.coll('indexer').add({
+      name: '1337x (Prowlarr)',
+      enableRss: true,
+    }) as { id: number };
+    w.arr.sonarr.paused.set(ids.sonarr, later());
+
+    expect(await healer.runOnce()).toBe('checked');
+    expect(w.arr.sonarr.tests).toEqual([ids.sonarr]);
+    expect(w.arr.sonarr.tests).not.toContain(other.id);
+    expect(w.arr.sonarr.paused.size).toBe(0);
+  });
+
+  it('tests every enabled indexer when /health says all of them are paused', async () => {
+    const { w, healer, ids } = setup();
+    const other = w.arr.sonarr.coll('indexer').add({
+      name: '1337x (Prowlarr)',
+      enableRss: true,
+    }) as { id: number };
+    w.arr.sonarr.paused.set(ids.sonarr, later());
+    w.arr.sonarr.paused.set(other.id, later());
+
+    expect(await healer.runOnce()).toBe('checked');
+    expect(w.arr.sonarr.tests.sort()).toEqual([ids.sonarr, other.id].sort());
+    expect(w.arr.sonarr.paused.size).toBe(0);
+  });
+
   it('does nothing while the VPN is down (a test would only lengthen the pause)', async () => {
     const { w, healer, ids } = setup({ canReach: async () => false });
     w.arr.prowlarr.paused.set(ids.nyaa, later());

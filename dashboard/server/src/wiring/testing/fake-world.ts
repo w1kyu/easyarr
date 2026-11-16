@@ -51,7 +51,10 @@ export class FakeServarr {
   log: Json[] = [];
   /** Implementation whose download-client POST fails validation (like a missing category). */
   reject: string | null = null;
-  /** Indexer back-offs: indexer id → disabledTill (ISO), as GET /indexerstatus lists them. */
+  /**
+   * Indexer back-offs: indexer id → disabledTill (ISO). Prowlarr lists them at GET /indexerstatus;
+   * Sonarr/Radarr/Lidarr have no such route (404) and only name them in GET /health.
+   */
   paused = new Map<number, string>();
   /** Indexers whose site doesn't answer: a test fails and keeps them paused. */
   unreachable = new Set<number>();
@@ -251,7 +254,34 @@ export class FakeServarr {
       });
       return [200, [t('NZBgeek'), t('Generic Newznab')]];
     }
-    if (res === 'indexerstatus') {
+    if (res === 'health' && this.app !== 'prowlarr') {
+      // Servarr IndexerStatusCheck: Source = check type name, names joined with ", ".
+      const now = Date.now();
+      const indexers = this.c['indexer']?.items ?? [];
+      const names = [...this.paused]
+        .filter(([, till]) => Date.parse(till) > now)
+        .map(([id]) => indexers.find((i) => i['id'] === id)?.['name'])
+        .filter((n): n is string => typeof n === 'string');
+      if (names.length === 0) return [200, []];
+      // Every enabled indexer paused → "All indexers…", without names.
+      const all =
+        names.length ===
+        indexers.filter((i) => i['enableRss'] || i['enableAutomaticSearch']).length;
+      return [
+        200,
+        [
+          {
+            source: 'IndexerStatusCheck',
+            type: all ? 'error' : 'warning',
+            message: all
+              ? 'All indexers are unavailable due to failures'
+              : `Indexers unavailable due to failures: ${names.join(', ')}`,
+            wikiUrl: 'https://wiki.servarr.com/x#indexers-are-unavailable-due-to-failures',
+          },
+        ],
+      ];
+    }
+    if (res === 'indexerstatus' && this.app === 'prowlarr') {
       return [
         200,
         [...this.paused].map(([indexerId, disabledTill], i) => ({

@@ -86,17 +86,12 @@ export class IndexerHealer {
   private async heal(app: App, keys: Record<string, string>) {
     const base = `${this.deps.url(app)}${APPS[app]}`;
     const key = keys[app] ?? '';
-    const [indexers, statuses] = await Promise.all([
-      this.call<Indexer[]>('GET', `${base}/indexer`, key),
-      this.call<IndexerStatus[]>('GET', `${base}/indexerstatus`, key),
-    ]);
-    const now = this.now();
-    const paused = new Set(
-      statuses
-        .filter((s) => s.disabledTill && Date.parse(s.disabledTill) > now)
-        .map((s) => s.indexerId),
-    );
+    const indexers = await this.call<Indexer[]>('GET', `${base}/indexer`, key);
     const enabled = indexers.filter((i) => isEnabled(app, i));
+    const paused =
+      app === 'prowlarr'
+        ? await this.pausedInProwlarr(base, key)
+        : await this.pausedInApp(base, key, enabled);
     let blocked = 0;
     const healed: string[] = [];
     for (const indexer of enabled.filter((i) => paused.has(i.id))) {
@@ -111,6 +106,33 @@ export class IndexerHealer {
       this.deps.log?.info({ app, indexers: healed }, 'paused search sites work again, resumed');
     }
     return { total: enabled.length, blocked };
+  }
+
+  /** Prowlarr lists each indexer's back-off (`IndexerStatusController`). */
+  private async pausedInProwlarr(base: string, key: string): Promise<Set<number>> {
+    const statuses = await this.call<IndexerStatus[]>('GET', `${base}/indexerstatus`, key);
+    const now = this.now();
+    return new Set(
+      statuses
+        .filter((s) => s.disabledTill && Date.parse(s.disabledTill) > now)
+        .map((s) => s.indexerId),
+    );
+  }
+
+  /**
+   * Sonarr/Radarr/Lidarr have no /indexerstatus route (it answers 404). Their back-offs only show
+   * in GET /health: sources `IndexerStatusCheck` / `IndexerLongTermStatusCheck`, the message lists
+   * the paused indexers' names ("…: A, B") or none when all are paused. Names in the message mark
+   * those indexers; no name match means all of them (also covers translated messages).
+   */
+  private async pausedInApp(base: string, key: string, enabled: Indexer[]): Promise<Set<number>> {
+    const health = await this.call<HealthItem[]>('GET', `${base}/health`, key);
+    const messages = (health ?? [])
+      .filter((h) => h.source === 'IndexerStatusCheck' || h.source === 'IndexerLongTermStatusCheck')
+      .map((h) => h.message ?? '');
+    if (messages.length === 0) return new Set();
+    const named = enabled.filter((i) => i.name && messages.some((m) => m.includes(String(i.name))));
+    return new Set((named.length > 0 ? named : enabled).map((i) => i.id));
   }
 
   private async call<T>(method: string, url: string, key: string, body?: unknown): Promise<T> {
@@ -157,6 +179,11 @@ interface Indexer {
   enableRss?: boolean;
   enableAutomaticSearch?: boolean;
   enableInteractiveSearch?: boolean;
+}
+
+interface HealthItem {
+  source?: string;
+  message?: string | null;
 }
 
 interface IndexerStatus {
